@@ -1,0 +1,13 @@
+*.pyc
+*.swo
+*.swp
+~*
+*~
+.ropeproj
+.project
+*.egg*
+.DS_Store
+*.sublime-project
+.vscode
+.pytest_cache
+.env
