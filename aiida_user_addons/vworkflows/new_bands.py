@@ -27,8 +27,10 @@ class VaspBandsWorkChain(WorkChain):
     3. Do a non-scf calculation for bands and dos.
 
     Inputs must be passed for the SCF calculation, others are optional. The dos calculation
-    will only run if the kpoints for DOS are passed. The `parameters` for dos and bands namespace
-    does not have to be complete - they will be merged with the based parameter in the scf calculation.
+    will only run if the kpoints for DOS are passed. 
+
+    Input for bands and dos calculations are optional. However, if they are needed, the full list of inputs must
+    be passed. For the `parameters` node, one may choose to only specify those fields that need to be updated. 
     """
     _base_wk_string = 'vasp.vasp'
     _relax_wk_string = 'vaspu.relax'
@@ -40,14 +42,20 @@ class VaspBandsWorkChain(WorkChain):
         relax_work = WorkflowFactory(cls._relax_wk_string)
         base_work = WorkflowFactory(cls._base_wk_string)
 
-        spec.input('structure', help='The input structure')
+        spec.input('structure', help='The input structure', valid_type=orm.StructureData)
         spec.input('bands_kpoints',
                    help='Explicit kpoints for the bands',
+                   valid_type=orm.KpointsData,
                    required=False)
         spec.input('bands_kpoints_distance',
                    help='Spacing for band distances',
                    valid_type=orm.Float,
                    required=False)
+        spec.input('dos_kpoints',
+                   help='Kpoints for running DOS calculations',
+                   required=False,
+                   valid_type=orm.KpointsData,
+                   )
         spec.expose_inputs(relax_work,
                            namespace='relax',
                            exclude=('structure', ),
@@ -63,7 +71,7 @@ class VaspBandsWorkChain(WorkChain):
                            namespace_options={
                                'required': True,
                                'populate_defaults': True,
-                               'help': 'Inputs for SCF workchain, if needed'
+                               'help': 'Inputs for SCF workchain, mandatory'
                            })
         spec.expose_inputs(base_work,
                            namespace='bands',
@@ -71,7 +79,7 @@ class VaspBandsWorkChain(WorkChain):
                            namespace_options={
                                'required': False,
                                'populate_defaults': False,
-                               'help': 'Inputs for bands calculation, required'
+                               'help': 'Inputs for bands calculation, if needed'
                            })
         spec.expose_inputs(base_work,
                            namespace='dos',
@@ -79,7 +87,7 @@ class VaspBandsWorkChain(WorkChain):
                            namespace_options={
                                'required': False,
                                'populate_defaults': False,
-                               'help': 'Inputs for DOS calculation, optional'
+                               'help': 'Inputs for DOS calculation, if needed'
                            })
         spec.input('clean_children_workdir',
                    valid_type=orm.Str,
@@ -104,16 +112,20 @@ class VaspBandsWorkChain(WorkChain):
             cls.inspec_bands_dos,
         )
 
-        spec.expose_outputs(base_work)
         spec.output(
             'primitive_structure',
             help='Primitive structure used for band structure calculations')
-        spec.output('band_structure', help='Computed band structure')
+        spec.output('band_structure', help='Computed band structure with labels')
         spec.output('seekpath_parameters',
                     help='Parameters used by seekpath',
                     required=False)
         spec.output('dos', required=False)
         spec.output('projectors', required=False)
+
+        spec.exit_code(501, 'ERROR_SUB_PROC_RELAX_FAILED', message='Relaxation workchain failed')
+        spec.exit_code(502, 'ERROR_SUB_PROC_SCF_FAILED', message='SCF workchain failed')
+        spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
+        spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
 
     def setup(self):
         """Setup the calculation"""
@@ -140,7 +152,7 @@ class VaspBandsWorkChain(WorkChain):
         relax_workchain = self.ctx.workchain_relax
         if not relax_workchain.is_finished_ok:
             self.report('Relaxation finished with Error')
-            return self.exit_codes.ERROR_SUB_PROC_RELAXATION_FAILED
+            return self.exit_codes.ERROR_SUB_PROC_RELAX_FAILED
 
         # Use the relaxed structure as the current structure
         self.ctx.current_structure = relax_workchain.outputs.relax__structure
@@ -216,6 +228,7 @@ class VaspBandsWorkChain(WorkChain):
         else:
             self.ctx.chgcar = None
         self.ctx.restart_folder = scf_workchain.outputs.remote_folder
+        self.report("SCF calculation {} completed".format(scf_workchain))
 
     def run_bands_dos(self):
         """Run the bands and the DOS calculations"""
@@ -278,11 +291,27 @@ class VaspBandsWorkChain(WorkChain):
 
             bands_calc = self.submit(base_work, **inputs)
             running['bands_workchain'] = bands_calc
+            self.report('Submitted workchain {} for band structure'.format(bands_calc))
 
-        if 'dos' in self.inputs:
+        # Do DOS calculation if dos input namespace is populated or a
+        # dos_kpoints input is passed.
+        if ('dos_kpoints' in self.inputs) or ('dos' in self.inputs) :
 
-            dos_input = AttributeDict(
-                self.exposed_inputs(base_work, namespace='dos'))
+            if 'dos' in self.inputs:
+                dos_input = AttributeDict(
+                    self.exposed_inputs(base_work, namespace='bands'))
+            else:
+                dos_input = AttributeDict({
+                    'settings':
+                    orm.Dict(dict={'add_dos': True}),
+                    'parameters':
+                    orm.Dict(dict={'charge': {
+                        'constant_charge': True
+                    }}),
+                })
+
+            dos_input.kpoints = self.inputs.dos_kpoints
+
             # Special treatment - combine the paramaters
             parameters = inputs.parameters.get_dict()
             dos_parameters = dos_input.parameters.get_dict()
@@ -313,18 +342,36 @@ class VaspBandsWorkChain(WorkChain):
 
             dos_calc = self.submit(base_work, **inputs)
             running['dos_workchain'] = dos_calc
+            self.report('Submitted workchain {} for DOS'.format(dos_calc))
 
         return self.to_context(**running)
 
     def inspec_bands_dos(self):
         """Inspect the bands and dos calculations"""
+
+        exit_code = None
+
+        if 'bands_workchain' in self.ctx:
+            bands = self.ctx.bands_workchain
+            if not bands.is_finished_ok:
+                self.report(
+                    'Bands calculation finished with error, exit_status: {}'.
+                    format(bands, bands.exit_status))
+                exit_code = self.exit_codes.ERROR_SUB_PROC_BANDS_FAILED
+            self.out(
+                'band_structure',
+                compose_labelled_bands(bands.outputs.bands,
+                                       bands.inputs.kpoints))
+        else:
+            bands = None
+
         if 'dos_workchain' in self.ctx:
             dos = self.ctx.dos_workchain
             if not dos.is_finished_ok:
                 self.report(
                     'DOS calculation finished with error, exit_status: {}'.
                     format(dos.exit_status))
-                return self.exit_codes.ERROR_SUB_PROC_DOS_FAILURE
+                exit_code = self.exit_codes.ERROR_SUB_PROC_DOS_FAILED
 
             # Attach outputs
             self.out('dos', dos.outputs.dos)
@@ -333,19 +380,7 @@ class VaspBandsWorkChain(WorkChain):
         else:
             dos = None
 
-        if 'bands_workchain' in self.ctx:
-            bands = self.ctx.bands_workchain
-            if not bands.is_finished_ok:
-                self.report(
-                    'Bands calculation finished with error, exit_status: {}'.
-                    format(bands, bands.exit_status))
-                return self.exit_codes.ERROR_SUB_PROC_BANDS_FAILURE
-            self.out(
-                'band_structure',
-                compose_labelled_bands(bands.outputs.bands,
-                                       bands.inputs.kpoints))
-        else:
-            bands = None
+        return exit_code
 
     def on_terminated(self):
         """

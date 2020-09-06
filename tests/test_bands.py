@@ -30,15 +30,7 @@ builder.scf.options = Dict(dict={
 
 builder.scf.code = Code.get_from_string('vasp@localhost')
 
-builder.dos.kpoints = KpointsData()
-builder.dos.kpoints.set_kpoints_mesh((8, 8, 8))
-builder.dos.parameters = Dict(dict={
-    'bands': {'lm': True}
-})
-builder.dos.code = builder.scf.code
-builder.dos.options = builder.scf.options
-
-builder.dos.potential_family = Str('PBE.54')
-builder.dos.potential_mapping = Dict(dict={'Si': 'Si'})
+builder.dos_kpoints = KpointsData()
+builder.dos_kpoints.set_kpoints_mesh((8, 8, 8))
 
 submit(builder)
