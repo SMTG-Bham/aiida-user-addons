@@ -1,19 +1,12 @@
 """
 Bands workchain with a more flexible input
 """
-import enum
-from collections import defaultdict
 from copy import deepcopy
-import numpy as np
 
-from aiida.engine import calcfunction
-from aiida.orm import Data
 import aiida.orm as orm
 from aiida.common.extendeddicts import AttributeDict
-from aiida.engine import WorkChain, append_, calcfunction, if_
+from aiida.engine import WorkChain, calcfunction, if_
 from aiida.plugins import WorkflowFactory
-from .utils.aiida_utils import get_data_class, get_data_node
-from .utils.workchains import prepare_process_inputs, compose_exit_code
 
 
 class VaspBandsWorkChain(WorkChain):
@@ -42,7 +35,9 @@ class VaspBandsWorkChain(WorkChain):
         relax_work = WorkflowFactory(cls._relax_wk_string)
         base_work = WorkflowFactory(cls._base_wk_string)
 
-        spec.input('structure', help='The input structure', valid_type=orm.StructureData)
+        spec.input('structure',
+                   help='The input structure',
+                   valid_type=orm.StructureData)
         spec.input('bands_kpoints',
                    help='Explicit kpoints for the bands',
                    valid_type=orm.KpointsData,
@@ -51,11 +46,12 @@ class VaspBandsWorkChain(WorkChain):
                    help='Spacing for band distances',
                    valid_type=orm.Float,
                    required=False)
-        spec.input('dos_kpoints',
-                   help='Kpoints for running DOS calculations',
-                   required=False,
-                   valid_type=orm.KpointsData,
-                   )
+        spec.input(
+            'dos_kpoints',
+            help='Kpoints for running DOS calculations',
+            required=False,
+            valid_type=orm.KpointsData,
+        )
         spec.expose_inputs(relax_work,
                            namespace='relax',
                            exclude=('structure', ),
@@ -79,7 +75,8 @@ class VaspBandsWorkChain(WorkChain):
                            namespace_options={
                                'required': False,
                                'populate_defaults': False,
-                               'help': 'Inputs for bands calculation, if needed'
+                               'help':
+                               'Inputs for bands calculation, if needed'
                            })
         spec.expose_inputs(base_work,
                            namespace='dos',
@@ -115,17 +112,26 @@ class VaspBandsWorkChain(WorkChain):
         spec.output(
             'primitive_structure',
             help='Primitive structure used for band structure calculations')
-        spec.output('band_structure', help='Computed band structure with labels')
+        spec.output('band_structure',
+                    help='Computed band structure with labels')
         spec.output('seekpath_parameters',
                     help='Parameters used by seekpath',
                     required=False)
         spec.output('dos', required=False)
         spec.output('projectors', required=False)
 
-        spec.exit_code(501, 'ERROR_SUB_PROC_RELAX_FAILED', message='Relaxation workchain failed')
-        spec.exit_code(502, 'ERROR_SUB_PROC_SCF_FAILED', message='SCF workchain failed')
-        spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
-        spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
+        spec.exit_code(501,
+                       'ERROR_SUB_PROC_RELAX_FAILED',
+                       message='Relaxation workchain failed')
+        spec.exit_code(502,
+                       'ERROR_SUB_PROC_SCF_FAILED',
+                       message='SCF workchain failed')
+        spec.exit_code(503,
+                       'ERROR_SUB_PROC_BANDS_FAILED',
+                       message='Band structure workchain failed')
+        spec.exit_code(504,
+                       'ERROR_SUB_PROC_DOS_FAILED',
+                       message='DOS workchain failed')
 
     def setup(self):
         """Setup the calculation"""
@@ -276,11 +282,7 @@ class VaspBandsWorkChain(WorkChain):
 
             # Check if add_bands
             settings = inputs.get('settings')
-            essential = {
-                'parser_settings': {
-                    'add_bands': True
-                }
-            }
+            essential = {'parser_settings': {'add_bands': True}}
             if settings is None:
                 inputs.settings = orm.Dict(dict=essential)
             else:
@@ -291,11 +293,12 @@ class VaspBandsWorkChain(WorkChain):
 
             bands_calc = self.submit(base_work, **inputs)
             running['bands_workchain'] = bands_calc
-            self.report('Submitted workchain {} for band structure'.format(bands_calc))
+            self.report(
+                'Submitted workchain {} for band structure'.format(bands_calc))
 
         # Do DOS calculation if dos input namespace is populated or a
         # dos_kpoints input is passed.
-        if ('dos_kpoints' in self.inputs) or ('dos' in self.inputs) :
+        if ('dos_kpoints' in self.inputs) or ('dos' in self.inputs):
 
             if 'dos' in self.inputs:
                 dos_input = AttributeDict(
@@ -317,7 +320,6 @@ class VaspBandsWorkChain(WorkChain):
             dos_parameters = dos_input.parameters.get_dict()
             nested_update(parameters, dos_parameters)
 
-
             # Ensure we start from constant charge
             if 'charge' in dos_parameters:
                 dos_parameters['charge']['constant_charge'] = True
@@ -330,11 +332,7 @@ class VaspBandsWorkChain(WorkChain):
 
             # Check if add_dos
             settings = inputs.get('settings')
-            essential = {
-                'parser_settings': {
-                    'add_dos': True
-                }
-            }
+            essential = {'parser_settings': {'add_dos': True}}
             if settings is None:
                 inputs.settings = orm.Dict(dict=essential)
             else:
@@ -400,8 +398,9 @@ class VaspBandsWorkChain(WorkChain):
                         pass
 
             if cleaned_calcs:
-                self.report('cleaned remote folders of calculations: {}'.format(
-                    ' '.join(map(str, cleaned_calcs))))
+                self.report(
+                    'cleaned remote folders of calculations: {}'.format(
+                        ' '.join(map(str, cleaned_calcs))))
 
 
 def nested_update(dict_in, update_dict):
@@ -413,6 +412,7 @@ def nested_update(dict_in, update_dict):
             dict_in[key] = value
     return dict_in
 
+
 def nested_update_dict_node(dict_node, update_dict):
     """Utility to update a Dict node in a nested way"""
     pydict = dict_node.get_dict()
@@ -421,6 +421,7 @@ def nested_update_dict_node(dict_node, update_dict):
         return dict_node
     else:
         return orm.Dict(dict=pydict)
+
 
 @calcfunction
 def seekpath_structure_analysis(structure, **kwargs):
