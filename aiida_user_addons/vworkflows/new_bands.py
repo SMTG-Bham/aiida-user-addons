@@ -109,7 +109,7 @@ class VaspBandsWorkChain(WorkChain):
                 cls.verify_scf,
             ),
             cls.run_bands_dos,
-            cls.inspec_bands_dos,
+            cls.inspect_bands_dos,
         )
 
         spec.output(
@@ -346,7 +346,7 @@ class VaspBandsWorkChain(WorkChain):
 
         return self.to_context(**running)
 
-    def inspec_bands_dos(self):
+    def inspect_bands_dos(self):
         """Inspect the bands and dos calculations"""
 
         exit_code = None
