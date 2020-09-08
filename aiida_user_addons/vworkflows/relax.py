@@ -46,7 +46,7 @@ class RelaxWorkChain(WorkChain):
         spec.input('relax.perform',
                    valid_type=get_data_class('bool'),
                    required=False,
-                   default=lambda: get_data_node('bool', False),
+                   default=lambda: get_data_node('bool', True),
                    help="""
             If True, perform relaxation.
             """)

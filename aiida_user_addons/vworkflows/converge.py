@@ -6,7 +6,7 @@ Intended to be used to control convergence checks for plane-wave calculations.
 
 
 #TODO
-* Change convergence criterial to be per-atom
+* Change convergence criteria to be per-atom
 * Test displacement convergence
 * More verbose
 """
