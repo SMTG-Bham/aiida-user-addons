@@ -443,7 +443,7 @@ def seekpath_structure_analysis(structure, **kwargs):
     # All keyword arugments should be `Data` node instances of base type and so should have the `.value` attribute
     unwrapped_kwargs = {
         key: node.value
-        for key, node in kwargs.items() if isinstance(node, Data)
+        for key, node in kwargs.items() if isinstance(node, orm.Data)
     }
 
     return get_explicit_kpoints_path(structure, **unwrapped_kwargs)
