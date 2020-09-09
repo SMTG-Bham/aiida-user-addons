@@ -931,6 +931,7 @@ class RapidConvergeWorkChain(WorkChain):
             _, gap = find_bandgap(bands)
             if gap is None:
                 gap = 0.0
+            gap = float(gap)   # Ensure GAP is a float
             # Aiida cannot do VBM, yet, so set to zero for now
             max_valence_band = 0.0
 
