@@ -13,6 +13,10 @@
         "aiida-core>=1.1.0"
     ],
     "entry_points": {
+        "console_scripts":
+        [
+            "vasp-dryrun=aiida_user_addons.cmdline.cmd_vasp_dryrun:cmd_vasp_dryrun"
+        ],
         "aiida.schedulers": [
             "pbsarcher = aiida_user_addons.schedulers.pbsarcher:PbsArcherScheduler",
             "sgenodetail = aiida_user_addons.schedulers.sgenodetail:SgeNoDetailScheduler"

@@ -2,6 +2,28 @@
 
 Some addons to AiiDA
 
+ ## Command line tools
+
+`vasp-dryrun` is a tool to *dryrun* VASP calculations. It can obtain key information such as the number of kpoints and bands for working out the best parallelisation strategy.
+```
+Usage: vasp-dryrun [OPTIONS]
+
+  A simple tool to dryrun a VASP calculation. The calculation will be run
+  for up to <timeout> seconds. The underlying VASP process will be
+  terminated once it enters the main loop, which is signalled by the
+  appearance of a `INWAV` keyword in the OUTCAR.
+
+Options:
+  --input-dir DIRECTORY  Where the VASP input is, default to the current
+                         working directory.  [default: .]
+
+  --vasp-exe TEXT        Executable for VASP  [default: vasp_std]
+  --timeout INTEGER      Timeout in seconds to terminate VASP  [default: 10]
+  --work-dir TEXT        Working directory for running
+  --keep                 Wether to the dryrun files  [default: False]
+  --help                 Show this message and exit.
+```
+
 ## Additional VASP workflows
 
 - `vaspu.relax`: `RelaxWorkChain` with additional check and bug fixes
