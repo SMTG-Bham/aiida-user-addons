@@ -7,6 +7,7 @@ import aiida.orm as orm
 from aiida.common.extendeddicts import AttributeDict
 from aiida.engine import WorkChain, calcfunction, if_
 from aiida.plugins import WorkflowFactory
+import numpy as np
 
 
 class VaspBandsWorkChain(WorkChain):
@@ -47,10 +48,10 @@ class VaspBandsWorkChain(WorkChain):
                    valid_type=orm.Float,
                    required=False)
         spec.input(
-            'dos_kpoints',
-            help='Kpoints for running DOS calculations',
+            'dos_kpoints_density',
+            help='Kpoints for running DOS calculations in A^-1 * 2pi',
             required=False,
-            valid_type=orm.KpointsData,
+            valid_type=orm.Float,
         )
         spec.expose_inputs(relax_work,
                            namespace='relax',
@@ -137,6 +138,9 @@ class VaspBandsWorkChain(WorkChain):
         """Setup the calculation"""
         self.ctx.current_structure = self.inputs.structure
         self.ctx.bands_kpoints = self.inputs.get('bands_kpoints')
+        param = self.inputs.scf.parameters.get_dict()
+        if 'magmom' in param['vasp'] and not self.inputs.get('only_dos'):
+            raise RuntimeError("Cannot treat magnetic systems for BS for now")
 
     def should_do_relax(self):
         """Wether we should do relax or not"""
@@ -169,8 +173,11 @@ class VaspBandsWorkChain(WorkChain):
         return True
 
     def should_run_seekpath(self):
-        """Seekpath should only run if no explicit bands is provided"""
-        return 'bands_kpoints' not in self.inputs
+        """
+        Seekpath should only run if no explicit bands is provided or we are just
+        running for DOS, in which case the original structure is used.
+        """
+        return 'bands_kpoints' not in self.inputs or self.inputs.get('only_dos')
 
     def run_seekpath(self):
         """
@@ -214,7 +221,7 @@ class VaspBandsWorkChain(WorkChain):
         if (pdict['vasp'].get('lcharg') == False) or (
                 pdict['vasp'].get('LCHARG') == False):
             pdict['vasp']['lcharg'] = True
-            inputs.paramaters = orm.Dict(dict=pdict)
+            inputs.parameters = orm.Dict(dict=pdict)
             self.report('Correction: setting LCHARG to True')
 
         running = self.submit(base_work, **inputs)
@@ -265,7 +272,7 @@ class VaspBandsWorkChain(WorkChain):
                     }}),
                 })
 
-            # Special treatment - combine the paramaters
+            # Special treatment - combine the parameters
             parameters = inputs.parameters.get_dict()
             bands_parameters = bands_input.parameters.get_dict()
 
@@ -298,7 +305,7 @@ class VaspBandsWorkChain(WorkChain):
 
         # Do DOS calculation if dos input namespace is populated or a
         # dos_kpoints input is passed.
-        if ('dos_kpoints' in self.inputs) or ('dos' in self.inputs):
+        if ('dos_kpoints_density' in self.inputs) or ('dos' in self.inputs):
 
             if 'dos' in self.inputs:
                 dos_input = AttributeDict(
@@ -312,10 +319,14 @@ class VaspBandsWorkChain(WorkChain):
                         'constant_charge': True
                     }}),
                 })
+            # Use the supplied kpoints density for DOS
+            if 'dos_kpoints_density' in self.inputs:
+                dos_kpoints = orm.KpointsData()
+                dos_kpoints.set_cell_from_structure(self.ctx.current_structure)
+                dos_kpoints.set_kpoints_mesh_from_density(self.inputs.dos_kpoints_density * 2 * np.pi)
+                dos_input.kpoints = dos_kpoints
 
-            dos_input.kpoints = self.inputs.dos_kpoints
-
-            # Special treatment - combine the paramaters
+            # Special treatment - combine the parameters
             parameters = inputs.parameters.get_dict()
             dos_parameters = dos_input.parameters.get_dict()
             nested_update(parameters, dos_parameters)
