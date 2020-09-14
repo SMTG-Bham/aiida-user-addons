@@ -112,8 +112,10 @@ class VaspBandsWorkChain(WorkChain):
 
         spec.output(
             'primitive_structure',
+            required=False,
             help='Primitive structure used for band structure calculations')
         spec.output('band_structure',
+                    required=False,
                     help='Computed band structure with labels')
         spec.output('seekpath_parameters',
                     help='Parameters used by seekpath',
@@ -177,7 +179,8 @@ class VaspBandsWorkChain(WorkChain):
         Seekpath should only run if no explicit bands is provided or we are just
         running for DOS, in which case the original structure is used.
         """
-        return 'bands_kpoints' not in self.inputs and (not self.inputs.get('only_dos', False))
+        return 'bands_kpoints' not in self.inputs and (not self.inputs.get(
+            'only_dos', False))
 
     def run_seekpath(self):
         """
@@ -323,7 +326,8 @@ class VaspBandsWorkChain(WorkChain):
             if 'dos_kpoints_density' in self.inputs:
                 dos_kpoints = orm.KpointsData()
                 dos_kpoints.set_cell_from_structure(self.ctx.current_structure)
-                dos_kpoints.set_kpoints_mesh_from_density(self.inputs.dos_kpoints_density.value * 2 * np.pi)
+                dos_kpoints.set_kpoints_mesh_from_density(
+                    self.inputs.dos_kpoints_density.value * 2 * np.pi)
                 dos_input.kpoints = dos_kpoints
 
             # Special treatment - combine the parameters
