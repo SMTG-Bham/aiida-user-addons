@@ -177,7 +177,7 @@ class VaspBandsWorkChain(WorkChain):
         Seekpath should only run if no explicit bands is provided or we are just
         running for DOS, in which case the original structure is used.
         """
-        return 'bands_kpoints' not in self.inputs or (not self.inputs.get('only_dos', False))
+        return 'bands_kpoints' not in self.inputs and (not self.inputs.get('only_dos', False))
 
     def run_seekpath(self):
         """
