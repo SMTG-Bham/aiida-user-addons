@@ -198,6 +198,8 @@ class VaspBandsWorkChain(WorkChain):
         results = seekpath_structure_analysis(self.ctx.current_structure,
                                               **inputs)
         self.ctx.current_structure = results['primitive_structure']
+        if not np.allclose(self.ctx.structure.cell, self.inputs.structure.cell):
+            self.report("The primitive structure is not the same as the input structure - using the former for all calculations from now.")
         self.ctx.bands_kpoints = results['explicit_kpoints']
         self.out('primitive_structure', results['primitive_structure'])
         self.out('seekpath_parameters', results['parameters'])
