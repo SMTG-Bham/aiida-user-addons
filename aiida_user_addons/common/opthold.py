@@ -171,7 +171,6 @@ class OptionHolder(object):
                  str(type(value)), value])
 
         max_width_name = max([len(entry[0]) for entry in entries]) + 2
-        max_width_type = max([len(entry[1]) for entry in entries]) + 2
 
         lines = []
         for entry in entries:
