@@ -25,7 +25,7 @@
             "vaspu.relax = aiida_user_addons.vworkflows.relax:RelaxWorkChain",
             "vaspu.converge = aiida_user_addons.vworkflows.converge:RapidConvergeWorkChain",
             "vaspu.vasp = aiida_user_addons.vworkflows.vasp:VaspWorkChain",
-            "vaspu.bands = aiida_user_addons.vworkflows.bands:BandsWorkChain",
+            "vaspu.bands = aiida_user_addons.vworkflows.new_bands:VaspBandsWorkChain",
             "vaspu.master = aiida_user_addons.vworkflows.master:MasterWorkChain"
         ]
     },
