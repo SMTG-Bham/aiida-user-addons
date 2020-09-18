@@ -337,12 +337,12 @@ class VaspRelaxWorkChain(WorkChain):
             max_force = workchain.outputs.misc.get_attribute('maximum_force')
             if force_cut_off is not None and max_force > force_cut_off:
                 self.report(
-                    f'Maximum force in the structure {max_force:.3g} excess the cut-off limit {force_cut_off:.3g} - NOT OK'
+                    f'Maximum force in the structure {max_force:.4g} excess the cut-off limit {force_cut_off:.4g} - NOT OK'
                 )
                 converged = False
             elif self.ctx.verbose:
                 self.report(
-                    f'Maximum force in the structure {max_force:.3g} - OK')
+                    f'Maximum force in the structure {max_force:.4g} - OK')
 
             if not converged:
                 self.ctx.current_restart_folder = workchain.outputs.remote_folder
@@ -372,21 +372,21 @@ class VaspRelaxWorkChain(WorkChain):
         lengths_converged = bool(delta.cell_lengths.max() <= threshold_lengths)
         if not lengths_converged:
             self.report(
-                'cell lengths changed by max {:.3g}, tolerance is {:.3g} - NOT OK'
+                'cell lengths changed by max {:.4g}, tolerance is {:.4g} - NOT OK'
                 .format(delta.cell_lengths.max(), threshold_lengths))
         elif self.ctx.verbose:
             self.report(
-                'cell lengths changed by max {:.3g}, tolerance is {:.3g} - OK'.
+                'cell lengths changed by max {:.4g}, tolerance is {:.4g} - OK'.
                 format(delta.cell_lengths.max(), threshold_lengths))
 
         angles_converged = bool(delta.cell_angles.max() <= threshold_angles)
         if not angles_converged:
             self.report(
-                'cell angles changed by max {:.3g}, tolerance is {:.3g} - NOT OK'
+                'cell angles changed by max {:.4g}, tolerance is {:.4g} - NOT OK'
                 .format(delta.cell_angles.max(), threshold_angles))
         elif self.ctx.verbose:
             self.report(
-                'cell angles changed by max {:.3g}, tolerance is {:.3g} - OK'.
+                'cell angles changed by max {:.4g}, tolerance is {:.4g} - OK'.
                 format(delta.cell_angles.max(), threshold_angles))
 
         return bool(lengths_converged and angles_converged)
@@ -397,11 +397,11 @@ class VaspRelaxWorkChain(WorkChain):
         volume_converged = bool(delta.volume <= threshold)
         if not volume_converged:
             self.report(
-                'cell volume changed by {:.3g}, tolerance is {:.3g} - NOT OK'.
+                'cell volume changed by {:.4g}, tolerance is {:.4g} - NOT OK'.
                 format(delta.volume, threshold))
         elif self.ctx.verbose:
             self.report(
-                'cell volume changed by {:.3g}, tolerance is {:.3g} - OK'.
+                'cell volume changed by {:.4g}, tolerance is {:.4g} - OK'.
                 format(delta.volume, threshold))
 
         return volume_converged
@@ -425,14 +425,14 @@ class VaspRelaxWorkChain(WorkChain):
         if not positions_converged:
             try:
                 self.report(
-                    'max site position change is {:.3g}, tolerance is {:.3g} - NOT OK'
+                    'max site position change is {:.4g}, tolerance is {:.4g} - NOT OK'
                     .format(np.nanmax(delta.pos_lengths), threshold))
             except RuntimeWarning:
                 pass
         elif self.ctx.verbose:
             try:
                 self.report(
-                    'max site position change is {:.3g}, tolerance is {:.3g} - OK'
+                    'max site position change is {:.4g}, tolerance is {:.4g} - OK'
                     .format(np.nanmax(delta.pos_lengths), threshold))
             except RuntimeWarning:
                 pass
