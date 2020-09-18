@@ -292,16 +292,28 @@ class VaspRelaxWorkChain(WorkChain):
         self.ctx.current_structure = workchain.outputs.structure
 
         conv_mode = self.ctx.relax_settings.convergence_mode
+        # Assign the two structure used for comparison
         if conv_mode == 'inout':
             compare_from = self.ctx.previous_structure
+            compare_to = self.ctx.current_structure
         elif conv_mode == 'last':
-            compare_from = workchain.outputs.trajectory.get_step_structure(
-                -2)  # take take second last structure
+            traj = workchain.outputs.trajectory
+            if traj.numsteps > 1:
+                compare_from = get_step_structure_from_frac_pos(
+                    workchain.outputs.trajectory,
+                    -2)  # take take second last structure
+                compare_to = get_step_structure_from_frac_pos(
+                    workchain.outputs.trajectory,
+                    -1)  # take take second last structure
+            else:
+                self.report(
+                    'Warning - no enough number of steps to compare - using input/output structures instead.'
+                )
+                compare_from = self.ctx.previous_structure
+                compare_to = self.ctx.current_structure
         else:
             raise RuntimeError(
                 'Convergence mode {} is not a valid option'.format(conv_mode))
-
-        compare_to = self.ctx.current_structure
 
         converged = True
         relax_settings = self.ctx.relax_settings
@@ -325,9 +337,12 @@ class VaspRelaxWorkChain(WorkChain):
             max_force = workchain.outputs.misc.get_attribute('maximum_force')
             if force_cut_off is not None and max_force > force_cut_off:
                 self.report(
-                    f'Maximum force in the structure {max_force:.3g} excess the cut-off limit {force_cut_off:.3g}'
+                    f'Maximum force in the structure {max_force:.3g} excess the cut-off limit {force_cut_off:.3g} - NOT OK'
                 )
                 converged = False
+            elif self.ctx.verbose:
+                self.report(
+                    f'Maximum force in the structure {max_force:.3g} - OK')
 
             if not converged:
                 self.ctx.current_restart_folder = workchain.outputs.remote_folder
@@ -357,21 +372,21 @@ class VaspRelaxWorkChain(WorkChain):
         lengths_converged = bool(delta.cell_lengths.max() <= threshold_lengths)
         if not lengths_converged:
             self.report(
-                'cell lengths changed by max {:.5f}, tolerance is {:.5f} - NOT OK'
+                'cell lengths changed by max {:.3g}, tolerance is {:.3g} - NOT OK'
                 .format(delta.cell_lengths.max(), threshold_lengths))
         elif self.ctx.verbose:
             self.report(
-                'cell lengths changed by max {:.5f}, tolerance is {:.5f} - OK'.
+                'cell lengths changed by max {:.3g}, tolerance is {:.3g} - OK'.
                 format(delta.cell_lengths.max(), threshold_lengths))
 
         angles_converged = bool(delta.cell_angles.max() <= threshold_angles)
         if not angles_converged:
             self.report(
-                'cell angles changed by max {:.5f}, tolerance is {:.5f} - NOT OK'
+                'cell angles changed by max {:.3g}, tolerance is {:.3g} - NOT OK'
                 .format(delta.cell_angles.max(), threshold_angles))
         elif self.ctx.verbose:
             self.report(
-                'cell angles changed by max {:.5f}, tolerance is {:.5f} - OK'.
+                'cell angles changed by max {:.3g}, tolerance is {:.3g} - OK'.
                 format(delta.cell_angles.max(), threshold_angles))
 
         return bool(lengths_converged and angles_converged)
@@ -382,11 +397,11 @@ class VaspRelaxWorkChain(WorkChain):
         volume_converged = bool(delta.volume <= threshold)
         if not volume_converged:
             self.report(
-                'cell volume changed by {:.5f}, tolerance is {:.5f} - NOT OK'.
+                'cell volume changed by {:.3g}, tolerance is {:.3g} - NOT OK'.
                 format(delta.volume, threshold))
         elif self.ctx.verbose:
             self.report(
-                'cell volume changed by {:.5f}, tolerance is {:.5f} - OK'.
+                'cell volume changed by {:.3g}, tolerance is {:.3g} - OK'.
                 format(delta.volume, threshold))
 
         return volume_converged
@@ -410,14 +425,14 @@ class VaspRelaxWorkChain(WorkChain):
         if not positions_converged:
             try:
                 self.report(
-                    'max site position change is {:.5f}, tolerance is {:.5f} - NOT OK'
+                    'max site position change is {:.3g}, tolerance is {:.3g} - NOT OK'
                     .format(np.nanmax(delta.pos_lengths), threshold))
             except RuntimeWarning:
                 pass
         elif self.ctx.verbose:
             try:
                 self.report(
-                    'max site position change is {:.5f}, tolerance is {:.5f} - OK'
+                    'max site position change is {:.3g}, tolerance is {:.3g} - OK'
                     .format(np.nanmax(delta.pos_lengths), threshold))
             except RuntimeWarning:
                 pass
@@ -613,3 +628,15 @@ def nested_update_dict_node(dict_node, update_dict):
         return dict_node
     else:
         return orm.Dict(dict=pydict)
+
+
+def get_step_structure_from_frac_pos(traj, step):
+    """Get the step structure, but assume the positions are fractional"""
+    _, _, cell, symbols, positions, _ = traj.get_step_data(step)
+    # Convert to cartesian coorindates
+    positions = positions @ cell
+    struc = orm.StructureData(cell=cell)
+    for _s, _p in zip(symbols, positions):
+        # Automatic species generation
+        struc.append_atom(symbols=_s, position=_p)
+    return struc
