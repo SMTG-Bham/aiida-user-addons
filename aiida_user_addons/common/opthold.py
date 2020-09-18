@@ -14,7 +14,8 @@ def typed_field(name, types, doc, default):
         return output
 
     def setter(self, value):
-        if not isinstance(value, types):
+        # not None and wrong type - warn about it
+        if (value is not None) and (not isinstance(value, types)):
             raise InputValidationError(
                 f'Value {value} is in the wrong type for {name}, the allowed types are: {types}'
             )
@@ -69,10 +70,14 @@ class OptionHolder(object):
         return self.to_dict().__repr__().replace('AttributeDict', '')
 
     def to_dict(self):
-        """Return a dictionary of the options with values"""
-        return AttributeDict(
-            {key: getattr(self, key)
-             for key in self._allowed_options})
+        """
+        Return a dictionary of the options with values, exclude those with
+        values equal to None
+        """
+        return AttributeDict({
+            key: getattr(self, key)
+            for key in self._allowed_options if getattr(self, key) is not None
+        })
 
     @classmethod
     def validate_dict(cls, input_dict, port=None):
