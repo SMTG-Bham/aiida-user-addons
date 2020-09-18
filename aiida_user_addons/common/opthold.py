@@ -99,7 +99,7 @@ class OptionHolder(object):
             all_options.remove(key)
         # Check if any of the keys are not set
         if all_options:
-            raise InputValidationError(f'Keys: {all_options} are missing')
+            print(f'Warning - keys: {all_options} are missing')
 
     def __setitem__(self, key, value):
         if key not in self._allowed_options:
