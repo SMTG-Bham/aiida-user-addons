@@ -152,9 +152,12 @@ class VaspRelaxWorkChain(WorkChain):
             settings = orm.Dict(dict={})
         if self.perform_relaxation():
             settings = nested_update_dict_node(
-                settings, {'parser_settings': {
-                    'add_structure': True
-                }})
+                settings, {
+                    'parser_settings': {
+                        'add_structure': True,
+                        'add_trajectory': True,
+                    }
+                })
         # Update the settings for the relaxation
         if settings.get_dict():
             self.ctx.relax_input_additions.settings = settings
@@ -195,10 +198,12 @@ class VaspRelaxWorkChain(WorkChain):
             # For the final static run we do not need to parse the output structure
             if 'settings' in self.inputs:
                 self.ctx.static_input_additions.settings = nested_update_dict_node(
-                    self.inputs.settings,
-                    {'parser_settings': {
-                        'add_structure': False
-                    }})
+                    self.inputs.settings, {
+                        'parser_settings': {
+                            'add_structure': False,
+                            'add_trajectory': False,
+                        }
+                    })
 
             # Override INCARs for the final relaxation
             if 'static_parameters' in self.inputs:
@@ -286,13 +291,24 @@ class VaspRelaxWorkChain(WorkChain):
         self.ctx.previous_structure = self.ctx.current_structure
         self.ctx.current_structure = workchain.outputs.structure
 
+        conv_mode = self.ctx.relax_settings.convergence_mode
+        if conv_mode == 'inout':
+            compare_from = self.ctx.previous_structure
+        elif conv_mode == 'last':
+            compare_from = workchain.outputs.trajectory.get_step_structure(
+                -2)  # take take second last structure
+        else:
+            raise RuntimeError(
+                'Convergence mode {} is not a valid option'.format(conv_mode))
+
+        compare_to = self.ctx.current_structure
+
         converged = True
         relax_settings = self.ctx.relax_settings
         if relax_settings.convergence_on:
             if self.ctx.verbose:
                 self.report('Checking the convergence of the relaxation.')
-            comparison = compare_structures(self.ctx.previous_structure,
-                                            self.ctx.current_structure)
+            comparison = compare_structures(compare_from, compare_to)
             delta = comparison.absolute if relax_settings.convergence_absolute else comparison.relative
             if relax_settings.positions:
                 # For positions it only makes sense to check the absolute change
@@ -513,9 +529,9 @@ class RelaxOptions(OptionHolder):
     """
     _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps',
                         'positions', 'shape', 'volume', 'convergence_on',
-                        'convergence_volume', 'convergence_absolute',
-                        'convergence_max_iterations', 'convergence_positions',
-                        'convergence_shape_lengths',
+                        'convergence_mode', 'convergence_volume',
+                        'convergence_absolute', 'convergence_max_iterations',
+                        'convergence_positions', 'convergence_shape_lengths',
                         'convergence_shape_angles', 'perform')
 
     algo = typed_field('algo', (str, ), 'The algorithm to use for relaxation.',
@@ -567,6 +583,9 @@ class RelaxOptions(OptionHolder):
         'convergence_shape_angles', (float, ),
         'The cut off value for the convergence check on the angles of the unit cell vectors, between input and output structure.',
         0.1)
+    convergence_mode = typed_field(
+        'convergence_mode', (str, ),
+        'Mode of the convergence - select from \'inout\' and \'last\'', 'last')
     perform = typed_field(
         'perform',
         (bool, ),
