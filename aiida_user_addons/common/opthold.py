@@ -27,6 +27,28 @@ def typed_field(name, types, doc, default):
     return property(getter, setter, deleter, doc)
 
 
+def required_field(name, types, doc):
+    """A option of certain types"""
+    def getter(self):
+        output = self._get_opt(name)  # pylint: disable=protected-access
+        if output is None:
+            raise ValueError(f'{name} is a required field!')
+        return output
+
+    def setter(self, value):
+        # not None and wrong type - warn about it
+        if (value is not None) and (not isinstance(value, types)):
+            raise InputValidationError(
+                f'Value {value} is in the wrong type for {name}, the allowed types are: {types}'
+            )
+        self._set_opt(name, value)  # pylint: disable=protected-access
+
+    def deleter(self):
+        self._delete_opt(name)  # pylint: disable=protected-access
+
+    return property(getter, setter, deleter, doc)
+
+
 class OptionHolder(object):
     """
     A container for holding a dictionary of options.
@@ -100,6 +122,12 @@ class OptionHolder(object):
         # Check if any of the keys are not set
         if all_options:
             print(f'Warning - keys: {all_options} are missing')
+
+        try:
+            obj.to_dict()
+        except ValueError as error:
+            raise InputValidationError('Problems encouterred: {}'.format(
+                error.args))
 
     def __setitem__(self, key, value):
         if key not in self._allowed_options:
