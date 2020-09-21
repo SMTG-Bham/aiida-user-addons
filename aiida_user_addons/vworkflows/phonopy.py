@@ -231,6 +231,9 @@ class VaspAutoPhononWorkChain(WorkChain):
             param['vasp']['magmom'] = magmom
             force_calc_inputs.parameters = orm.Dict(dict=param)
 
+        # Ensure we parser the forces
+        ensure_parse_objs(force_calc_inputs, ['forces'])
+
         for key, node in self.ctx.supercell_structures.items():
             force_calc_inputs.structure = node
             running = self.submit(self._singlepoint_chain, **force_calc_inputs)
@@ -241,7 +244,9 @@ class VaspAutoPhononWorkChain(WorkChain):
         if self.is_nac():
             self.report('calculate born charges and dielectric constant')
             nac_inputs = self.exposed_inputs(self._singlepoint_chain, 'nac')
-            nac_inputs.structure = self.ctx.currrent_structure
+            # NAC needs to use the primitive structure!
+            nac_inputs.structure = self.ctx.primitive
+            ensure_parse_objs(nac_inputs, ['dielectrics', 'born_charges'])
 
             running = self.submit(self._singlepoint_chain, **nac_inputs)
             self.report('Submissted calculation for nac: {}'.format(running))
@@ -410,3 +415,44 @@ class PhononSettings(OptionHolder):
         float,
         int,
     ), 'Distance for band structure', None)
+
+
+def nested_update(dict_in, update_dict):
+    """Update the dictionary - combine nested subdictionary with update as well"""
+    for key, value in update_dict.items():
+        if key in dict_in and isinstance(value, (dict, AttributeDict)):
+            nested_update(dict_in[key], value)
+        else:
+            dict_in[key] = value
+    return dict_in
+
+
+def nested_update_dict_node(dict_node, update_dict):
+    """Utility to update a Dict node in a nested way"""
+    pydict = dict_node.get_dict()
+    nested_update(pydict, update_dict)
+    if pydict == dict_node.get_dict():
+        return dict_node
+    else:
+        return orm.Dict(dict=pydict)
+
+
+def ensure_parse_objs(input_port, objs):
+    """
+    Ensure parser will parse certain objects
+
+    Arguments:
+        input_port: input port to be update, assume the existence of `settings`
+        objs: a list of objects to include, for example ['structure', 'forces']
+
+    Returns:
+        process_port: the port with the new settings
+    """
+    update = {'parser_settings': {'add_{}'.format(obj): True for obj in objs}}
+    if 'settings' not in input_port:
+        input_port.settings = orm.Dict(dict=update)
+    else:
+        settings = input_port.settings
+        nested_update_dict_node(settings, update)
+        input_port.settings = settings
+    return input_port
