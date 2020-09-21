@@ -22,7 +22,7 @@
             "sgenodetail = aiida_user_addons.schedulers.sgenodetail:SgeNoDetailScheduler"
         ],
         "aiida.workflows": [
-            "vaspu.relax = aiida_user_addons.vworkflows.relax:RelaxWorkChain",
+            "vaspu.relax = aiida_user_addons.vworkflows.relax:VaspRelaxWorkChain",
             "vaspu.converge = aiida_user_addons.vworkflows.converge:RapidConvergeWorkChain",
             "vaspu.vasp = aiida_user_addons.vworkflows.vasp:VaspWorkChain",
             "vaspu.bands = aiida_user_addons.vworkflows.new_bands:VaspBandsWorkChain",
