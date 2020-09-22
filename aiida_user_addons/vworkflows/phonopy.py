@@ -148,6 +148,9 @@ class VaspAutoPhononWorkChain(WorkChain):
         inputs = self.exposed_inputs(self._relax_chain, 'relax')
         inputs.structure = self.inputs.structure
         inputs.metadata.call_link_label = 'high_prec_relax'
+        if not inputs.metadata.label:
+            inputs.metadata.label = self.inputs.metadata.label + ' HIGH-PREC RELAX'
+
         running = self.submit(self._relax_chain, **inputs)
 
         self.report(f'Submitted high-precision relaxation {running}')
@@ -242,9 +245,15 @@ class VaspAutoPhononWorkChain(WorkChain):
         ensure_parse_objs(force_calc_inputs, ['forces'])
 
         for key, node in self.ctx.supercell_structures.items():
-            force_calc_inputs.structure = node
-            running = self.submit(self._singlepoint_chain, **force_calc_inputs)
             label = 'force_calc_' + key.split('_')[-1]
+            force_calc_inputs.structure = node
+            force_calc_inputs.metdata.call_link_label = label
+            if not force_calc_inputs.metadata.label:
+                force_calc_inputs.metadata.label = self.inputs.metdata.label + ' FC_' + key.split(
+                    '_')[-1]
+
+            running = self.submit(self._singlepoint_chain, **force_calc_inputs)
+
             self.report('Submitted {} for {}'.format(running, label))
             self.to_context(**{label: running})
 
@@ -253,6 +262,9 @@ class VaspAutoPhononWorkChain(WorkChain):
             nac_inputs = self.exposed_inputs(self._singlepoint_chain, 'nac')
             # NAC needs to use the primitive structure!
             nac_inputs.structure = self.ctx.primitive
+            nac_inputs.metdata.call_link_label = 'nac_calc'
+            if not nac_inputs.metadata.label:
+                nac_inputs.metdata.label = self.inputs.metadata.label + ' NAC'
             ensure_parse_objs(nac_inputs, ['dielectrics', 'born_charges'])
 
             running = self.submit(self._singlepoint_chain, **nac_inputs)
