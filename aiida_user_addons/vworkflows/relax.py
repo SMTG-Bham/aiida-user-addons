@@ -37,7 +37,7 @@ from ..common.opthold import OptionHolder, typed_field
 class VaspRelaxWorkChain(WorkChain):
     """Structure relaxation workchain."""
     _verbose = True
-    _base_workchain_string = 'vasp.vasp'
+    _base_workchain_string = 'vaspu.vasp'
     _base_workchain = WorkflowFactory(_base_workchain_string)
 
     @classmethod

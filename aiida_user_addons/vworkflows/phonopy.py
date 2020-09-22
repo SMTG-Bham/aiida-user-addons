@@ -28,7 +28,7 @@ from aiida_phonopy.common.utils import (
 class VaspAutoPhononWorkChain(WorkChain):
     _relax_entrypoint = 'vaspu.relax'
     _relax_chain = WorkflowFactory(_relax_entrypoint)
-    _singlepoint_entrypoint = 'vasp.vasp'
+    _singlepoint_entrypoint = 'vaspu.vasp'
     _singlepoint_chain = WorkflowFactory(_singlepoint_entrypoint)
 
     @classmethod
@@ -210,7 +210,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         for key, node in self.ctx.supercell_structures.items():
             label = 'force_calc_' + key.split('_')[-1]
             force_calc_inputs.structure = node
-            force_calc_inputs.metdata.call_link_label = label
+            force_calc_inputs.metadata.call_link_label = label
             if 'label' not in force_calc_inputs.metadata or (not force_calc_inputs.metadata.label):
                 force_calc_inputs.metadata.label = self.ctx.label + ' FC_' + key.split('_')[-1]
 
@@ -224,9 +224,9 @@ class VaspAutoPhononWorkChain(WorkChain):
             nac_inputs = self.exposed_inputs(self._singlepoint_chain, 'nac')
             # NAC needs to use the primitive structure!
             nac_inputs.structure = self.ctx.primitive
-            nac_inputs.metdata.call_link_label = 'nac_calc'
+            nac_inputs.metadata.call_link_label = 'nac_calc'
             if 'label' not in nac_inputs.metadata or (not nac_inputs.metadata.label):
-                nac_inputs.metdata.label = self.ctx.label + ' NAC'
+                nac_inputs.metadata.label = self.ctx.label + ' NAC'
             ensure_parse_objs(nac_inputs, ['dielectrics', 'born_charges'])
 
             running = self.submit(self._singlepoint_chain, **nac_inputs)
