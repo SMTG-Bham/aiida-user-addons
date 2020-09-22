@@ -211,8 +211,8 @@ class VaspAutoPhononWorkChain(WorkChain):
             label = 'force_calc_' + key.split('_')[-1]
             force_calc_inputs.structure = node
             force_calc_inputs.metadata.call_link_label = label
-            if 'label' not in force_calc_inputs.metadata or (not force_calc_inputs.metadata.label):
-                force_calc_inputs.metadata.label = self.ctx.label + ' FC_' + key.split('_')[-1]
+            # Set the label of the force calculation
+            force_calc_inputs.metadata.label = self.ctx.label + ' FC_' + key.split('_')[-1]
 
             running = self.submit(self._singlepoint_chain, **force_calc_inputs)
 
