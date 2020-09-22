@@ -148,7 +148,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         inputs = self.exposed_inputs(self._relax_chain, 'relax')
         inputs.structure = self.inputs.structure
         inputs.metadata.call_link_label = 'high_prec_relax'
-        if not inputs.metadata.label:
+        if 'label' not in inputs.metadata or (not inputs.metadata.label):
             inputs.metadata.label = self.inputs.metadata.label + ' HIGH-PREC RELAX'
 
         running = self.submit(self._relax_chain, **inputs)
@@ -248,7 +248,8 @@ class VaspAutoPhononWorkChain(WorkChain):
             label = 'force_calc_' + key.split('_')[-1]
             force_calc_inputs.structure = node
             force_calc_inputs.metdata.call_link_label = label
-            if not force_calc_inputs.metadata.label:
+            if 'label' not in force_calc_inputs.metadata or (
+                    not force_calc_inputs.metadata.label):
                 force_calc_inputs.metadata.label = self.inputs.metdata.label + ' FC_' + key.split(
                     '_')[-1]
 
@@ -263,7 +264,8 @@ class VaspAutoPhononWorkChain(WorkChain):
             # NAC needs to use the primitive structure!
             nac_inputs.structure = self.ctx.primitive
             nac_inputs.metdata.call_link_label = 'nac_calc'
-            if not nac_inputs.metadata.label:
+            if 'label' not in nac_inputs.metadata or (
+                    not nac_inputs.metadata.label):
                 nac_inputs.metdata.label = self.inputs.metadata.label + ' NAC'
             ensure_parse_objs(nac_inputs, ['dielectrics', 'born_charges'])
 
