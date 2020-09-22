@@ -178,11 +178,18 @@ class VaspAutoPhononWorkChain(WorkChain):
         # Check if we are doing magnetic calculations
         force_calc_inputs = self.exposed_inputs(self._singlepoint_chain,
                                                 'singlepoint')
-        magmom = force_calc_inputs.parameters['vasp'].get('magmom')
-        if magmom:
+        relax_calc_inputs = self.exposed_inputs(self._relax_chain, 'relax')
+
+        # Fetch the magmom from the relaxation calculation (eg. for the starting structure)
+        try:
+            magmom = relax_calc_inputs.vasp.parameters['vasp'].get('magmom')
+        except AttributeError:
+            magmom = None
+
+        # MAGMOM tag in the phonon_settings input port take the precedence
+        if magmom and ('magmom' not in phonon_settings):
             self.report(
-                'Using MAGMOM from the inputs for the singlepoint calculations'
-            )
+                'Using MAGMOM from the inputs for the relaxation calculations')
             phonon_settings['magmom'] = magmom
             phonon_settings_dict = orm.Dict(dict=phonon_settings)
         else:
@@ -414,6 +421,7 @@ class PhononSettings(OptionHolder):
     primitive_matrix = typed_field('primitive_matrix', (list, str),
                                    'primitive matrix for phonons', 'auto')
     mesh = required_field('mesh', (int, ), 'Mesh for phonon calculation')
+    magmom = typed_field('magmom', (list, ), 'Starting magnetic moments', None)
     distance = typed_field('distance', (
         float,
         int,
@@ -423,7 +431,7 @@ class PhononSettings(OptionHolder):
 def nested_update(dict_in, update_dict):
     """Update the dictionary - combine nested subdictionary with update as well"""
     for key, value in update_dict.items():
-        if key in dict_in and isinstance(value, (dict, AttributeDict)):
+        if key in dict_in and isinstance(value, (dict, orm.AttributeDict)):
             nested_update(dict_in[key], value)
         else:
             dict_in[key] = value
