@@ -57,16 +57,26 @@ class OptionHolder(object):
     """
 
     _allowed_options = tuple()
+    _allow_empty_field = True
 
     @classmethod
     def _validate_class(cls):
         if not cls._allowed_options:
             raise RuntimeError('Must have non-empty _allowed_options')
 
-    def __init__(self, *args, **kwargs):
-        """A holder of options"""
+    def __init__(self, **kwargs):
+        """
+        A holder of options
+
+        Arguments:
+            kwargs: unpack keyword arguments and set them as the attributes
+        """
         self._validate_class()
         self._opt_data = dict()
+
+        # Set the attributes
+        for key, value in kwargs.items():
+            setattr(self, key, value)
 
     def _get_opt_dict(self):
         return self._opt_data
@@ -120,8 +130,8 @@ class OptionHolder(object):
             setattr(obj, key, value)
             all_options.remove(key)
         # Check if any of the keys are not set
-        if all_options:
-            print(f'Warning - keys: {all_options} are missing')
+        if all_options and not cls._allow_empty_field:
+            raise InputValidationError(f'Keys: {all_options} are missing')
 
         try:
             obj.to_dict()
@@ -174,6 +184,11 @@ class OptionHolder(object):
     def serialise(cls, value):
         """Serialise a dictionary into Dict"""
         cls._validate_class()
+
+        # If a instance of the objection is passed, call the to_aiida_dict to construct the input
+        if isinstance(value, cls):
+            return value.to_aiida_dict()
+        # Otherwise, instantiate an object and construct the input from it
         obj = cls.from_dict(value)
         return obj.to_aiida_dict()
 
