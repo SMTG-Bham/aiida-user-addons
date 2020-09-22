@@ -224,6 +224,8 @@ class VaspRelaxWorkChain(WorkChain):
 
         # Update the input with whatever stored in the relax_input_additions attribute dict
         inputs.update(self.ctx.relax_input_additions)
+        if 'label' not in inputs.metadata:
+            inputs.metadata.label = self.inputs.metadata.label
 
         running = self.submit(self._base_workchain, **inputs)
         self.report('launching {}<{}> iterations #{}'.format(
@@ -237,6 +239,9 @@ class VaspRelaxWorkChain(WorkChain):
 
         inputs = self.exposed_inputs(self._base_workchain, 'vasp')
         inputs.structure = self.ctx.current_structure
+
+        if 'label' not in inputs.metadata:
+            inputs.metadata.label = self.inputs.metadata.label + ' SP'
 
         # Update the input with whatever stored in the relax_input_additions attribute dict
         inputs.update(self.ctx.static_input_additions)
