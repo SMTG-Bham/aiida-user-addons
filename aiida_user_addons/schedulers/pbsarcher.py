@@ -20,6 +20,7 @@ class PbsArcherJobResource(PbsJobResource):
     """
     JobResource for ARCHER with bigmem flag for big memory nodes
     """
+
     def __init__(self, *args, **kwargs):
         """
         Add additonal bigmem attribute
@@ -39,12 +40,9 @@ def test_job_resource():
     """
     Simple test for the resource class
     """
-    resource = PbsArcherJobResource(num_machines=1,
-                                    num_mpiprocs_per_machine=16)
+    resource = PbsArcherJobResource(num_machines=1, num_mpiprocs_per_machine=16)
     assert resource.bigmem is None
-    resource = PbsArcherJobResource(num_machines=1,
-                                    bigmem=True,
-                                    num_mpiprocs_per_machine=16)
+    resource = PbsArcherJobResource(num_machines=1, bigmem=True, num_mpiprocs_per_machine=16)
     assert resource.bigmem is True
 
 
@@ -102,10 +100,9 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
         if email_events:
             lines.append('#PBS -m {}'.format(email_events))
             if not job_tmpl.email:
-                _LOGGER.info(
-                    'Email triggers provided to PBSPro script for job,'
-                    'but no email field set; will send emails to '
-                    'the job owner as set in the scheduler')
+                _LOGGER.info('Email triggers provided to PBSPro script for job,'
+                             'but no email field set; will send emails to '
+                             'the job owner as set in the scheduler')
         else:
             lines.append('#PBS -m n')
 
@@ -124,8 +121,7 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
 
             # prepend a 'j' (for 'job') before the string if the string
             # is now empty or does not start with a valid charachter
-            if not job_title or (job_title[0] not in string.ascii_letters +
-                                 string.digits):
+            if not job_title or (job_title[0] not in string.ascii_letters + string.digits):
                 job_title = 'j' + job_title
 
             # Truncate to the first 15 characters
@@ -149,9 +145,7 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
             # 'n' : Standard error and standard output are not merged (default)
             lines.append('#PBS -j oe')
             if job_tmpl.sched_error_path:
-                _LOGGER.info(
-                    'sched_join_files is True, but sched_error_path is set in '
-                    'PBSPro script; ignoring sched_error_path')
+                _LOGGER.info('sched_join_files is True, but sched_error_path is set in ' 'PBSPro script; ignoring sched_error_path')
         else:
             if job_tmpl.sched_error_path:
                 lines.append('#PBS -e {}'.format(job_tmpl.sched_error_path))
@@ -171,19 +165,15 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
             lines.append('#PBS -p {}'.format(job_tmpl.priority))
 
         if not job_tmpl.job_resource:
-            raise ValueError(
-                'Job resources (as the num_machines) are required for the PBSPro scheduler plugin'
-            )
+            raise ValueError('Job resources (as the num_machines) are required for the PBSPro scheduler plugin')
 
         # NOTE HERE I Added the bigmem flag
-        resource_lines = self._get_resource_lines(
-            num_machines=job_tmpl.job_resource.num_machines,
-            num_mpiprocs_per_machine=job_tmpl.job_resource.
-            num_mpiprocs_per_machine,
-            num_cores_per_machine=job_tmpl.job_resource.num_cores_per_machine,
-            max_memory_kb=job_tmpl.max_memory_kb,
-            bigmem=job_tmpl.job_resource.bigmem,
-            max_wallclock_seconds=job_tmpl.max_wallclock_seconds)
+        resource_lines = self._get_resource_lines(num_machines=job_tmpl.job_resource.num_machines,
+                                                  num_mpiprocs_per_machine=job_tmpl.job_resource.num_mpiprocs_per_machine,
+                                                  num_cores_per_machine=job_tmpl.job_resource.num_cores_per_machine,
+                                                  max_memory_kb=job_tmpl.max_memory_kb,
+                                                  bigmem=job_tmpl.job_resource.bigmem,
+                                                  max_wallclock_seconds=job_tmpl.max_wallclock_seconds)
 
         lines += resource_lines
 
@@ -200,11 +190,9 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
             lines.append(empty_line)
             lines.append('# ENVIRONMENT VARIABLES BEGIN ###')
             if not isinstance(job_tmpl.job_environment, dict):
-                raise ValueError(
-                    'If you provide job_environment, it must be a dictionary')
+                raise ValueError('If you provide job_environment, it must be a dictionary')
             for key, value in job_tmpl.job_environment.items():
-                lines.append('export {}={}'.format(key.strip(),
-                                                   escape_for_bash(value)))
+                lines.append('export {}={}'.format(key.strip(), escape_for_bash(value)))
             lines.append('# ENVIRONMENT VARIABLES  END  ###')
             lines.append(empty_line)
 
@@ -215,9 +203,8 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
 
         return '\n'.join(lines)
 
-    def _get_resource_lines(self, num_machines, num_mpiprocs_per_machine,
-                            num_cores_per_machine, max_memory_kb,
-                            max_wallclock_seconds, bigmem):
+    def _get_resource_lines(self, num_machines, num_mpiprocs_per_machine, num_cores_per_machine, max_memory_kb, max_wallclock_seconds,
+                            bigmem):
         """
         Return the lines for machines, memory and wallclock relative
         to pbspro.
@@ -242,16 +229,14 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
                 if tot_secs <= 0:
                     raise ValueError
             except ValueError:
-                raise ValueError(
-                    'max_wallclock_seconds must be '
-                    "a positive integer (in seconds)! It is instead '{}'"
-                    ''.format(max_wallclock_seconds))
+                raise ValueError('max_wallclock_seconds must be '
+                                 "a positive integer (in seconds)! It is instead '{}'"
+                                 ''.format(max_wallclock_seconds))
             hours = tot_secs // 3600
             tot_minutes = tot_secs % 3600
             minutes = tot_minutes // 60
             seconds = tot_minutes % 60
-            return_lines.append('#PBS -l walltime={:02d}:{:02d}:{:02d}'.format(
-                hours, minutes, seconds))
+            return_lines.append('#PBS -l walltime={:02d}:{:02d}:{:02d}'.format(hours, minutes, seconds))
 
         if bigmem:
             select_string += ':bigmem=true'
@@ -262,10 +247,7 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
                 if virtualMemoryKb <= 0:
                     raise ValueError
             except ValueError:
-                raise ValueError(
-                    'max_memory_kb must be '
-                    "a positive integer (in kB)! It is instead '{}'"
-                    ''.format((max_memory_kb)))
+                raise ValueError('max_memory_kb must be ' "a positive integer (in kB)! It is instead '{}'" ''.format((max_memory_kb)))
             select_string += ':mem={}kb'.format(virtualMemoryKb)
 
         return_lines.append('#PBS -l {}'.format(select_string))

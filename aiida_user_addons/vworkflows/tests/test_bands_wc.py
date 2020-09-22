@@ -20,8 +20,7 @@ from aiida_vasp.parsers.file_parsers.incar import IncarParser
 from aiida_vasp.utils.aiida_utils import create_authinfo
 
 
-@pytest.mark.skip(
-    reason='Currently fails, need to find a better way to eject logs etc.')
+@pytest.mark.skip(reason='Currently fails, need to find a better way to eject logs etc.')
 @pytest.mark.wc
 def test_bands_wc(fresh_aiida_env, potentials, mock_vasp):
     """Test with mocked vasp code."""
@@ -34,10 +33,8 @@ def test_bands_wc(fresh_aiida_env, potentials, mock_vasp):
     mock_vasp.store()
     create_authinfo(computer=mock_vasp.computer, store=True)
 
-    structure = PoscarParser(
-        file_path=data_path('test_bands_wc', 'inp', 'POSCAR')).structure
-    parameters = IncarParser(
-        file_path=data_path('test_bands_wc', 'inp', 'INCAR')).incar
+    structure = PoscarParser(file_path=data_path('test_bands_wc', 'inp', 'POSCAR')).structure
+    parameters = IncarParser(file_path=data_path('test_bands_wc', 'inp', 'INCAR')).incar
     parameters['system'] = 'test-case:test_bands_wc'
     #chgcar = get_data_node('vasp.chargedensity', file=data_path('test_bands_wc', 'inp', 'CHGCAR'))
 
@@ -73,9 +70,6 @@ def test_bands_wc(fresh_aiida_env, potentials, mock_vasp):
     np.testing.assert_allclose(kpoints[97, 0:3], np.array([0.5, 0., 0.5]))
     bands = results['bands'].get_bands()
     assert bands.shape == (1, 98, 20)
-    np.testing.assert_allclose(bands[0, 0, 0:3],
-                               np.array([-6.0753, 6.0254, 6.0254]))
-    np.testing.assert_allclose(bands[0, 2, 0:3],
-                               np.array([-6.0386, 5.7955, 5.8737]))
-    np.testing.assert_allclose(bands[0, 97, 0:3],
-                               np.array([-1.867, -1.867, 3.1102]))
+    np.testing.assert_allclose(bands[0, 0, 0:3], np.array([-6.0753, 6.0254, 6.0254]))
+    np.testing.assert_allclose(bands[0, 2, 0:3], np.array([-6.0386, 5.7955, 5.8737]))
+    np.testing.assert_allclose(bands[0, 97, 0:3], np.array([-1.867, -1.867, 3.1102]))

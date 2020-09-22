@@ -43,12 +43,8 @@ class VaspRelaxWorkChain(WorkChain):
     @classmethod
     def define(cls, spec):
         super(VaspRelaxWorkChain, cls).define(spec)
-        spec.expose_inputs(cls._base_workchain,
-                           'vasp',
-                           exclude=('structure', ))
-        spec.input('structure',
-                   valid_type=(get_data_class('structure'),
-                               get_data_class('cif')))
+        spec.expose_inputs(cls._base_workchain, 'vasp', exclude=('structure',))
+        spec.input('structure', valid_type=(get_data_class('structure'), get_data_class('cif')))
         spec.input('static_calc_parameters',
                    valid_type=get_data_class('dict'),
                    required=False,
@@ -59,31 +55,18 @@ class VaspRelaxWorkChain(WorkChain):
                    valid_type=get_data_class('dict'),
                    validator=RelaxOptions.validate_dict,
                    help=RelaxOptions.get_description())
-        spec.input('verbose',
-                   required=False,
-                   help='Increased verbosity.',
-                   valid_type=orm.Bool)
+        spec.input('verbose', required=False, help='Increased verbosity.', valid_type=orm.Bool)
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
-        spec.exit_code(
-            300,
-            'ERROR_MISSING_REQUIRED_OUTPUT',
-            message=
-            'the called workchain does not contain the necessary relaxed output structure'
-        )
-        spec.exit_code(420,
-                       'ERROR_NO_CALLED_WORKCHAIN',
-                       message='no called workchain detected')
-        spec.exit_code(500,
-                       'ERROR_UNKNOWN',
-                       message='unknown error detected in the relax workchain')
-        spec.exit_code(502,
-                       'ERROR_OVERRIDE_PARAMETERS',
-                       message='there was an error overriding the parameters')
+        spec.exit_code(300,
+                       'ERROR_MISSING_REQUIRED_OUTPUT',
+                       message='the called workchain does not contain the necessary relaxed output structure')
+        spec.exit_code(420, 'ERROR_NO_CALLED_WORKCHAIN', message='no called workchain detected')
+        spec.exit_code(500, 'ERROR_UNKNOWN', message='unknown error detected in the relax workchain')
+        spec.exit_code(502, 'ERROR_OVERRIDE_PARAMETERS', message='there was an error overriding the parameters')
         spec.exit_code(
             600,
             'ERROR_RELAX_NOT_CONVERGED',
-            message=
-            'Ionic relaxation was not converged after the maximum number of iterations has been spent',
+            message='Ionic relaxation was not converged after the maximum number of iterations has been spent',
         )
         spec.outline(
             cls.initialize,
@@ -105,9 +88,7 @@ class VaspRelaxWorkChain(WorkChain):
         )  # yapf: disable
 
         spec.expose_outputs(cls._base_workchain)
-        spec.output('relax.structure',
-                    valid_type=get_data_class('structure'),
-                    required=False)
+        spec.output('relax.structure', valid_type=get_data_class('structure'), required=False)
 
     def initialize(self):
         """Initialize."""
@@ -119,9 +100,7 @@ class VaspRelaxWorkChain(WorkChain):
         self.ctx.iteration = 0
         self.ctx.workchains = []
         self.ctx.inputs = AttributeDict()  # This may not be necessary anymore
-        self.ctx.relax_settings = AttributeDict(
-            self.inputs.relax_settings.get_dict(
-            ))  # relax_settings controls the logic of the workchain
+        self.ctx.relax_settings = AttributeDict(self.inputs.relax_settings.get_dict())  # relax_settings controls the logic of the workchain
 
         # Storage space for the inputs
         self.ctx.relax_input_additions = self._init_relax_input_additions()
@@ -151,13 +130,10 @@ class VaspRelaxWorkChain(WorkChain):
         else:
             settings = orm.Dict(dict={})
         if self.perform_relaxation():
-            settings = nested_update_dict_node(
-                settings, {
-                    'parser_settings': {
-                        'add_structure': True,
-                        'add_trajectory': True,
-                    }
-                })
+            settings = nested_update_dict_node(settings, {'parser_settings': {
+                'add_structure': True,
+                'add_trajectory': True,
+            }})
         # Update the settings for the relaxation
         if settings.get_dict():
             self.ctx.relax_input_additions.settings = settings
@@ -173,16 +149,13 @@ class VaspRelaxWorkChain(WorkChain):
         # Update the "relax" field inside the parameters - this is needed because some of the
         # settings will be translated into VASP parameters
         if self.perform_relaxation():
-            parameters = nested_update_dict_node(
-                self.inputs.vasp.parameters,
-                {'relax': self.ctx.relax_settings})
+            parameters = nested_update_dict_node(self.inputs.vasp.parameters, {'relax': self.ctx.relax_settings})
             additions.parameters = parameters
 
         return additions
 
     def run_next_relax(self):
-        within_max_iterations = bool(self.ctx.iteration < self.ctx.
-                                     relax_settings.convergence_max_iterations)
+        within_max_iterations = bool(self.ctx.iteration < self.ctx.relax_settings.convergence_max_iterations)
         return bool(within_max_iterations and not self.ctx.is_converged)
 
     def init_relaxed(self):
@@ -191,29 +164,22 @@ class VaspRelaxWorkChain(WorkChain):
         # Did not perform the relaxation - going into the final singlepoint directly
         if not self.perform_relaxation():
             if self._verbose:
-                self.report(
-                    'skipping structure relaxation and forwarding input to the next workchain.'
-                )
+                self.report('skipping structure relaxation and forwarding input to the next workchain.')
         else:
             # For the final static run we do not need to parse the output structure
             if 'settings' in self.inputs:
                 self.ctx.static_input_additions.settings = nested_update_dict_node(
-                    self.inputs.settings, {
-                        'parser_settings': {
-                            'add_structure': False,
-                            'add_trajectory': False,
-                        }
-                    })
+                    self.inputs.settings, {'parser_settings': {
+                        'add_structure': False,
+                        'add_trajectory': False,
+                    }})
 
             # Override INCARs for the final relaxation
             if 'static_parameters' in self.inputs:
-                self.ctx.static_input_additions.parameters = nested_update_dict_node(
-                    self.inputs.vasp.parameters,
-                    self.inputs.static_parameters.get_dict())
+                self.ctx.static_input_additions.parameters = nested_update_dict_node(self.inputs.vasp.parameters,
+                                                                                     self.inputs.static_parameters.get_dict())
             if self._verbose:
-                self.report(
-                    'performing a final calculation using the relaxed structure.'
-                )
+                self.report('performing a final calculation using the relaxed structure.')
 
     def run_relax(self):
         """Perform the relaxation"""
@@ -228,8 +194,7 @@ class VaspRelaxWorkChain(WorkChain):
             inputs.metadata.label = self.inputs.metadata.label
 
         running = self.submit(self._base_workchain, **inputs)
-        self.report('launching {}<{}> iterations #{}'.format(
-            self._base_workchain.__name__, running.pk, self.ctx.iteration))
+        self.report('launching {}<{}> iterations #{}'.format(self._base_workchain.__name__, running.pk, self.ctx.iteration))
 
         return ToContext(workchains=append_(running))
 
@@ -247,8 +212,7 @@ class VaspRelaxWorkChain(WorkChain):
         inputs.update(self.ctx.static_input_additions)
 
         running = self.submit(self._base_workchain, **inputs)
-        self.report('launching {}<{}> iterations #{}'.format(
-            self._base_workchain.__name__, running.pk, self.ctx.iteration))
+        self.report('launching {}<{}> iterations #{}'.format(self._base_workchain.__name__, running.pk, self.ctx.iteration))
         return ToContext(workchains=append_(running))
 
     def verify_next_workchain(self):
@@ -257,8 +221,7 @@ class VaspRelaxWorkChain(WorkChain):
         try:
             workchain = self.ctx.workchains[-1]
         except IndexError:
-            self.report('There is no {} in the called workchain list.'.format(
-                self._base_workchain.__name__))
+            self.report('There is no {} in the called workchain list.'.format(self._base_workchain.__name__))
             return self.exit_codes.ERROR_NO_CALLED_WORKCHAIN  # pylint: disable=no-member
 
         # Inherit exit status from last workchain (supposed to be
@@ -268,12 +231,9 @@ class VaspRelaxWorkChain(WorkChain):
         if not next_workchain_exit_status:
             self.ctx.exit_code = self.exit_codes.NO_ERROR  # pylint: disable=no-member
         else:
-            self.ctx.exit_code = compose_exit_code(
-                next_workchain_exit_status, next_workchain_exit_message)
+            self.ctx.exit_code = compose_exit_code(next_workchain_exit_status, next_workchain_exit_message)
             self.report('The called {}<{}> returned a non-zero exit status. '
-                        'The exit status {} is inherited'.format(
-                            workchain.__class__.__name__, workchain.pk,
-                            self.ctx.exit_code))
+                        'The exit status {} is inherited'.format(workchain.__class__.__name__, workchain.pk, self.ctx.exit_code))
 
         return self.ctx.exit_code
 
@@ -289,8 +249,7 @@ class VaspRelaxWorkChain(WorkChain):
         if 'structure' not in workchain.outputs:
             self.report('The {}<{}> for the relaxation run did not have an '
                         'output structure and most likely failed. However, '
-                        'its exit status was zero.'.format(
-                            workchain.__class__.__name__, workchain.pk))
+                        'its exit status was zero.'.format(workchain.__class__.__name__, workchain.pk))
             return self.exit_codes.ERROR_NO_RELAXED_STRUCTURE  # pylint: disable=no-member
 
         self.ctx.previous_structure = self.ctx.current_structure
@@ -304,21 +263,14 @@ class VaspRelaxWorkChain(WorkChain):
         elif conv_mode == 'last':
             traj = workchain.outputs.trajectory
             if traj.numsteps > 1:
-                compare_from = get_step_structure_from_frac_pos(
-                    workchain.outputs.trajectory,
-                    -2)  # take take second last structure
-                compare_to = get_step_structure_from_frac_pos(
-                    workchain.outputs.trajectory,
-                    -1)  # take take second last structure
+                compare_from = get_step_structure_from_frac_pos(workchain.outputs.trajectory, -2)  # take take second last structure
+                compare_to = get_step_structure_from_frac_pos(workchain.outputs.trajectory, -1)  # take take second last structure
             else:
-                self.report(
-                    'Warning - no enough number of steps to compare - using input/output structures instead.'
-                )
+                self.report('Warning - no enough number of steps to compare - using input/output structures instead.')
                 compare_from = self.ctx.previous_structure
                 compare_to = self.ctx.current_structure
         else:
-            raise RuntimeError(
-                'Convergence mode {} is not a valid option'.format(conv_mode))
+            raise RuntimeError('Convergence mode {} is not a valid option'.format(conv_mode))
 
         converged = True
         relax_settings = self.ctx.relax_settings
@@ -329,8 +281,7 @@ class VaspRelaxWorkChain(WorkChain):
             delta = comparison.absolute if relax_settings.convergence_absolute else comparison.relative
             if relax_settings.positions:
                 # For positions it only makes sense to check the absolute change
-                converged &= self.check_positions_convergence(
-                    comparison.absolute)
+                converged &= self.check_positions_convergence(comparison.absolute)
             if relax_settings.volume:
                 converged &= self.check_volume_convergence(delta)
             if relax_settings.shape:
@@ -341,30 +292,21 @@ class VaspRelaxWorkChain(WorkChain):
             force_cut_off = relax_settings.get('force_cutoff')
             max_force = workchain.outputs.misc.get_attribute('maximum_force')
             if force_cut_off is not None and max_force > force_cut_off:
-                self.report(
-                    f'Maximum force in the structure {max_force:.4g} excess the cut-off limit {force_cut_off:.4g} - NOT OK'
-                )
+                self.report(f'Maximum force in the structure {max_force:.4g} excess the cut-off limit {force_cut_off:.4g} - NOT OK')
                 converged = False
             elif self.ctx.verbose:
-                self.report(
-                    f'Maximum force in the structure {max_force:.4g} - OK')
+                self.report(f'Maximum force in the structure {max_force:.4g} - OK')
 
             if not converged:
                 self.ctx.current_restart_folder = workchain.outputs.remote_folder
                 if self.ctx.verbose:
-                    self.report(
-                        'Relaxation did not converge, restarting the relaxation.'
-                    )
+                    self.report('Relaxation did not converge, restarting the relaxation.')
             else:
                 if self.ctx.verbose:
-                    self.report(
-                        'Relaxation is converged, finishing with a final static calculation.'
-                    )
+                    self.report('Relaxation is converged, finishing with a final static calculation.')
         else:
             if self.ctx.verbose:
-                self.report(
-                    'Convergence checking is not enabled - finishing with a final static calculation.'
-                )
+                self.report('Convergence checking is not enabled - finishing with a final static calculation.')
 
         self.ctx.is_converged = converged
         return self.exit_codes.NO_ERROR  # pylint: disable=no-member
@@ -376,23 +318,16 @@ class VaspRelaxWorkChain(WorkChain):
 
         lengths_converged = bool(delta.cell_lengths.max() <= threshold_lengths)
         if not lengths_converged:
-            self.report(
-                'cell lengths changed by max {:.4g}, tolerance is {:.4g} - NOT OK'
-                .format(delta.cell_lengths.max(), threshold_lengths))
+            self.report('cell lengths changed by max {:.4g}, tolerance is {:.4g} - NOT OK'.format(delta.cell_lengths.max(),
+                                                                                                  threshold_lengths))
         elif self.ctx.verbose:
-            self.report(
-                'cell lengths changed by max {:.4g}, tolerance is {:.4g} - OK'.
-                format(delta.cell_lengths.max(), threshold_lengths))
+            self.report('cell lengths changed by max {:.4g}, tolerance is {:.4g} - OK'.format(delta.cell_lengths.max(), threshold_lengths))
 
         angles_converged = bool(delta.cell_angles.max() <= threshold_angles)
         if not angles_converged:
-            self.report(
-                'cell angles changed by max {:.4g}, tolerance is {:.4g} - NOT OK'
-                .format(delta.cell_angles.max(), threshold_angles))
+            self.report('cell angles changed by max {:.4g}, tolerance is {:.4g} - NOT OK'.format(delta.cell_angles.max(), threshold_angles))
         elif self.ctx.verbose:
-            self.report(
-                'cell angles changed by max {:.4g}, tolerance is {:.4g} - OK'.
-                format(delta.cell_angles.max(), threshold_angles))
+            self.report('cell angles changed by max {:.4g}, tolerance is {:.4g} - OK'.format(delta.cell_angles.max(), threshold_angles))
 
         return bool(lengths_converged and angles_converged)
 
@@ -401,13 +336,9 @@ class VaspRelaxWorkChain(WorkChain):
         threshold = self.ctx.relax_settings.convergence_volume
         volume_converged = bool(delta.volume <= threshold)
         if not volume_converged:
-            self.report(
-                'cell volume changed by {:.4g}, tolerance is {:.4g} - NOT OK'.
-                format(delta.volume, threshold))
+            self.report('cell volume changed by {:.4g}, tolerance is {:.4g} - NOT OK'.format(delta.volume, threshold))
         elif self.ctx.verbose:
-            self.report(
-                'cell volume changed by {:.4g}, tolerance is {:.4g} - OK'.
-                format(delta.volume, threshold))
+            self.report('cell volume changed by {:.4g}, tolerance is {:.4g} - OK'.format(delta.volume, threshold))
 
         return volume_converged
 
@@ -415,30 +346,24 @@ class VaspRelaxWorkChain(WorkChain):
         """Check the convergence of the atomic positions, given a cutoff."""
         threshold = self.ctx.relax_settings.convergence_positions
         try:
-            positions_converged = bool(
-                np.nanmax(delta.pos_lengths) <= threshold)
+            positions_converged = bool(np.nanmax(delta.pos_lengths) <= threshold)
         except RuntimeWarning:
             # Here we encountered the case of having one atom centered at the origin, so
             # we do not know if it is converged, so settings it to False
             # BONAN: this should never happen now - remove it later
-            self.report(
-                'there is NaN entries in the relative comparison for '
-                'the positions during relaxation, assuming position is not converged'
-            )
+            self.report('there is NaN entries in the relative comparison for '
+                        'the positions during relaxation, assuming position is not converged')
             positions_converged = False
 
         if not positions_converged:
             try:
-                self.report(
-                    'max site position change is {:.4g}, tolerance is {:.4g} - NOT OK'
-                    .format(np.nanmax(delta.pos_lengths), threshold))
+                self.report('max site position change is {:.4g}, tolerance is {:.4g} - NOT OK'.format(
+                    np.nanmax(delta.pos_lengths), threshold))
             except RuntimeWarning:
                 pass
         elif self.ctx.verbose:
             try:
-                self.report(
-                    'max site position change is {:.4g}, tolerance is {:.4g} - OK'
-                    .format(np.nanmax(delta.pos_lengths), threshold))
+                self.report('max site position change is {:.4g}, tolerance is {:.4g} - OK'.format(np.nanmax(delta.pos_lengths), threshold))
             except RuntimeWarning:
                 pass
 
@@ -450,17 +375,15 @@ class VaspRelaxWorkChain(WorkChain):
 
         relaxed_structure = workchain.outputs.structure
         if self.ctx.verbose:
-            self.report("attaching the node {}<{}> as '{}'".format(
-                relaxed_structure.__class__.__name__, relaxed_structure.pk,
-                'relax.structure'))
+            self.report("attaching the node {}<{}> as '{}'".format(relaxed_structure.__class__.__name__, relaxed_structure.pk,
+                                                                   'relax.structure'))
         self.out('relax.structure', relaxed_structure)
 
         if not self.ctx.is_converged:
             # If the relaxation is not converged, there is no point to
             # proceed furthure, and the result of last calculation is attached
             workchain = self.ctx.workchains[-1]
-            self.out_many(self.exposed_outputs(workchain,
-                                               self._base_workchain))
+            self.out_many(self.exposed_outputs(workchain, self._base_workchain))
             return self.exit_codes.ERROR_RELAX_NOT_CONVERGED  # pylint: disable=no-member
 
     def results(self):
@@ -474,6 +397,7 @@ class VaspRelaxWorkChain(WorkChain):
 
     def finalize(self):
         """Finalize the workchain."""
+
     def perform_relaxation(self):
         """Check if a relaxation is to be performed."""
         return self.ctx.relax_settings.perform
@@ -519,26 +443,18 @@ def compare_structures(structure_a, structure_b):
     # pos_b = np.array([site.position for site in structure_b.sites])
     delta.absolute.pos = pos_change_abs
 
-    site_vectors = [
-        delta.absolute.pos[i, :] for i in range(delta.absolute.pos.shape[0])
-    ]
+    site_vectors = [delta.absolute.pos[i, :] for i in range(delta.absolute.pos.shape[0])]
     a_lengths = np.linalg.norm(pos_a, axis=1)
-    delta.absolute.pos_lengths = np.array(
-        [np.linalg.norm(vector) for vector in site_vectors])
-    delta.relative.pos_lengths = np.array(
-        [np.linalg.norm(vector) for vector in site_vectors]) / a_lengths
+    delta.absolute.pos_lengths = np.array([np.linalg.norm(vector) for vector in site_vectors])
+    delta.relative.pos_lengths = np.array([np.linalg.norm(vector) for vector in site_vectors]) / a_lengths
 
     cell_lengths_a = np.array(structure_a.cell_lengths)
-    delta.absolute.cell_lengths = np.absolute(
-        cell_lengths_a - np.array(structure_b.cell_lengths))
-    delta.relative.cell_lengths = np.absolute(
-        cell_lengths_a - np.array(structure_b.cell_lengths)) / cell_lengths_a
+    delta.absolute.cell_lengths = np.absolute(cell_lengths_a - np.array(structure_b.cell_lengths))
+    delta.relative.cell_lengths = np.absolute(cell_lengths_a - np.array(structure_b.cell_lengths)) / cell_lengths_a
 
     cell_angles_a = np.array(structure_a.cell_angles)
-    delta.absolute.cell_angles = np.absolute(cell_angles_a -
-                                             np.array(structure_b.cell_angles))
-    delta.relative.cell_angles = np.absolute(
-        cell_angles_a - np.array(structure_b.cell_angles)) / cell_angles_a
+    delta.absolute.cell_angles = np.absolute(cell_angles_a - np.array(structure_b.cell_angles))
+    delta.relative.cell_angles = np.absolute(cell_angles_a - np.array(structure_b.cell_angles)) / cell_angles_a
 
     return delta
 
@@ -547,68 +463,45 @@ class RelaxOptions(OptionHolder):
     """
     Options for relaxations
     """
-    _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps',
-                        'positions', 'shape', 'volume', 'convergence_on',
-                        'convergence_mode', 'convergence_volume',
-                        'convergence_absolute', 'convergence_max_iterations',
-                        'convergence_positions', 'convergence_shape_lengths',
-                        'convergence_shape_angles', 'perform')
+    _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps', 'positions', 'shape', 'volume', 'convergence_on',
+                        'convergence_mode', 'convergence_volume', 'convergence_absolute', 'convergence_max_iterations',
+                        'convergence_positions', 'convergence_shape_lengths', 'convergence_shape_angles', 'perform')
 
-    algo = typed_field('algo', (str, ), 'The algorithm to use for relaxation.',
-                       'cg')
-    energy_cutoff = typed_field(
-        'energy_cutoff', (float, ), """
+    algo = typed_field('algo', (str,), 'The algorithm to use for relaxation.', 'cg')
+    energy_cutoff = typed_field('energy_cutoff', (float,), """
     The cutoff that determines when the relaxation is stopped (eg. EDIFF)
     """, None)
     force_cutoff = typed_field(
-        'force_cutoff', (float, ), """
+        'force_cutoff', (float,), """
             The cutoff that determines when the relaxation procedure is stopped. In this
             case it stops when all forces are smaller than than the
             supplied value.
     """, 0.03)
-    steps = typed_field('steps', (int, ),
-                        'Number of relaxation steps to perform (eg. NSW)', 60)
-    positions = typed_field(
-        'positions', (bool, ),
-        'If True, perform relaxation of the atomic positions', True)
-    shape = typed_field('shape', (bool, ),
-                        'If True, perform relaxation of the cell shape', True)
-    volume = typed_field('volume', (bool, ),
-                         'If True, perform relaxation of the cell volume',
-                         True)
+    steps = typed_field('steps', (int,), 'Number of relaxation steps to perform (eg. NSW)', 60)
+    positions = typed_field('positions', (bool,), 'If True, perform relaxation of the atomic positions', True)
+    shape = typed_field('shape', (bool,), 'If True, perform relaxation of the cell shape', True)
+    volume = typed_field('volume', (bool,), 'If True, perform relaxation of the cell volume', True)
 
-    convergence_on = typed_field(
-        'convergence_on', (bool, ),
-        'If True, perform convergence checks within the workchain', True)
-    convergence_absolute = typed_field(
-        'convergence_absolute', (bool, ),
-        'If True, use absolute value for convergence checks where possible',
-        False)
-    convergence_max_iterations = typed_field(
-        'convergence_max_iterations', (int, ),
-        'Maximum iterations for convergence checking', 5)
-    convergence_volume = typed_field(
-        'convergence_volume', (float, ),
-        'The cutoff value for the convergence check on volume, between input and output structure',
-        0.01)
-    convergence_positions = typed_field('convergence_positions', (float, ), (
-        'The cutoff value for the convergence check on positions, in AA regardless'
-        'of the value of ``convergence_absolute``.'
-        'NOTE: This check is done between input and output structure.'), 0.1)
+    convergence_on = typed_field('convergence_on', (bool,), 'If True, perform convergence checks within the workchain', True)
+    convergence_absolute = typed_field('convergence_absolute', (bool,), 'If True, use absolute value for convergence checks where possible',
+                                       False)
+    convergence_max_iterations = typed_field('convergence_max_iterations', (int,), 'Maximum iterations for convergence checking', 5)
+    convergence_volume = typed_field('convergence_volume', (float,),
+                                     'The cutoff value for the convergence check on volume, between input and output structure', 0.01)
+    convergence_positions = typed_field('convergence_positions', (float,),
+                                        ('The cutoff value for the convergence check on positions, in AA regardless'
+                                         'of the value of ``convergence_absolute``.'
+                                         'NOTE: This check is done between input and output structure.'), 0.1)
     convergence_shape_lengths = typed_field(
-        'convergence_shape_lengths', (float, ),
-        'The cut off value for the convergence check on the lengths of the unit cell vectors, between input and output structure.',
-        0.1)
+        'convergence_shape_lengths', (float,),
+        'The cut off value for the convergence check on the lengths of the unit cell vectors, between input and output structure.', 0.1)
     convergence_shape_angles = typed_field(
-        'convergence_shape_angles', (float, ),
-        'The cut off value for the convergence check on the angles of the unit cell vectors, between input and output structure.',
-        0.1)
-    convergence_mode = typed_field(
-        'convergence_mode', (str, ),
-        'Mode of the convergence - select from \'inout\' and \'last\'', 'last')
+        'convergence_shape_angles', (float,),
+        'The cut off value for the convergence check on the angles of the unit cell vectors, between input and output structure.', 0.1)
+    convergence_mode = typed_field('convergence_mode', (str,), 'Mode of the convergence - select from \'inout\' and \'last\'', 'last')
     perform = typed_field(
         'perform',
-        (bool, ),
+        (bool,),
         'Wether to perform the relaxation or not',
         True,
     )

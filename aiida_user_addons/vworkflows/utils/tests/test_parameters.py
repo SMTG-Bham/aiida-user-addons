@@ -95,8 +95,7 @@ def test_relax_parameters_energy(init_relax_parameters):
     assert parameters.ediffg == 0.01
 
 
-def test_relax_parameters_no_algo(init_relax_parameters,
-                                  init_simple_workchain):
+def test_relax_parameters_no_algo(init_relax_parameters, init_simple_workchain):
     """Test no provided algo tag."""
     mock_workchain = init_simple_workchain
     del init_relax_parameters.relax.algo
@@ -326,18 +325,12 @@ def test_inherit_and_merge():
     parameters = inherit_and_merge_parameters(inputs)
     print(parameters)
     test_parameters = AttributeDict({
-        'electronic':
-        AttributeDict({'somekey': True}),
-        'bands':
-        AttributeDict({'somekey': True}),
-        'smearing':
-        AttributeDict({'somekey': True}),
-        'charge':
-        AttributeDict({'somekey': True}),
-        'relax':
-        AttributeDict({'somekey': True}),
-        'converge':
-        AttributeDict({'somekey': True})
+        'electronic': AttributeDict({'somekey': True}),
+        'bands': AttributeDict({'somekey': True}),
+        'smearing': AttributeDict({'somekey': True}),
+        'charge': AttributeDict({'somekey': True}),
+        'relax': AttributeDict({'somekey': True}),
+        'converge': AttributeDict({'somekey': True})
     })
     assert parameters == test_parameters
     # Test ignored

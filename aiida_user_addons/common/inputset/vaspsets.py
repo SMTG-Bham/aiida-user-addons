@@ -10,6 +10,7 @@ from aiida.orm import Dict, StructureData
 
 class VASPInputSet(InputSet):
     """Input set for VASP"""
+
     def get_input_dict(self, raw_python=True):
         """Get a input dictionary"""
         out_dict = super(VASPInputSet, self).get_input_dict(raw_python=True)
@@ -47,10 +48,7 @@ class VASPInputSet(InputSet):
         ldaujmap = deepcopy(self._presets['ldauj_mapping'])
         ldaujmap.update(self.overides.get('ldauj_mapping', {}))
 
-        ldaukeys = get_ldau_keys(self.structure,
-                                 ldauumap,
-                                 utype=2,
-                                 jmapping=ldaujmap)
+        ldaukeys = get_ldau_keys(self.structure, ldauumap, utype=2, jmapping=ldaujmap)
         out_dict.update(ldaukeys)
 
         # Apply overrides again over the automatically applied keys
@@ -129,14 +127,7 @@ def get_ldau_keys(structure, mapping, utype=2, jmapping=None, felec=False):
 
     if count > 0:
         # Only enable U is there is any non-zero value
-        output = {
-            'ldauu': ldauu,
-            'ldauj': ldauj,
-            'ldautype': utype,
-            'lmaxmix': 6 if felec else 4,
-            'ldaul': ldaul,
-            'ldau': True
-        }
+        output = {'ldauu': ldauu, 'ldauj': ldauj, 'ldautype': utype, 'lmaxmix': 6 if felec else 4, 'ldaul': ldaul, 'ldau': True}
     else:
         output = {}
     return output

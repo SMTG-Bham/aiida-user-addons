@@ -11,8 +11,7 @@ try:
     matplotlib.use('TKAgg')
     from matplotlib import pyplot as plt
 except ImportError:
-    raise ImportError('Error: matplotlib must be ' +
-                      'installed to use this functionality')
+    raise ImportError('Error: matplotlib must be ' + 'installed to use this functionality')
 
 
 def get_bs_dims(bands_array):
@@ -92,12 +91,7 @@ def get_kp_node(calc):
     return kpoints_node
 
 
-def plot_bstr(bands_node,
-              kpoints_node=None,
-              title=None,
-              efermi=None,
-              use_parent_calc=False,
-              **kwargs):
+def plot_bstr(bands_node, kpoints_node=None, title=None, efermi=None, use_parent_calc=False, **kwargs):
     """
     Use matplotlib to plot the bands stored in a BandsData node.
 
@@ -129,9 +123,7 @@ def plot_bstr(bands_node,
 
     if efermi:
         plt.hlines(efermi, plt.xlim()[0], nkp - 1, linestyles='dashed')
-        plt.yticks(
-            list(plt.yticks()[0]) + [efermi],
-            [str(l) for l in plt.yticks()[0]] + [r'$E_{fermi}$'])
+        plt.yticks(list(plt.yticks()[0]) + [efermi], [str(l) for l in plt.yticks()[0]] + [r'$E_{fermi}$'])
 
     try:
         kpx, kpl = get_kp_labels(bands_node, kpoints_node)

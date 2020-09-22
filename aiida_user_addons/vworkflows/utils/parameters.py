@@ -74,27 +74,18 @@ class OrbitEnum(enum.IntEnum):
     @classmethod
     def get_lorbit_from_combination(cls, **kwargs):
         """Get the correct mode of the projectors/decomposition."""
-        combination = tuple(kwargs[i]
-                            for i in ['lm', 'phase', 'wigner_seitz_radius'])
+        combination = tuple(kwargs[i] for i in ['lm', 'phase', 'wigner_seitz_radius'])
         value_from_combinations = {
-            (False, False, True):
-            cls.ATOM,
-            (True, False, True):
-            cls.ATOM_LM,
-            (True, True, True):
-            cls.ATOM_LM_PHASE,
-            (False, False, False):
-            cls.NO_RWIGS_ATOM,
-            (True, False, False):
-            cls.NO_RWIGS_ATOM_LM,
-            (True, True, False):
-            cls.NO_RWIGS_ATOM_LM_PHASE,
+            (False, False, True): cls.ATOM,
+            (True, False, True): cls.ATOM_LM,
+            (True, True, True): cls.ATOM_LM_PHASE,
+            (False, False, False): cls.NO_RWIGS_ATOM,
+            (True, False, False): cls.NO_RWIGS_ATOM_LM,
+            (True, True, False): cls.NO_RWIGS_ATOM_LM_PHASE,
             # Not supported, so also calculate lm decomposed
-            (False, True, True):
-            cls.ATOM_LM_PHASE,
+            (False, True, True): cls.ATOM_LM_PHASE,
             # Not supported, so also calculate lm decomposed
-            (False, True, False):
-            cls.NO_RWIGS_ATOM_LM_PHASE
+            (False, True, False): cls.NO_RWIGS_ATOM_LM_PHASE
         }
         return value_from_combinations[combination]
 
@@ -140,9 +131,7 @@ class RelaxModeEnum(enum.IntEnum):
         try:
             return value_from_dof[dof]
         except KeyError:
-            raise ValueError(
-                'Invalid combination for degrees of freedom: {}'.format(
-                    dict(zip(RELAX_POSSIBILITIES, dof))))
+            raise ValueError('Invalid combination for degrees of freedom: {}'.format(dict(zip(RELAX_POSSIBILITIES, dof))))
 
 
 class ParametersMassage():
@@ -155,6 +144,7 @@ class ParametersMassage():
     This set function takes the AiiDA input and converts it. The parameter property should return ready to go parameters
     that can be dumped using the parsers in the respective CalcJob plugins.
     """
+
     def __init__(self, workchain, parameters):
         # First of all make sure parameters is a not a AiiDA Dict datatype
         self.exit_code = None
@@ -165,20 +155,14 @@ class ParametersMassage():
         elif isinstance(parameters, AttributeDict):
             self._parameters = parameters
         else:
-            raise TypeError(
-                'The supplied type: {} of parameters is not supported. '
-                'Supply either a Dict or an AttributeDict'.format(
-                    type(parameters)))
+            raise TypeError('The supplied type: {} of parameters is not supported. '
+                            'Supply either a Dict or an AttributeDict'.format(type(parameters)))
 
         # Internally, make sure the keys in self._parameters are all in lower case as standard
-        self._parameters = AttributeDict(
-            {key.lower(): value
-             for key, value in self._parameters.items()})
+        self._parameters = AttributeDict({key.lower(): value for key, value in self._parameters.items()})
 
         self._load_valid_params()
-        self._functions = ParameterSetFunctions(self._workchain,
-                                                self._parameters,
-                                                self._massage)
+        self._functions = ParameterSetFunctions(self._workchain, self._parameters, self._massage)
         self._set_parameters()
         self._set_vasp_parameters()
         # No point to proceed if the override parameters already contains an invalid keys, or the set process trigger another exit code
@@ -190,8 +174,7 @@ class ParametersMassage():
         """Import a list of valid parameters for VASP. This is generated from the manual."""
         from os import path  # pylint: disable=import-outside-toplevel
         from yaml import safe_load  # pylint: disable=import-outside-toplevel
-        with open(path.join(path.dirname(path.realpath(__file__)), 'tags.yml'),
-                  'r') as file_handler:
+        with open(path.join(path.dirname(path.realpath(__file__)), 'tags.yml'), 'r') as file_handler:
             tags_data = safe_load(file_handler)
         self._valid_parameters = list(tags_data.keys())
 
@@ -220,8 +203,7 @@ class ParametersMassage():
     def _valid_vasp_parameter(self, key):
         """Make sure a key are recognized as a valid VASP input parameter."""
         if key not in self._valid_parameters:
-            msg = 'Found an invalid key for the INCAR parameters: {}'.format(
-                key)
+            msg = 'Found an invalid key for the INCAR parameters: {}'.format(key)
             if self._workchain is not None:
                 self._workchain.report(msg)
                 self.exit_code = self._workchain.exit_codes.ERROR_INVALID_PARAMETER_DETECTED
@@ -262,6 +244,7 @@ class ParametersMassage():
 
 class ParameterSetFunctions():
     """Container for the set functions that converts an AiiDA parameters to a code specific one."""
+
     def __init__(self, workchain, parameters, massage):
         self._parameters = parameters
         self._workchain = workchain
@@ -280,8 +263,7 @@ class ParameterSetFunctions():
                 elif self._parameters.relax.algo == 'rd':
                     self._massage.ibrion = RelaxAlgoEnum.IONIC_RELAXATION_RMM_DIIS.value
                 else:
-                    self._workchain.report('Invalid algo parameter: {}'.format(
-                        self._parameters.relax.algo))
+                    self._workchain.report('Invalid algo parameter: {}'.format(self._parameters.relax.algo))
                     return self._workchain.exit_codes.ERROR_INVALID_PARAMETER_DETECTED
             except AttributeError:
                 self._workchain.report('Missing parameter: algo')
@@ -306,9 +288,7 @@ class ParameterSetFunctions():
         try:
             self._massage.ediffg = -abs(self._parameters.relax.force_cutoff)
             if energy_cutoff:
-                self._workchain.report(
-                    'User supplied both a force and an energy cutoff for the relaxation. Utilizing the force cutoff.'
-                )
+                self._workchain.report('User supplied both a force and an energy cutoff for the relaxation. Utilizing the force cutoff.')
         except AttributeError:
             pass
 
@@ -331,8 +311,7 @@ class ParameterSetFunctions():
         shape = self._parameters.get('relax', {}).get('shape', False)
         volume = self._parameters.get('relax', {}).get('volume', False)
         if positions or shape or volume:
-            self._massage.isif = RelaxModeEnum.get_isif_from_dof(
-                positions=positions, shape=shape, volume=volume).value
+            self._massage.isif = RelaxModeEnum.get_isif_from_dof(positions=positions, shape=shape, volume=volume).value
 
     def set_ismear(self):
         """
@@ -353,10 +332,7 @@ class ParameterSetFunctions():
             pass
         try:
             if self._parameters.smearing.mp:
-                self._set_simple(
-                    'ismear',
-                    IntSmearingEnum.MP.value *
-                    abs(int(self._parameters.smearing.mp)))
+                self._set_simple('ismear', IntSmearingEnum.MP.value * abs(int(self._parameters.smearing.mp)))
         except AttributeError:
             pass
         try:
@@ -413,9 +389,7 @@ class ParameterSetFunctions():
             if self._parameters.bands.decompose_bands:
                 if self._parameters.bands.decompose_wave:
                     # Issue a warning that one can only use either or
-                    raise ValueError(
-                        'Only projections/decompositions on the bands or the wave function are allowed.'
-                    )
+                    raise ValueError('Only projections/decompositions on the bands or the wave function are allowed.')
                 wigner_seitz_radius = False
                 try:
                     if abs(self._massage.rwigs[0]) > 1E-8:
@@ -423,8 +397,7 @@ class ParameterSetFunctions():
                 except AttributeError:
                     pass
                 if self._parameters.bands.decompose_auto:
-                    self._set_simple(
-                        'lorbit', OrbitEnum.NO_RWIGS_ATOM_LM_PHASE_AUTO.value)
+                    self._set_simple('lorbit', OrbitEnum.NO_RWIGS_ATOM_LM_PHASE_AUTO.value)
                 else:
                     try:
                         lm = self._parameters.bands.lm  # pylint: disable=invalid-name
@@ -434,16 +407,12 @@ class ParameterSetFunctions():
                         phase = self._parameters.bands.phase
                     except AttributeError:
                         phase = False
-                    lorbit = OrbitEnum.get_lorbit_from_combination(
-                        lm=lm,
-                        phase=phase,
-                        wigner_seitz_radius=wigner_seitz_radius).value
+                    lorbit = OrbitEnum.get_lorbit_from_combination(lm=lm, phase=phase, wigner_seitz_radius=wigner_seitz_radius).value
                     self._set_simple('lorbit', lorbit)
             else:
                 try:
                     if self._parameters.bands.decompose_wave:
-                        self._set_simple('lorbit',
-                                         OrbitEnum.ATOM_LM_WAVE.value)
+                        self._set_simple('lorbit', OrbitEnum.ATOM_LM_WAVE.value)
                 except AttributeError:
                     pass
         except AttributeError:
@@ -466,9 +435,7 @@ class ParameterSetFunctions():
                 if wigner_seitz_radius[0]:
                     self._set_simple('rwigs', wigner_seitz_radius)
             else:
-                raise ValueError(
-                    'The parameter wigner_seitz_radius should be supplied as a list of floats bigger than zero.'
-                )
+                raise ValueError('The parameter wigner_seitz_radius should be supplied as a list of floats bigger than zero.')
         except AttributeError:
             pass
 
@@ -494,9 +461,7 @@ def inherit_and_merge_parameters(inputs):
     in case there is overlap.
     """
     parameters = AttributeDict()
-    namespaces = [
-        'electronic', 'bands', 'smearing', 'charge', 'relax', 'converge'
-    ]
+    namespaces = ['electronic', 'bands', 'smearing', 'charge', 'relax', 'converge']
     for namespace in namespaces:  # pylint: disable=too-many-nested-blocks
         parameters[namespace] = AttributeDict()
         try:

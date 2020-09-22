@@ -9,12 +9,9 @@ import requests
 
 VERSION = {
     'latest': {
-        'version':
-        '5.2',
-        'url':
-        'http://cms.mpi.univie.ac.at/vasp/vasp/Recommended_PAW_potentials_DFT_calculations_using_vasp_5_2.html',
-        'gw-url':
-        'http://cms.mpi.univie.ac.at/vasp/vasp/Recommended_GW_PAW_potentials_vasp_5_2.html'
+        'version': '5.2',
+        'url': 'http://cms.mpi.univie.ac.at/vasp/vasp/Recommended_PAW_potentials_DFT_calculations_using_vasp_5_2.html',
+        'gw-url': 'http://cms.mpi.univie.ac.at/vasp/vasp/Recommended_GW_PAW_potentials_vasp_5_2.html'
     }
 }
 
@@ -43,6 +40,7 @@ def get_recommendations(version_nr='latest', use_gw=False):
 # pylint: disable=too-few-public-methods
 class PawInfo(object):  # pylint: disable=useless-object-inheritance
     """Simple class to bundle and pass around info about a PAW."""
+
     def __init__(self, symbol, default_enmax, valency):
         self.symbol = symbol
         self.default_enmax = default_enmax
@@ -91,12 +89,8 @@ if __name__ == '__main__':
     DEF_GW = get_recommendations(use_gw=True)
     with open('default_paws.py', 'w') as defaults:
         defaults.write('lda = {\n')
-        defaults.writelines(
-            ['"{}": "{}",\n'.format(k, v) for k, v in DEF_PAW.items()])
+        defaults.writelines(['"{}": "{}",\n'.format(k, v) for k, v in DEF_PAW.items()])
         defaults.write('}\n\n')
         defaults.write('gw = {\n')
-        defaults.writelines([
-            '"{}": "{}",\n'.format(k, v.replace('_GW', ''))
-            for k, v in DEF_GW.items()
-        ])
+        defaults.writelines(['"{}": "{}",\n'.format(k, v.replace('_GW', '')) for k, v in DEF_GW.items()])
         defaults.write('}\n\n')

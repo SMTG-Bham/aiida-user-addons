@@ -23,7 +23,7 @@ class BandsWorkChain(WorkChain):
     Automatically does bandstructure calculations.
     Logic:
       - Initialise and verify the inputs
-      - Generate the kpoints paths using seekpath, warn if the input structure differs 
+      - Generate the kpoints paths using seekpath, warn if the input structure differs
         from the primitive unit cell from which the bandstrucure will be compouted
       - if no charge density is given, perform single point calculation to obtain it
       - Perform the bandstructure calculation.
@@ -54,8 +54,7 @@ class BandsWorkChain(WorkChain):
         @classmethod
         def get_from_combination(cls, **kwargs):
             """Get the correct mode of the projectors/decomposition."""
-            combination = tuple(
-                kwargs[i] for i in ['lm', 'phase', 'wigner_seitz_radius'])
+            combination = tuple(kwargs[i] for i in ['lm', 'phase', 'wigner_seitz_radius'])
             value_from_combinations = {
                 (True, True, True): cls.ATOM_LM_PHASE,
                 (False, False, False): cls.NO_RWIGS_ATOM,
@@ -72,21 +71,15 @@ class BandsWorkChain(WorkChain):
     def define(cls, spec):
         super(BandsWorkChain, cls).define(spec)
         # This expose at the top level
-        spec.expose_inputs(cls._next_workchain,
-                           exclude=('parameters', 'settings'))
+        spec.expose_inputs(cls._next_workchain, exclude=('parameters', 'settings'))
 
-        spec.input('bands.option_update', help='Updates to the options for running the actual band calculation', 
-                   valid_type=get_data_class('dict'), 
-                   required=False)
-        spec.input('parameters',
+        spec.input('bands.option_update',
+                   help='Updates to the options for running the actual band calculation',
                    valid_type=get_data_class('dict'),
                    required=False)
-        spec.input('bands.parameters',
-                   valid_type=get_data_class('dict'),
-                   required=False)
-        spec.input('settings',
-                   valid_type=get_data_class('dict'),
-                   required=False)
+        spec.input('parameters', valid_type=get_data_class('dict'), required=False)
+        spec.input('bands.parameters', valid_type=get_data_class('dict'), required=False)
+        spec.input('settings', valid_type=get_data_class('dict'), required=False)
         spec.input('bands.kpoints_distance',
                    valid_type=get_data_class('float'),
                    required=False,
@@ -148,12 +141,8 @@ class BandsWorkChain(WorkChain):
         spec.output('primitive_structure', valid_type=get_data_class('structure'), required=False)
         spec.output('bands', valid_type=get_data_class('array.bands'))
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
-        spec.exit_code(420,
-                       'ERROR_NO_CALLED_WORKCHAIN',
-                       message='no called workchain detected')
-        spec.exit_code(500,
-                       'ERROR_UNKNOWN',
-                       message='unknown error detected in the bands workchain')
+        spec.exit_code(420, 'ERROR_NO_CALLED_WORKCHAIN', message='no called workchain detected')
+        spec.exit_code(500, 'ERROR_UNKNOWN', message='unknown error detected in the bands workchain')
 
         spec.exit_code(501, 'ERROR_INVALID_INPUT', message='Invalid input detected')
 
@@ -169,8 +158,7 @@ class BandsWorkChain(WorkChain):
         try:
             self.ctx.inputs
         except AttributeError:
-            raise ValueError(
-                'No input dictionary was defined in self.ctx.inputs')
+            raise ValueError('No input dictionary was defined in self.ctx.inputs')
 
         # Add exposed inputs
         self.ctx.inputs.update(self.exposed_inputs(self._next_workchain))
@@ -201,13 +189,12 @@ class BandsWorkChain(WorkChain):
         self.ctx.inputs.chgcar = self.ctx.workchains[-1].outputs.chgcar
 
         # Swap back the parameters and kpoints back to use those for bands
-        self.ctx.inputs.parameters = self.ctx.bands_parameters 
+        self.ctx.inputs.parameters = self.ctx.bands_parameters
         self.ctx.inputs.kpoints = self.ctx.seek_path_kpoints
 
         # Swap the settings - no longer retrieving chgcar
         self.ctx.inputs.settings['add_bands'] = True
         self.ctx.inputs.settings.pop('chgcar', None)
-
 
     def initialize(self):
         """Initialize."""
@@ -240,11 +227,7 @@ class BandsWorkChain(WorkChain):
 
         # Do not put the SeeKPath parameters in the inputs to avoid port checking
         # of the next workchain
-        self.ctx.seekpath_parameters = get_data_node(
-            'dict',
-            dict={
-                'reference_distance': self.inputs.bands.kpoints_distance.value
-            })
+        self.ctx.seekpath_parameters = get_data_node('dict', dict={'reference_distance': self.inputs.bands.kpoints_distance.value})
 
         try:
             self._verbose = self.inputs.verbose.value
@@ -254,10 +237,7 @@ class BandsWorkChain(WorkChain):
 
     def _add_overrides(self, parameters):
         """Add parameters tag overrides, except the ones controlled by other inputs (for provenance)."""
-        overrides = AttributeDict({
-            k.lower(): v
-            for k, v in self.inputs.bands.parameters.get_dict().items()
-        })
+        overrides = AttributeDict({k.lower(): v for k, v in self.inputs.bands.parameters.get_dict().items()})
         parameters.vasp.update(overrides)
 
     def _init_parameters(self):
@@ -306,10 +286,8 @@ class BandsWorkChain(WorkChain):
         try:
             ismear = int(parameters.ismear)
             if ismear < -1:
-                self.report(
-                    'The requested integration method is incompatible with explicit k-point grids. '
-                    'Setting the integration method to the default (removing tag).'
-                )
+                self.report('The requested integration method is incompatible with explicit k-point grids. '
+                            'Setting the integration method to the default (removing tag).')
                 del parameters.ismear
         except AttributeError:
             pass
@@ -329,16 +307,13 @@ class BandsWorkChain(WorkChain):
         if self.inputs.bands.decompose_bands:
             if self.inputs.bands.decompose_wave:
                 # Issue a warning that one can only use either or
-                raise ValueError(
-                    'Only projections/decompositions on the bands or the '
-                    'wave function are allowed.')
+                raise ValueError('Only projections/decompositions on the bands or the ' 'wave function are allowed.')
             wigner_seitz_radius = False
             if self.inputs.bands.wigner_seitz_radius.value[0]:
                 wigner_seitz_radius = True
-            parameters.lorbit = self.OrbitEnum.get_from_combination(
-                lm=self.inputs.bands.lm.value,
-                phase=self.inputs.bands.phase.value,
-                wigner_seitz_radius=wigner_seitz_radius)
+            parameters.lorbit = self.OrbitEnum.get_from_combination(lm=self.inputs.bands.lm.value,
+                                                                    phase=self.inputs.bands.phase.value,
+                                                                    wigner_seitz_radius=wigner_seitz_radius)
         else:
             if self.inputs.bands.decompose_wave:
                 parameters.lorbit = self.OrbitEnum.ATOM_LM_WAVE
@@ -348,8 +323,7 @@ class BandsWorkChain(WorkChain):
         try:
             self.ctx.inputs
         except AttributeError:
-            raise ValueError(
-                'No input dictionary was defined in self.ctx.inputs')
+            raise ValueError('No input dictionary was defined in self.ctx.inputs')
 
         # Add exposed inputs
         self.ctx.inputs.update(self.exposed_inputs(self._next_workchain))
@@ -371,8 +345,7 @@ class BandsWorkChain(WorkChain):
         inputs = self.ctx.inputs
         running = self.submit(self._next_workchain, **inputs)
 
-        self.report('launching {}<{}> '.format(self._next_workchain.__name__,
-                                               running.pk))
+        self.report('launching {}<{}> '.format(self._next_workchain.__name__, running.pk))
 
         return self.to_context(workchains=append_(running))
 
@@ -384,8 +357,7 @@ class BandsWorkChain(WorkChain):
         routine returns a new (potentially different to the input structure) primitive
         structure. It also returns the k-point path for this structure.
         """
-        result = seekpath_structure_analysis(self.inputs.structure,
-                                             self.ctx.seekpath_parameters)
+        result = seekpath_structure_analysis(self.inputs.structure, self.ctx.seekpath_parameters)
         self.ctx.seek_path_kpoints = result['explicit_kpoints']
         self.ctx.seek_path_primitive_structure = result['primitive_structure']
 
@@ -394,14 +366,14 @@ class BandsWorkChain(WorkChain):
         cell_mat_seekpath = np.array(self.ctx.seek_path_primitive_structure.cell)
         diff = np.abs(cell_mat_input - cell_mat_seekpath)
         if np.any(diff > 1e-4):
-            self.report("INFO: The original cell is not the same as the primitive cell")
+            self.report('INFO: The original cell is not the same as the primitive cell')
             self.ctx.input_is_primitive = False
             self.ctx.inputs.structure = result['primitive_structure']
             self.out('primitive_structure', self.ctx.inputs.structure)
         else:
             self.ctx.input_is_primitive = True
             self.ctx.inputs.structure = self.inputs.structure
-        
+
         # This sets the kpoints
         self.ctx.inputs.kpoints = result['explicit_kpoints']
 
@@ -411,8 +383,7 @@ class BandsWorkChain(WorkChain):
         try:
             workchain = self.ctx.workchains[-1]
         except IndexError:
-            self.report('There is no {} in the called workchain list.'.format(
-                self._next_workchain.__name__))
+            self.report('There is no {} in the called workchain list.'.format(self._next_workchain.__name__))
             return self.exit_codes.ERROR_NO_CALLED_WORKCHAIN  # pylint: disable=no-member
 
         # Inherit exit status from last workchain (supposed to be
@@ -422,12 +393,9 @@ class BandsWorkChain(WorkChain):
         if not next_workchain_exit_status:
             self.ctx.exit_code = self.exit_codes.NO_ERROR  # pylint: disable=no-member
         else:
-            self.ctx.exit_code = compose_exit_code(
-                next_workchain_exit_status, next_workchain_exit_message)
+            self.ctx.exit_code = compose_exit_code(next_workchain_exit_status, next_workchain_exit_message)
             self.report('The called {}<{}> returned a non-zero exit status. '
-                        'The exit status {} is inherited'.format(
-                            workchain.__class__.__name__, workchain.pk,
-                            self.ctx.exit_code))
+                        'The exit status {} is inherited'.format(workchain.__class__.__name__, workchain.pk, self.ctx.exit_code))
 
         return self.ctx.exit_code
 
@@ -458,6 +426,7 @@ def seekpath_structure_analysis(structure, parameters):
     from aiida.tools import get_explicit_kpoints_path
     return get_explicit_kpoints_path(structure, **parameters.get_dict())
 
+
 @calcfunction
 def compose_labeled_bands(bands, kpoints):
     """
@@ -468,13 +437,13 @@ def compose_labeled_bands(bands, kpoints):
     new_bands.set_kpointsdata(kpoints)
     return new_bands
 
+
 def check_parameters_bands_entries(parameters):
     """Check that some flags are not present in the parameters (no override is allowed)."""
 
     top_level_overrides = AttributeDict({k.lower(): v for k, v in parameters.items()})
     overrides = AttributeDict({k.lower(): v for k, v in parameters.vasp.items()})
     if 'icharg' in overrides or 'icharg' in top_level_overrides:
-        raise ValueError(
-            'overriding ICHARG not allowed, use inputs to control')
+        raise ValueError('overriding ICHARG not allowed, use inputs to control')
     if 'lorbit' in overrides or 'icharg' in top_level_overrides:
         raise ValueError('overriding ISIF not allowed, use inputs to control')

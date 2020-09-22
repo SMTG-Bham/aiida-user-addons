@@ -7,6 +7,7 @@ from aiida_vasp.utils.delegates import Delegate
 
 
 class VaspParser(object):  # pylint: disable=useless-object-inheritance
+
     def __init__(self):
         super(VaspParser, self).__init__()
 
@@ -15,6 +16,7 @@ class VaspParser(object):  # pylint: disable=useless-object-inheritance
 
 
 class FileParser(object):  # pylint: disable=useless-object-inheritance
+
     def __init__(self, cls):
         self._vasp_parser = cls
         if cls is not None:

@@ -24,10 +24,10 @@ class SgeNoDetailScheduler(SgeScheduler):
     SGE Scheduler for Myriad - the qacct account in SGE is slow.
     This plugin does use qacct to save ``detailed_job_info``.
     """
+
     def _get_detailed_job_info_command(self, jobid):
         """
         Override superclass method
         """
         # pylint: disable=no-self-use, not-callable, unused-argument
-        raise FeatureNotAvailable(
-            'Detailed jobinfo disabled in SgeNoDetailScheduler')
+        raise FeatureNotAvailable('Detailed jobinfo disabled in SgeNoDetailScheduler')

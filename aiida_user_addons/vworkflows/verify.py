@@ -34,13 +34,8 @@ class VerifyWorkChain(WorkChain):
                    The maximum number of iterations to perform.
                    """)
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
-        spec.exit_code(420,
-                       'ERROR_NO_CALLED_WORKCHAIN',
-                       message='no called workchain detected')
-        spec.exit_code(
-            500,
-            'ERROR_UNKNOWN',
-            message='unknown error detected in the verify workchain')
+        spec.exit_code(420, 'ERROR_NO_CALLED_WORKCHAIN', message='no called workchain detected')
+        spec.exit_code(500, 'ERROR_UNKNOWN', message='unknown error detected in the verify workchain')
         spec.outline(
             cls.initialize,
             while_(cls.run_next_workchains)(
@@ -90,8 +85,7 @@ class VerifyWorkChain(WorkChain):
         try:
             self.ctx.inputs
         except AttributeError:
-            raise ValueError(
-                'No input dictionary was defined in self.ctx.inputs')
+            raise ValueError('No input dictionary was defined in self.ctx.inputs')
 
         # Add exposed inputs
         self.ctx.inputs.update(self.exposed_inputs(self._next_workchain))
@@ -104,8 +98,7 @@ class VerifyWorkChain(WorkChain):
         inputs = self.ctx.inputs
         running = self.submit(self._next_workchain, **inputs)
 
-        self.report('launching {}<{}> iteration #{}'.format(
-            self._next_workchain.__name__, running.pk, self.ctx.iteration))
+        self.report('launching {}<{}> iteration #{}'.format(self._next_workchain.__name__, running.pk, self.ctx.iteration))
         return self.to_context(workchains=append_(running))
 
     def verify_next_workchain(self):
@@ -123,8 +116,7 @@ class VerifyWorkChain(WorkChain):
         try:
             workchain = self.ctx.workchains[-1]
         except IndexError:
-            self.report('There is no {} in the called workchain list.'.format(
-                self._next_workchain.__name__))
+            self.report('There is no {} in the called workchain list.'.format(self._next_workchain.__name__))
             return self.exit_codes.ERROR_NO_CALLED_WORKCHAIN  # pylint: disable=no-member
 
         # Inherit exit status from last workchain (supposed to be
@@ -134,12 +126,9 @@ class VerifyWorkChain(WorkChain):
         if not next_workchain_exit_status:
             self.ctx.exit_code = self.exit_codes.NO_ERROR  # pylint: disable=no-member
         else:
-            self.ctx.exit_code = compose_exit_code(
-                next_workchain_exit_status, next_workchain_exit_message)
+            self.ctx.exit_code = compose_exit_code(next_workchain_exit_status, next_workchain_exit_message)
             self.report('The called {}<{}> returned a non-zero exit status. '
-                        'The exit status {} is inherited'.format(
-                            workchain.__class__.__name__, workchain.pk,
-                            self.ctx.exit_code))
+                        'The exit status {} is inherited'.format(workchain.__class__.__name__, workchain.pk, self.ctx.exit_code))
 
         return self.ctx.exit_code
 

@@ -16,10 +16,8 @@ from aiida_vasp.utils.aiida_utils import get_data_node, aiida_version, cmp_versi
 
 
 @pytest.mark.wc
-@pytest.mark.parametrize(['vasp_structure', 'vasp_kpoints'], [('str', 'mesh')],
-                         indirect=True)
-def test_vasp_wc(fresh_aiida_env, vasp_params, potentials, vasp_kpoints,
-                 vasp_structure, mock_vasp):
+@pytest.mark.parametrize(['vasp_structure', 'vasp_kpoints'], [('str', 'mesh')], indirect=True)
+def test_vasp_wc(fresh_aiida_env, vasp_params, potentials, vasp_kpoints, vasp_structure, mock_vasp):
     """Test submitting only, not correctness, with mocked vasp code."""
     from aiida.orm import Code
     from aiida.plugins import WorkflowFactory
@@ -63,10 +61,8 @@ def test_vasp_wc(fresh_aiida_env, vasp_params, potentials, vasp_kpoints,
 
 
 @pytest.mark.wc
-@pytest.mark.parametrize(['vasp_structure', 'vasp_kpoints'], [('str', 'mesh')],
-                         indirect=True)
-def test_vasp_wc_chgcar(fresh_aiida_env, vasp_params, potentials, vasp_kpoints,
-                        vasp_structure, mock_vasp):
+@pytest.mark.parametrize(['vasp_structure', 'vasp_kpoints'], [('str', 'mesh')], indirect=True)
+def test_vasp_wc_chgcar(fresh_aiida_env, vasp_params, potentials, vasp_kpoints, vasp_structure, mock_vasp):
     """Test submitting only, not correctness, with mocked vasp code, test fetching of the CHGCAR."""
     from aiida.orm import Code
     from aiida.plugins import WorkflowFactory
@@ -95,13 +91,7 @@ def test_vasp_wc_chgcar(fresh_aiida_env, vasp_params, potentials, vasp_kpoints,
                                        },
                                        'max_wallclock_seconds': 3600
                                    })
-    inputs.settings = get_data_node('dict',
-                                    dict={
-                                        'ADDITIONAL_RETRIEVE_LIST': ['CHGCAR'],
-                                        'parser_settings': {
-                                            'add_chgcar': True
-                                        }
-                                    })
+    inputs.settings = get_data_node('dict', dict={'ADDITIONAL_RETRIEVE_LIST': ['CHGCAR'], 'parser_settings': {'add_chgcar': True}})
     inputs.max_iterations = get_data_node('int', 1)
     inputs.clean_workdir = get_data_node('bool', False)
     inputs.verbose = get_data_node('bool', True)

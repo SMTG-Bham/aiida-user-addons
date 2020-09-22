@@ -62,10 +62,7 @@ def make_reference_bands_inline(wannier_bands, vasp_bands, efermi=None):
     w_nbands = wbands.shape[1]
     ref_nbands = vbands.shape[1]
     for band_idx in range(w_nbands):
-        errs = [
-            band_error(wbands[:, band_idx], vbands[:, i])
-            for i in range(ref_nbands)
-        ]
+        errs = [band_error(wbands[:, band_idx], vbands[:, i]) for i in range(ref_nbands)]
         minerr = np.argmin(errs)
         vbands_window[:, band_idx] = vbands[:, minerr]
         vocc_window[:, band_idx] = vocc[:, minerr]
@@ -113,13 +110,10 @@ def get_outer_window(bands_node, silent=False):
         owindow = (wset['dis_win_min'], wset['dis_win_max'])
     except KeyError as err:
         if not silent:
-            raise KeyError('Missing window parameters in input to '
-                           'parent calculation:\n' + str(err))
+            raise KeyError('Missing window parameters in input to ' 'parent calculation:\n' + str(err))
     except AttributeError as err:
         if not silent:
-            raise AttributeError(
-                'bands_node is not an output of an appropriate calc node.' +
-                str(err))
+            raise AttributeError('bands_node is not an output of an appropriate calc node.' + str(err))
     return owindow
 
 
@@ -166,9 +160,7 @@ def band_gap(bands, occ, efermi=None):
     # if lumo crosses efermi, something is wrong
     if efermi:
         if gap_upper < efermi:
-            raise ValueError(
-                ('The given E_fermi was higher than '
-                 'the lowest point of the lowest unoccupied band'))
+            raise ValueError(('The given E_fermi was higher than ' 'the lowest point of the lowest unoccupied band'))
     result['gap'] = gap_upper - gap_lower
     result['direct'] = bool(gap_upper_k == gap_lower_k)
     # check wether the two closest points are at the same kpoint (direct)
@@ -216,10 +208,7 @@ def compare_bands(vasp_bands, wannier_bands_list, plot_folder=None):
     import numpy as np
     import aiida_vasp.utils.bands as btool
     owindows = {get_outer_window(b): b for b in wannier_bands_list}
-    ref_bands = {
-        k: make_reference_bands_inline(wannier_bands=b, vasp_bands=vasp_bands)
-        for k, b in owindows.items()
-    }
+    ref_bands = {k: make_reference_bands_inline(wannier_bands=b, vasp_bands=vasp_bands) for k, b in owindows.items()}
     info = {}
     for wannier_bands in wannier_bands_list:
         owindow = get_outer_window(wannier_bands)
@@ -227,58 +216,35 @@ def compare_bands(vasp_bands, wannier_bands_list, plot_folder=None):
         refinfo = ref_bands[owindow]['info'].get_dict()
         wannier_calc = wannier_bands.inp.bands
         wannier_param = wannier_calc.inp.parameters.get_dict()
-        iwindow = [
-            wannier_param['dis_froz_min'], wannier_param['dis_froz_max']
-        ]
-        wannier_gap = band_gap(wannier_bands.get_bands(),
-                               reference.get_array('occupations'))
+        iwindow = [wannier_param['dis_froz_min'], wannier_param['dis_froz_max']]
+        wannier_gap = band_gap(wannier_bands.get_bands(), reference.get_array('occupations'))
         ref_gap = refinfo['bandgap']
         if wannier_gap['vector']:
-            wannier_k_gap = np.array(
-                [wannier_gap['vector'][0][0], wannier_gap['vector'][1][0]])
-            ref_k_gap = np.array(
-                [wannier_gap['vector'][0][0], wannier_gap['vector'][1][0]])
+            wannier_k_gap = np.array([wannier_gap['vector'][0][0], wannier_gap['vector'][1][0]])
+            ref_k_gap = np.array([wannier_gap['vector'][0][0], wannier_gap['vector'][1][0]])
             error_k_gap = np.abs(ref_k_gap - wannier_k_gap)
         else:
             error_k_gap = []
         info[wannier_bands.pk] = {
-            'calc':
-            wannier_calc.pk,
-            'outer_window':
-            owindow,
-            'inner_window':
-            iwindow,
-            'error_per_band':
-            bands_error(reference, wannier_bands),
-            'error_e_gap':
-            wannier_gap['gap'] and abs(wannier_gap['gap'] - ref_gap['gap']),
-            'error_direct':
-            wannier_gap['direct'] != ref_gap['direct'],
-            'error_k_gap':
-            error_k_gap
+            'calc': wannier_calc.pk,
+            'outer_window': owindow,
+            'inner_window': iwindow,
+            'error_per_band': bands_error(reference, wannier_bands),
+            'error_e_gap': wannier_gap['gap'] and abs(wannier_gap['gap'] - ref_gap['gap']),
+            'error_direct': wannier_gap['direct'] != ref_gap['direct'],
+            'error_k_gap': error_k_gap
         }
         if plot_folder:
             import os
             colors = ['r', 'b', 'g', 'm', 'c', 'y', 'k']
-            title = 'Vasp-Wannier comparison for window {}'.format(
-                [owindow, iwindow])
-            fig = btool.plot_bstr(reference,
-                                  efermi=refinfo['efermi'],
-                                  colors=colors,
-                                  title=title)
+            title = 'Vasp-Wannier comparison for window {}'.format([owindow, iwindow])
+            fig = btool.plot_bstr(reference, efermi=refinfo['efermi'], colors=colors, title=title)
             btool.plot_bands(wannier_bands, colors=colors, figure=fig, ls=':')
             xlim = btool.plt.xlim()
             btool.plt.hlines(iwindow, xlim[0], xlim[1], color='k')
-            btool.plt.hlines(refinfo['efermi'],
-                             xlim[0],
-                             xlim[1],
-                             color='k',
-                             linestyles='dashed')
-            btool.plt.yticks(
-                list(btool.plt.yticks()[0]) + [refinfo['efermi']],
-                [str(l) for l in btool.plt.yticks()[0]] + [r'$E_{fermi}$'])
-            pdf = os.path.join(plot_folder,
-                               'comparison_%s.pdf' % wannier_calc.pk)
+            btool.plt.hlines(refinfo['efermi'], xlim[0], xlim[1], color='k', linestyles='dashed')
+            btool.plt.yticks(list(btool.plt.yticks()[0]) + [refinfo['efermi']], [str(l) for l in btool.plt.yticks()[0]] + [r'$E_{fermi}$'])
+            pdf = os.path.join(plot_folder, 'comparison_%s.pdf' % wannier_calc.pk)
             fig.savefig(pdf)
             info[wannier_bands.pk]['plot'] = pdf
 
@@ -287,13 +253,9 @@ def compare_bands(vasp_bands, wannier_bands_list, plot_folder=None):
 
 def compare_from_window_wf(workflow, **kwargs):
     """Find the relevant bands in the window workflow and compare them."""
-    wblist = [
-        v for k, v in workflow.get_results().iteritems() if 'bands_' in k
-    ]
+    wblist = [v for k, v in workflow.get_results().iteritems() if 'bands_' in k]
     vbands = workflow.get_result('reference_bands')
-    return compare_bands(vasp_bands=vbands,
-                         wannier_bands_list=wblist,
-                         **kwargs)
+    return compare_bands(vasp_bands=vbands, wannier_bands_list=wblist, **kwargs)
 
 
 def plot_errors_vs_iwsize(comparison_info):

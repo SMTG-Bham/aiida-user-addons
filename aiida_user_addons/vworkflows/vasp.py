@@ -57,32 +57,15 @@ class VaspWorkChain(BaseRestartWorkChain):
     def define(cls, spec):
         super(VaspWorkChain, cls).define(spec)
         spec.input('code', valid_type=Code)
-        spec.input('structure',
-                   valid_type=(get_data_class('structure'),
-                               get_data_class('cif')),
-                   required=True)
-        spec.input('kpoints',
-                   valid_type=get_data_class('array.kpoints'),
-                   required=False)
-        spec.input('potential_family',
-                   valid_type=get_data_class('str'),
-                   required=True)
-        spec.input('potential_mapping',
-                   valid_type=get_data_class('dict'),
-                   required=True)
-        spec.input('parameters',
-                   valid_type=get_data_class('dict'),
-                   required=True)
+        spec.input('structure', valid_type=(get_data_class('structure'), get_data_class('cif')), required=True)
+        spec.input('kpoints', valid_type=get_data_class('array.kpoints'), required=False)
+        spec.input('potential_family', valid_type=get_data_class('str'), required=True)
+        spec.input('potential_mapping', valid_type=get_data_class('dict'), required=True)
+        spec.input('parameters', valid_type=get_data_class('dict'), required=True)
         spec.input('options', valid_type=get_data_class('dict'), required=True)
-        spec.input('settings',
-                   valid_type=get_data_class('dict'),
-                   required=False)
-        spec.input('wavecar',
-                   valid_type=get_data_class('vasp.wavefun'),
-                   required=False)
-        spec.input('chgcar',
-                   valid_type=get_data_class('vasp.chargedensity'),
-                   required=False)
+        spec.input('settings', valid_type=get_data_class('dict'), required=False)
+        spec.input('wavecar', valid_type=get_data_class('vasp.wavefun'), required=False)
+        spec.input('chgcar', valid_type=get_data_class('vasp.chargedensity'), required=False)
         spec.input('restart_folder',
                    valid_type=get_data_class('remote'),
                    required=False,
@@ -134,76 +117,32 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.output('misc', valid_type=get_data_class('dict'))
         spec.output('remote_folder', valid_type=get_data_class('remote'))
         spec.output('retrieved', valid_type=get_data_class('folder'))
-        spec.output('structure',
-                    valid_type=get_data_class('structure'),
-                    required=False)
-        spec.output('kpoints',
-                    valid_type=get_data_class('array.kpoints'),
-                    required=False)
-        spec.output('trajectory',
-                    valid_type=get_data_class('array.trajectory'),
-                    required=False)
-        spec.output('chgcar',
-                    valid_type=get_data_class('vasp.chargedensity'),
-                    required=False)
-        spec.output('wavecar',
-                    valid_type=get_data_class('vasp.wavefun'),
-                    required=False)
-        spec.output('bands',
-                    valid_type=get_data_class('array.bands'),
-                    required=False)
-        spec.output('forces',
-                    valid_type=get_data_class('array'),
-                    required=False)
-        spec.output('stress',
-                    valid_type=get_data_class('array'),
-                    required=False)
+        spec.output('structure', valid_type=get_data_class('structure'), required=False)
+        spec.output('kpoints', valid_type=get_data_class('array.kpoints'), required=False)
+        spec.output('trajectory', valid_type=get_data_class('array.trajectory'), required=False)
+        spec.output('chgcar', valid_type=get_data_class('vasp.chargedensity'), required=False)
+        spec.output('wavecar', valid_type=get_data_class('vasp.wavefun'), required=False)
+        spec.output('bands', valid_type=get_data_class('array.bands'), required=False)
+        spec.output('forces', valid_type=get_data_class('array'), required=False)
+        spec.output('stress', valid_type=get_data_class('array'), required=False)
         spec.output('dos', valid_type=get_data_class('array'), required=False)
-        spec.output('occupancies',
-                    valid_type=get_data_class('array'),
-                    required=False)
-        spec.output('energies',
-                    valid_type=get_data_class('array'),
-                    required=False)
-        spec.output('projectors',
-                    valid_type=get_data_class('array'),
-                    required=False)
-        spec.output('dielectrics',
-                    valid_type=get_data_class('array'),
-                    required=False)
-        spec.output('born_charges',
-                    valid_type=get_data_class('array'),
-                    required=False)
-        spec.output('hessian',
-                    valid_type=get_data_class('array'),
-                    required=False)
-        spec.output('dynmat',
-                    valid_type=get_data_class('array'),
-                    required=False)
+        spec.output('occupancies', valid_type=get_data_class('array'), required=False)
+        spec.output('energies', valid_type=get_data_class('array'), required=False)
+        spec.output('projectors', valid_type=get_data_class('array'), required=False)
+        spec.output('dielectrics', valid_type=get_data_class('array'), required=False)
+        spec.output('born_charges', valid_type=get_data_class('array'), required=False)
+        spec.output('hessian', valid_type=get_data_class('array'), required=False)
+        spec.output('dynmat', valid_type=get_data_class('array'), required=False)
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
-        spec.exit_code(
-            700,
-            'ERROR_NO_POTENTIAL_FAMILY_NAME',
-            message='the user did not supply a potential family name')
-        spec.exit_code(
-            701,
-            'ERROR_POTENTIAL_VALUE_ERROR',
-            message='ValueError was returned from get_potcars_from_structure')
-        spec.exit_code(702,
-                       'ERROR_POTENTIAL_DO_NOT_EXIST',
-                       message='the potential does not exist')
-        spec.exit_code(
-            703,
-            'ERROR_INVALID_PARAMETER_DETECTED',
-            message=
-            'the parameter massager found invalid tags in the input parameters.'
-        )
-        spec.exit_code(
-            704,
-            'ERROR_MISSING_PARAMETER_DETECTED',
-            message=
-            'the parameter massager did not find expected tags in the input parameters.'
-        )
+        spec.exit_code(700, 'ERROR_NO_POTENTIAL_FAMILY_NAME', message='the user did not supply a potential family name')
+        spec.exit_code(701, 'ERROR_POTENTIAL_VALUE_ERROR', message='ValueError was returned from get_potcars_from_structure')
+        spec.exit_code(702, 'ERROR_POTENTIAL_DO_NOT_EXIST', message='the potential does not exist')
+        spec.exit_code(703,
+                       'ERROR_INVALID_PARAMETER_DETECTED',
+                       message='the parameter massager found invalid tags in the input parameters.')
+        spec.exit_code(704,
+                       'ERROR_MISSING_PARAMETER_DETECTED',
+                       message='the parameter massager did not find expected tags in the input parameters.')
 
     def init_calculation(self):
         """Set the restart folder and set parameters tags for a restart."""
@@ -214,16 +153,14 @@ class VaspWorkChain(BaseRestartWorkChain):
         # Then check if we the restart workchain wants a restart
         if isinstance(self.ctx.restart_calc, self._calculation):
             self.ctx.inputs.restart_folder = self.ctx.restart_calc.outputs.remote_folder
-            old_parameters = AttributeDict(
-                self.ctx.inputs.parameters.get_dict())
+            old_parameters = AttributeDict(self.ctx.inputs.parameters.get_dict())
             parameters = old_parameters.copy()
             if 'istart' in parameters:
                 parameters.istart = 1
             if 'icharg' in parameters:
                 parameters.icharg = 1
             if parameters != old_parameters:
-                self.ctx.inputs.parameters = get_data_node('dict',
-                                                           dict=parameters)
+                self.ctx.inputs.parameters = get_data_node('dict', dict=parameters)
 
     def init_inputs(self):
         """Make sure all the required inputs are there and valid, create input dictionary for calculation."""
@@ -241,12 +178,10 @@ class VaspWorkChain(BaseRestartWorkChain):
         elif 'kpoints_spacing' in self.inputs:
             kpoints = KpointsData()
             kpoints.set_cell_from_structure(self.ctx.inputs.structure)
-            kpoints.set_kpoints_mesh_from_density(
-                self.inputs.kpoints_spacing.value * np.pi * 2)
+            kpoints.set_kpoints_mesh_from_density(self.inputs.kpoints_spacing.value * np.pi * 2)
             self.ctx.inputs.kpoints = kpoints
         else:
-            raise InputValidationError(
-                "Must supply either 'kpoints' or 'kpoints_spacing'")
+            raise InputValidationError("Must supply either 'kpoints' or 'kpoints_spacing'")
 
         # Perform inputs massage to accommodate generalization in higher lying workchains
         # and set parameters
@@ -259,8 +194,7 @@ class VaspWorkChain(BaseRestartWorkChain):
         # Setup LDAU keys
         if 'ldau_setings' in self.inputs:
             ldau_settings = self.inputs.ldau_mapping.get_dict()
-            ldau_keys = get_ldau_keys(self.ctx.inputs.structure,
-                                      **ldau_settings)
+            ldau_keys = get_ldau_keys(self.ctx.inputs.structure, **ldau_settings)
             # Directly update the raw inputs passed to VaspCalculation
             self.ctx.inputs.parameters.update(ldau_keys)
 
@@ -278,11 +212,9 @@ class VaspWorkChain(BaseRestartWorkChain):
             self.ctx.inputs.metadata = {}
             self.ctx.inputs.metadata['options'] = options
             # Override the parser name if it is supplied by the user.
-            parser_name = self.ctx.inputs.metadata['options'].get(
-                'parser_name')
+            parser_name = self.ctx.inputs.metadata['options'].get('parser_name')
             if parser_name:
-                self.ctx.inputs.metadata['options'][
-                    'parser_name'] = parser_name
+                self.ctx.inputs.metadata['options']['parser_name'] = parser_name
             # Also make sure we specify the entry point for the
             # Set MPI to True, unless the user specifies otherwise
             withmpi = self.ctx.inputs.metadata['options'].get('withmpi', True)
@@ -292,8 +224,7 @@ class VaspWorkChain(BaseRestartWorkChain):
         self.ctx.inputs.metadata['options']['output_filename'] = 'OUTCAR'
 
         # Set the CalcJobNode to have the same label as the WorkChain
-        self.ctx.inputs.metadata['label'] = self.inputs.metadata.get(
-            'label', '')
+        self.ctx.inputs.metadata['label'] = self.inputs.metadata.get('label', '')
 
         # Verify and set potentials (potcar)
         if not self.inputs.potential_family.value:
@@ -301,17 +232,14 @@ class VaspWorkChain(BaseRestartWorkChain):
                 'An empty string for the potential family name was detected.')
             return self.exit_codes.ERROR_NO_POTENTIAL_FAMILY_NAME  # pylint: disable=no-member
         try:
-            self.ctx.inputs.potential = get_data_class(
-                'vasp.potcar').get_potcars_from_structure(
-                    structure=self.inputs.structure,
-                    family_name=self.inputs.potential_family.value,
-                    mapping=self.inputs.potential_mapping.get_dict())
+            self.ctx.inputs.potential = get_data_class('vasp.potcar').get_potcars_from_structure(
+                structure=self.inputs.structure,
+                family_name=self.inputs.potential_family.value,
+                mapping=self.inputs.potential_mapping.get_dict())
         except ValueError as err:
-            return compose_exit_code(
-                self.exit_codes.ERROR_POTENTIAL_VALUE_ERROR.status, str(err))  # pylint: disable=no-member
+            return compose_exit_code(self.exit_codes.ERROR_POTENTIAL_VALUE_ERROR.status, str(err))  # pylint: disable=no-member
         except NotExistent as err:
-            return compose_exit_code(
-                self.exit_codes.ERROR_POTENTIAL_DO_NOT_EXIST.status, str(err))  # pylint: disable=no-member
+            return compose_exit_code(self.exit_codes.ERROR_POTENTIAL_DO_NOT_EXIST.status, str(err))  # pylint: disable=no-member
 
         try:
             self._verbose = self.inputs.verbose.value
@@ -331,15 +259,12 @@ class VaspWorkChain(BaseRestartWorkChain):
     def on_except(self, exc_info):
         """Handle excepted state."""
         try:
-            last_calc = self.ctx.calculations[
-                -1] if self.ctx.calculations else None
+            last_calc = self.ctx.calculations[-1] if self.ctx.calculations else None
             if last_calc is not None:
                 self.report(  # pylint: disable=not-callable
                     'Last calculation: {calc}'.format(calc=repr(last_calc)))
-                sched_err = last_calc.outputs.retrieved.get_file_content(
-                    '_scheduler-stderr.txt')
-                sched_out = last_calc.outputs.retrieved.get_file_content(
-                    '_scheduler-stdout.txt')
+                sched_err = last_calc.outputs.retrieved.get_file_content('_scheduler-stderr.txt')
+                sched_out = last_calc.outputs.retrieved.get_file_content('_scheduler-stdout.txt')
                 self.report('Scheduler output:\n{}'.format(sched_out or ''))  # pylint: disable=not-callable
                 self.report('Scheduler stderr:\n{}'.format(sched_err or ''))  # pylint: disable=not-callable
         except AttributeError:

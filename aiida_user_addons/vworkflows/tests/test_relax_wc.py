@@ -32,17 +32,10 @@ def test_relax_wc(fresh_aiida_env, vasp_params, potentials, mock_vasp):
     mock_vasp.store()
     create_authinfo(computer=mock_vasp.computer, store=True)
 
-    structure = PoscarParser(
-        file_path=data_path('test_relax_wc', 'inp', 'POSCAR')).structure
-    kpoints = KpointsParser(
-        file_path=data_path('test_relax_wc', 'inp', 'KPOINTS')).kpoints
-    parameters = IncarParser(
-        file_path=data_path('test_relax_wc', 'inp', 'INCAR')).incar
-    parameters = {
-        k: v
-        for k, v in parameters.items()
-        if k not in ['isif', 'ibrion', 'nsw', 'ediffg']
-    }
+    structure = PoscarParser(file_path=data_path('test_relax_wc', 'inp', 'POSCAR')).structure
+    kpoints = KpointsParser(file_path=data_path('test_relax_wc', 'inp', 'KPOINTS')).kpoints
+    parameters = IncarParser(file_path=data_path('test_relax_wc', 'inp', 'INCAR')).incar
+    parameters = {k: v for k, v in parameters.items() if k not in ['isif', 'ibrion', 'nsw', 'ediffg']}
     parameters['system'] = 'test-case:test_relax_wc'
     parameters['relax'] = {}
     parameters['relax']['perform'] = True
@@ -91,11 +84,7 @@ def test_mode_values():
         for shape in (True, False):
             for volume in (True, False):
                 try:
-                    RelaxWorkChain.ModeEnum.get_from_dof(**{
-                        'positions': pos,
-                        'shape': shape,
-                        'volume': volume
-                    })
+                    RelaxWorkChain.ModeEnum.get_from_dof(**{'positions': pos, 'shape': shape, 'volume': volume})
                 except ValueError:
                     pass
                 except Exception as exc:  # pylint: disable=broad-except

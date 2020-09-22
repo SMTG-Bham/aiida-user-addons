@@ -10,12 +10,7 @@ def fe_atoms():
 
 
 def test_base(fe_atoms):
-    iset = InputSet('MITRelaxSet',
-                    fe_atoms,
-                    overrides={
-                        'ediff': 1.0,
-                        'nsw': None
-                    })
+    iset = InputSet('MITRelaxSet', fe_atoms, overrides={'ediff': 1.0, 'nsw': None})
 
     out = iset.get_input_dict()
     assert out['ediff'] == 1.0
@@ -24,13 +19,7 @@ def test_base(fe_atoms):
 
 
 def test_vasp(fe_atoms):
-    iset = VASPInputSet('MITRelaxSet',
-                        fe_atoms,
-                        overrides={
-                            'ediff': 1.0,
-                            'nsw': None,
-                            'ldautype': 3
-                        })
+    iset = VASPInputSet('MITRelaxSet', fe_atoms, overrides={'ediff': 1.0, 'nsw': None, 'ldautype': 3})
 
     out = iset.get_input_dict()
     assert out['ediff'] == 1.0

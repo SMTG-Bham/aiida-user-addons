@@ -12,21 +12,14 @@ builder.scf.kpoints = KpointsData()
 builder.scf.kpoints.set_cell(silicon.cell)
 builder.scf.kpoints.set_kpoints_mesh((4, 4, 4))
 
-builder.scf.parameters = Dict(dict={
-    'vasp':{
-        'encut': 300,
-        'prec': 'accurate'
-    }
-})
+builder.scf.parameters = Dict(dict={'vasp': {'encut': 300, 'prec': 'accurate'}})
 
 builder.scf.potential_family = Str('PBE.54')
 builder.scf.potential_mapping = Dict(dict={'Si': 'Si'})
-builder.scf.options = Dict(dict={
-    'resources': {
-        'tot_num_mpiprocs': 1,
-        'num_machines': 1,
-    }
-})
+builder.scf.options = Dict(dict={'resources': {
+    'tot_num_mpiprocs': 1,
+    'num_machines': 1,
+}})
 
 builder.scf.code = Code.get_from_string('vasp@localhost')
 

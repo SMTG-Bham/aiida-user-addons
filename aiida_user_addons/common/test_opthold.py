@@ -8,25 +8,25 @@ from .opthold import OptionHolder, typed_field, required_field
 
 class DummyOptions(OptionHolder):
     _allowed_options = ('a', 'b', 'c', 'd')
-    a = typed_field('a', (int, ), 'a', 1)
-    b = typed_field('b', (int, ), 'b', 2)
-    c = typed_field('c', (float, ), 'c', 2.0)
-    d = typed_field('d', (str, ), 'd', 'foo')
+    a = typed_field('a', (int,), 'a', 1)
+    b = typed_field('b', (int,), 'b', 2)
+    c = typed_field('c', (float,), 'c', 2.0)
+    d = typed_field('d', (str,), 'd', 'foo')
 
 
 class DummyOptions2(OptionHolder):
     _allowed_options = ('a', 'b', 'c', 'd')
-    a = typed_field('a', (int, ), 'a', 1)
-    b = typed_field('b', (int, ), 'b', 2)
-    c = typed_field('c', (float, ), 'c', 2.0)
-    d = typed_field('d', (int, ), 'd', 2.0)
+    a = typed_field('a', (int,), 'a', 1)
+    b = typed_field('b', (int,), 'b', 2)
+    c = typed_field('c', (float,), 'c', 2.0)
+    d = typed_field('d', (int,), 'd', 2.0)
 
 
 class DummyOptions3(OptionHolder):
-    a = typed_field('a', (int, ), 'a', 1)
-    b = typed_field('b', (int, ), 'b', 2)
-    c = typed_field('c', (float, ), 'c', 2.0)
-    d = typed_field('d', (int, ), 'd', 2.0)
+    a = typed_field('a', (int,), 'a', 1)
+    b = typed_field('b', (int,), 'b', 2)
+    c = typed_field('c', (float,), 'c', 2.0)
+    d = typed_field('d', (int,), 'd', 2.0)
 
 
 class DummyOptions4(OptionHolder):
@@ -36,9 +36,9 @@ class DummyOptions4(OptionHolder):
         'c',
     )
     _allow_empty_field = False
-    a = typed_field('a', (int, ), 'a', 1)
-    b = typed_field('b', (int, ), 'b', 2)
-    c = typed_field('c', (float, ), 'c', None)
+    a = typed_field('a', (int,), 'a', 1)
+    b = typed_field('b', (int,), 'b', 2)
+    c = typed_field('c', (float,), 'c', None)
 
 
 def test_constructor():

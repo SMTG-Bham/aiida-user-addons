@@ -77,6 +77,7 @@ def mock_factory(base_class, run_method):
     :param base_class: THe base class inheriting from CalcJobNode as e.g. defined in a plugin.
     :param run_method: a method with signature run(self) that will add outputs based on the inputs to the CalcJobNode.
     """
+
     class MockCalcJob(base_class):
         """A mock CalcJob class."""
 

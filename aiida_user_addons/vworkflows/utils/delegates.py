@@ -13,8 +13,10 @@ def delegate_method_kwargs(prefix='_init_with_'):
 
     :params prefix: (str) common prefix of delegate functions
     """
+
     def decorator(meth):
         """Decorate a class method to delegate kwargs."""
+
         def wrapper(*args, **kwargs):
             for kwarg, value in kwargs.items():
                 getattr(args[0], prefix + kwarg)(value)
@@ -28,6 +30,7 @@ def delegate_method_kwargs(prefix='_init_with_'):
 
 class Delegate(list):
     """A callable list, that will call every function inside the list and delegate the arguments."""
+
     def __call__(self, *args, **kwargs):
         """Call all the functions subscribed to this list and return their result."""
         results = []

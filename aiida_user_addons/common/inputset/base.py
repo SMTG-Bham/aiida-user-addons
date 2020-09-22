@@ -98,8 +98,7 @@ class InputSet:
             if set_path.is_file():
                 break
         if set_path is None:
-            raise RuntimeError(
-                f'Cannot find input set definition for {self.set_name}')
+            raise RuntimeError(f'Cannot find input set definition for {self.set_name}')
 
         with open(set_path) as fhd:
             self._presets = yaml.load(fhd, Loader=yaml.FullLoader)

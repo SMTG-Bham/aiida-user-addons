@@ -132,11 +132,8 @@ def cmp_load_verdi_data():
             import_errors.append(err)
 
     if not verdi_data:
-        err_messages = '\n'.join(
-            [' * {}'.format(err) for err in import_errors])
-        raise ImportError(
-            'The verdi data base command group could not be found:\n' +
-            err_messages)
+        err_messages = '\n'.join([' * {}'.format(err) for err in import_errors])
+        raise ImportError('The verdi data base command group could not be found:\n' + err_messages)
 
     return verdi_data
 

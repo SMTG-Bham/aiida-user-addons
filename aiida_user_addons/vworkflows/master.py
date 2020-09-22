@@ -27,14 +27,9 @@ class MasterWorkChain(WorkChain):
     @classmethod
     def define(cls, spec):
         super(MasterWorkChain, cls).define(spec)
-        spec.expose_inputs(cls._base_workchain,
-                           exclude=['settings', 'clean_workdir'])
-        spec.input('settings',
-                   valid_type=get_data_class('dict'),
-                   required=False)
-        spec.input('kpoints',
-                   valid_type=get_data_class('array.kpoints'),
-                   required=False)
+        spec.expose_inputs(cls._base_workchain, exclude=['settings', 'clean_workdir'])
+        spec.input('settings', valid_type=get_data_class('dict'), required=False)
+        spec.input('kpoints', valid_type=get_data_class('array.kpoints'), required=False)
         spec.input_namespace('relax', required=False, dynamic=True)
         spec.input('extract_bands',
                    valid_type=get_data_class('bool'),
@@ -88,26 +83,11 @@ class MasterWorkChain(WorkChain):
             ),
             cls.finalize
         )  # yapf: disable
-        spec.expose_outputs(cls._bands_workchain,
-                            namespace='bands',
-                            namespace_options={
-                                'required': False,
-                                'populate_defaults': False
-                            })
-        spec.expose_outputs(cls._dos_workchain,
-                            namespace='dos',
-                            namespace_options={
-                                'required': False,
-                                'populate_defaults': False
-                            })
+        spec.expose_outputs(cls._bands_workchain, namespace='bands', namespace_options={'required': False, 'populate_defaults': False})
+        spec.expose_outputs(cls._dos_workchain, namespace='dos', namespace_options={'required': False, 'populate_defaults': False})
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
-        spec.exit_code(420,
-                       'ERROR_NO_CALLED_WORKCHAIN',
-                       message='no called workchain detected')
-        spec.exit_code(
-            500,
-            'ERROR_UNKNOWN',
-            message='unknown error detected in the master workchain')
+        spec.exit_code(420, 'ERROR_NO_CALLED_WORKCHAIN', message='no called workchain detected')
+        spec.exit_code(500, 'ERROR_UNKNOWN', message='unknown error detected in the master workchain')
 
     def initialize(self):
         """Initialize."""
@@ -208,8 +188,7 @@ class MasterWorkChain(WorkChain):
         """Enables a restart from a previous charge density file."""
         # Make sure we set the restart folder (the charge density file is not
         # copied locally, but is present in the folder of the previous remote directory)
-        self.ctx.inputs.restart_folder = self.ctx.workchains[
-            -1].outputs.remote_folder
+        self.ctx.inputs.restart_folder = self.ctx.workchains[-1].outputs.remote_folder
         # Also enable the clean_workdir again
         self.ctx.inputs.clean_workdir = get_data_node('bool', True)
 
@@ -217,17 +196,14 @@ class MasterWorkChain(WorkChain):
         """Clean the inputs for the next workchain in order not to pass redundant inputs."""
         # Now make sure we clean the inputs for redundant inputs not needed for the bands workchain
         exclude = ['converge', 'relax', 'verify', 'kpoints']
-        self.ctx.inputs = AttributeDict(
-            {k: v
-             for k, v in self.ctx.inputs.items() if k not in exclude})
+        self.ctx.inputs = AttributeDict({k: v for k, v in self.ctx.inputs.items() if k not in exclude})
 
     def init_workchain(self):
         """Initialize the base workchain."""
         try:
             self.ctx.inputs
         except AttributeError:
-            raise ValueError(
-                'No input dictionary was defined in self.ctx.inputs')
+            raise ValueError('No input dictionary was defined in self.ctx.inputs')
 
         # Add exposed inputs
         self.ctx.inputs.update(self.exposed_inputs(self._next_workchain))
@@ -239,16 +215,14 @@ class MasterWorkChain(WorkChain):
             pass
 
         # Make sure we do not have any floating dict (convert to Dict)
-        self.ctx.inputs = prepare_process_inputs(
-            self.ctx.inputs, namespaces=['relax', 'converge', 'verify'])
+        self.ctx.inputs = prepare_process_inputs(self.ctx.inputs, namespaces=['relax', 'converge', 'verify'])
 
     def run_next_workchain(self):
         """Run the next workchain."""
         inputs = self.ctx.inputs
         running = self.submit(self._next_workchain, **inputs)
 
-        self.report('launching {}<{}> '.format(self._next_workchain.__name__,
-                                               running.pk))
+        self.report('launching {}<{}> '.format(self._next_workchain.__name__, running.pk))
 
         return self.to_context(workchains=append_(running))
 
@@ -257,8 +231,7 @@ class MasterWorkChain(WorkChain):
         try:
             workchain = self.ctx.workchains[-1]
         except IndexError:
-            self.report('There is no {} in the called workchain list.'.format(
-                self._next_workchain.__name__))
+            self.report('There is no {} in the called workchain list.'.format(self._next_workchain.__name__))
             return self.exit_codes.ERROR_NO_CALLED_WORKCHAIN  # pylint: disable=no-member
 
         # Inherit exit status from last workchain (supposed to be
@@ -268,12 +241,9 @@ class MasterWorkChain(WorkChain):
         if not next_workchain_exit_status:
             self.ctx.exit_code = self.exit_codes.NO_ERROR  # pylint: disable=no-member
         else:
-            self.ctx.exit_code = compose_exit_code(
-                next_workchain_exit_status, next_workchain_exit_message)
+            self.ctx.exit_code = compose_exit_code(next_workchain_exit_status, next_workchain_exit_message)
             self.report('The called {}<{}> returned a non-zero exit status. '
-                        'The exit status {} is inherited'.format(
-                            workchain.__class__.__name__, workchain.pk,
-                            self.ctx.exit_code))
+                        'The exit status {} is inherited'.format(workchain.__class__.__name__, workchain.pk, self.ctx.exit_code))
 
         return self.ctx.exit_code
 
@@ -294,12 +264,6 @@ class MasterWorkChain(WorkChain):
 
         workchain = self.ctx.workchains[-1]
         if self.extract_bands():
-            self.out_many(
-                self.exposed_outputs(workchain,
-                                     self._bands_workchain,
-                                     namespace='bands'))
+            self.out_many(self.exposed_outputs(workchain, self._bands_workchain, namespace='bands'))
         if self.extract_dos():
-            self.out_many(
-                self.exposed_outputs(workchain,
-                                     self._dos_workchain,
-                                     namespace='dos'))
+            self.out_many(self.exposed_outputs(workchain, self._dos_workchain, namespace='dos'))

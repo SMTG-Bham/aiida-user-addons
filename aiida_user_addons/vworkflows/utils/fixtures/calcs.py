@@ -34,19 +34,14 @@ def calc_with_retrieved(localhost):
         node.set_attribute('input_filename', 'INCAR')
         node.set_attribute('output_filename', 'OUTCAR')
         node.set_attribute('error_filename', 'aiida.err')
-        node.set_option('resources', {
-            'num_machines': 1,
-            'num_mpiprocs_per_machine': 1
-        })
+        node.set_option('resources', {'num_machines': 1, 'num_mpiprocs_per_machine': 1})
         node.set_option('max_wallclock_seconds', 1800)
 
         if input_settings is None:
             input_settings = {}
 
         settings = Dict(dict=input_settings)
-        node.add_incoming(settings,
-                          link_type=LinkType.INPUT_CALC,
-                          link_label='settings')
+        node.add_incoming(settings, link_type=LinkType.INPUT_CALC, link_label='settings')
         settings.store()
         node.store()
 
@@ -54,9 +49,7 @@ def calc_with_retrieved(localhost):
         # output fixture in there and link it.
         retrieved = FolderData()
         retrieved.put_object_from_tree(file_path)
-        retrieved.add_incoming(node,
-                               link_type=LinkType.CREATE,
-                               link_label='retrieved')
+        retrieved.add_incoming(node, link_type=LinkType.CREATE, link_label='retrieved')
         retrieved.store()
 
         return node
@@ -72,14 +65,7 @@ def base_calc(fresh_aiida_env, vasp_code):
     runner = manager.get_runner()
     inputs = AttributeDict()
 
-    metadata = AttributeDict({
-        'options': {
-            'resources': {
-                'num_machines': 1,
-                'num_mpiprocs_per_machine': 1
-            }
-        }
-    })
+    metadata = AttributeDict({'options': {'resources': {'num_machines': 1, 'num_mpiprocs_per_machine': 1}}})
 
     inputs.code = vasp_code
     inputs.metadata = metadata
@@ -126,38 +112,22 @@ def vasp2w90_calc(vasp_inputs):
 @pytest.fixture
 def vasp_calc_and_ref(vasp_calc, vasp_kpoints, ref_incar):
     """Fixture for non varying setup of a vasp calculation."""
-    calc = vasp_calc(
-        settings={'parser_settings': {
-            'add_bands': True,
-            'add_dos': True
-        }})
+    calc = vasp_calc(settings={'parser_settings': {'add_bands': True, 'add_dos': True}})
     _, ref_kpoints = vasp_kpoints
 
     return calc, {'kpoints': ref_kpoints, 'incar': ref_incar}
 
 
 @pytest.fixture
-def vasp2w90_calc_and_ref(vasp2w90_calc, vasp_kpoints, vasp2w90_inputs,
-                          ref_incar_vasp2w90, ref_win):
+def vasp2w90_calc_and_ref(vasp2w90_calc, vasp_kpoints, vasp2w90_inputs, ref_incar_vasp2w90, ref_win):
     """Fixture for non varying setup of a vasp2w90 calculation."""
 
-    inputs = vasp2w90_inputs(
-        settings={
-            'parser_settings': {
-                'add_bands': True,
-                'add_dos': True,
-                'poscar_precision': 12
-            }
-        })
+    inputs = vasp2w90_inputs(settings={'parser_settings': {'add_bands': True, 'add_dos': True, 'poscar_precision': 12}})
 
     calc = vasp2w90_calc(inputs=inputs)
     _, ref_kpoints = vasp_kpoints
 
-    return calc, {
-        'kpoints': ref_kpoints,
-        'incar': ref_incar_vasp2w90,
-        'win': ref_win
-    }
+    return calc, {'kpoints': ref_kpoints, 'incar': ref_incar_vasp2w90, 'win': ref_win}
 
 
 @pytest.fixture()
@@ -175,9 +145,9 @@ def vasp_nscf_and_ref(vasp_calc_and_ref, vasp_chgcar, vasp_wavecar):
 
 
 @pytest.fixture()
-def run_vasp_calc(fresh_aiida_env, vasp_params, potentials, vasp_kpoints,
-                  vasp_structure, mock_vasp):
+def run_vasp_calc(fresh_aiida_env, vasp_params, potentials, vasp_kpoints, vasp_structure, mock_vasp):
     """Setup and standard VASP calculation with the mock executable that accepts input overrides."""
+
     def inner(inputs=None, settings=None):
         from aiida.plugins import CalculationFactory
         from aiida.engine import run
@@ -190,11 +160,9 @@ def run_vasp_calc(fresh_aiida_env, vasp_params, potentials, vasp_kpoints,
         inpts.structure = vasp_structure
         inpts.parameters = vasp_params
         inpts.kpoints = kpoints
-        inpts.potential = get_data_class(
-            'vasp.potcar').get_potcars_from_structure(
-                structure=inpts.structure,
-                family_name=POTCAR_FAMILY_NAME,
-                mapping=POTCAR_MAP)
+        inpts.potential = get_data_class('vasp.potcar').get_potcars_from_structure(structure=inpts.structure,
+                                                                                   family_name=POTCAR_FAMILY_NAME,
+                                                                                   mapping=POTCAR_MAP)
         options = {
             'withmpi': False,
             'queue_name': 'None',
@@ -214,10 +182,6 @@ def run_vasp_calc(fresh_aiida_env, vasp_params, potentials, vasp_kpoints,
     return inner
 
 
-ONLY_ONE_CALC = pytest.mark.parametrize(['vasp_structure', 'vasp_kpoints'],
-                                        [('cif', 'mesh')],
-                                        indirect=True)
+ONLY_ONE_CALC = pytest.mark.parametrize(['vasp_structure', 'vasp_kpoints'], [('cif', 'mesh')], indirect=True)
 
-STRUCTURE_TYPES = pytest.mark.parametrize(['vasp_structure', 'vasp_kpoints'],
-                                          [('cif', 'mesh'), ('str', 'mesh')],
-                                          indirect=True)
+STRUCTURE_TYPES = pytest.mark.parametrize(['vasp_structure', 'vasp_kpoints'], [('cif', 'mesh'), ('str', 'mesh')], indirect=True)

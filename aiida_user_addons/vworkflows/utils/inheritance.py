@@ -40,6 +40,7 @@ def update_docstring(method_name, content, append=True):
                 for _, value in kwargs.items():
                     print value
     """
+
     def wrapper(cls):
         """Update the method docstring and return the class."""
         if append:

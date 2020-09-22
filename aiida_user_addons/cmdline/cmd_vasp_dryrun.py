@@ -11,12 +11,11 @@ import yaml
 
 
 @click.command('vasp-dryrun')
-@click.option(
-    '--input-dir',
-    help='Where the VASP input is, default to the current working directory.',
-    type=click.Path(exists=True, file_okay=False, dir_okay=True),
-    default='.',
-    show_default=True)
+@click.option('--input-dir',
+              help='Where the VASP input is, default to the current working directory.',
+              type=click.Path(exists=True, file_okay=False, dir_okay=True),
+              default='.',
+              show_default=True)
 @click.option('--vasp-exe', help='Executable for VASP', default='vasp_std', show_default=True)
 @click.option('--timeout', help='Timeout in seconds to terminate VASP', default=10, show_default=True)
 @click.option('--work-dir', help='Working directory for running', show_default=True)
@@ -27,30 +26,21 @@ def cmd_vasp_dryrun(input_dir, vasp_exe, timeout, work_dir, keep):
     up to <timeout> seconds. The underlying VASP process will be terminated once it enters
     the main loop, which is signalled by the appearance of a `INWAV` keyword in the OUTCAR.
     """
-    result = vasp_dryrun(input_dir=input_dir,
-                         vasp_exe=vasp_exe,
-                         timeout=timeout,
-                         work_dir=work_dir,
-                         keep=keep)
+    result = vasp_dryrun(input_dir=input_dir, vasp_exe=vasp_exe, timeout=timeout, work_dir=work_dir, keep=keep)
     with open(Path(input_dir) / 'dryrun.yaml', 'w') as fhandle:
         yaml.dump(result, fhandle, Dumper=yaml.SafeDumper)
 
 
-def vasp_dryrun(input_dir,
-                vasp_exe='vasp_std',
-                timeout=10,
-                work_dir=None,
-                keep=False):
+def vasp_dryrun(input_dir, vasp_exe='vasp_std', timeout=10, work_dir=None, keep=False):
     """
-    Perform a "dryrun" for a VASP calculation - get the number of kpoints, bands and 
+    Perform a "dryrun" for a VASP calculation - get the number of kpoints, bands and
     estimated memory usage.
     """
     if not work_dir:
-        tmpdir = tempfile.mkdtemp(
-        )  # tmpdir is the one to remove when finished
-        work_dir = Path(tmpdir) / "vasp_dryrun"
+        tmpdir = tempfile.mkdtemp()  # tmpdir is the one to remove when finished
+        work_dir = Path(tmpdir) / 'vasp_dryrun'
     else:
-        work_dir = Path(work_dir) / "vasp_dyrun"
+        work_dir = Path(work_dir) / 'vasp_dyrun'
         tmpdir = str(work_dir)
     input_dir = Path(input_dir)
     shutil.copytree(str(input_dir), str(work_dir))
@@ -106,13 +96,10 @@ def parse_outcar(outcar_path):
             output_dict['NGZ'] = int(tokens[tokens.index('NGZ') + 2])
         elif 'k-points in reciprocal lattice and weights:' in line:
             kblock = lines[il + 1:il + 1 + output_dict['num_kpoints']]
-            k_list = [[float(token) for token in subline.strip().split()]
-                      for subline in kblock]
+            k_list = [[float(token) for token in subline.strip().split()] for subline in kblock]
             output_dict['kpoints_and_weights'] = k_list
         elif 'maximum and minimum number of plane-waves per node :' in line:
-            output_dict['plane_waves_min_max'] = [
-                float(token) for token in line.split()[-2:]
-            ]
+            output_dict['plane_waves_min_max'] = [float(token) for token in line.split()[-2:]]
         elif 'total amount of memory used by VASP MPI-rank0' in line:
             output_dict['max_ram_rank0'] = float(line.split()[-2])
             for subline in lines[il + 3:il + 9]:

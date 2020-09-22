@@ -20,6 +20,7 @@ class DictWithAttributes(AttributeDict):
 
     If the key is not in the dict a default value will be returned.
     """
+
     def __getattr__(self, attr):
         """Read a key as an attribute. Return a Default value on missing key."""
         return self.get(attr)
@@ -64,8 +65,7 @@ def update_nested_dict(dict1, dict2):
     """Updated a nested dictionary, where dict1 is updated with values in dict2."""
     for key, value in dict2.items():
         dict1_value = dict1.get(key)
-        if isinstance(value, collections.Mapping) and isinstance(
-                dict1_value, collections.Mapping):
+        if isinstance(value, collections.Mapping) and isinstance(dict1_value, collections.Mapping):
             update_nested_dict(dict1_value, value)
         else:
             dict1[key] = deepcopy(value)

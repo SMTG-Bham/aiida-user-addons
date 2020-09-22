@@ -30,16 +30,7 @@ from aiida_vasp.parsers.file_parsers.outcar import OutcarParser
 from aiida_vasp.parsers.file_parsers.stdout import StdoutParser
 
 POTCAR_FAMILY_NAME = 'test_family'
-POTCAR_MAP = {
-    'In': 'In_sv',
-    'In_d': 'In_d',
-    'As': 'As',
-    'Ga': 'Ga',
-    'Si': 'Si',
-    'P': 'P',
-    'S': 'S',
-    'Zn': 'Zn'
-}
+POTCAR_MAP = {'In': 'In_sv', 'In_d': 'In_d', 'As': 'As', 'Ga': 'Ga', 'Si': 'Si', 'P': 'P', 'S': 'S', 'Zn': 'Zn'}
 
 
 @pytest.fixture(scope='session')
@@ -63,21 +54,14 @@ def localhost(fresh_aiida_env, localhost_dir):
 
 @pytest.fixture
 def vasp_params(fresh_aiida_env):
-    incar_data = get_data_class('dict')(dict={
-        'gga': 'PE',
-        'gga_compat': False,
-        'lorbit': 11,
-        'sigma': 0.5,
-        'magmom': '30 * 2*0.'
-    })
+    incar_data = get_data_class('dict')(dict={'gga': 'PE', 'gga_compat': False, 'lorbit': 11, 'sigma': 0.5, 'magmom': '30 * 2*0.'})
     return incar_data
 
 
 @pytest.fixture
 def vasp2w90_params(fresh_aiida_env, vasp_params):
     vasp_params_data = vasp_params()
-    incar_data = get_data_class('dict')(
-        dict=vasp_params_data.get_dict().update({'lwannier90': True}))
+    incar_data = get_data_class('dict')(dict=vasp_params_data.get_dict().update({'lwannier90': True}))
     return incar_data
 
 
@@ -87,10 +71,7 @@ def potcar_node_pair(fresh_aiida_env):
     potcar_path = data_path('potcar', 'As', 'POTCAR')
     potcar_file_node = get_data_node('vasp.potcar_file', file=potcar_path)
     potcar_file_node.store()
-    return {
-        'file': potcar_file_node,
-        'potcar': get_data_class('vasp.potcar').find_one(symbol='As')
-    }
+    return {'file': potcar_file_node, 'potcar': get_data_class('vasp.potcar').find_one(symbol='As')}
 
 
 @pytest.fixture
@@ -125,10 +106,7 @@ def potcar_family(fresh_aiida_env, temp_pot_folder):
     family_name = POTCAR_FAMILY_NAME
     family_desc = 'A POTCAR family used as a test fixture. Contains only unusable POTCAR files.'
     potcar_cls = get_data_class('vasp.potcar')
-    potcar_cls.upload_potcar_family(temp_pot_folder.strpath,
-                                    family_name,
-                                    family_desc,
-                                    stop_if_existing=False)
+    potcar_cls.upload_potcar_family(temp_pot_folder.strpath, family_name, family_desc, stop_if_existing=False)
     if len(potcar_cls.find(full_name='In_d')) == 1:
         family_group = potcar_cls.get_potcar_group(POTCAR_FAMILY_NAME)
         in_d = potcar_cls.find(full_name='In_d')[0]
@@ -146,9 +124,7 @@ def potcar_family(fresh_aiida_env, temp_pot_folder):
 def potentials(potcar_family):
     """Fixture for two incomplete POTPAW potentials."""
     potcar_cls = get_data_class('vasp.potcar')
-    potentials = potcar_cls.get_potcars_dict(['In', 'In_d', 'As'],
-                                             family_name=potcar_family,
-                                             mapping=POTCAR_MAP)
+    potentials = potcar_cls.get_potcars_dict(['In', 'In_d', 'As'], family_name=potcar_family, mapping=POTCAR_MAP)
 
     return potentials
 
@@ -168,32 +144,21 @@ def vasp_structure(request, fresh_aiida_env):
         structure.append_atom(position=[.25, .25, .25], symbols='As')
         structure.append_atom(position=[.25, .33, .34], symbols='As')
         structure.append_atom(position=[.5, .5, .5], symbols='In', name='In_d')
-        structure.append_atom(position=[.7896, .6234, .5],
-                              symbols='In',
-                              name='In_d')
+        structure.append_atom(position=[.7896, .6234, .5], symbols='In', name='In_d')
         structure.append_atom(position=[.75, .75, .75], symbols='As')
     elif request.param == 'str-Al':
         larray = numpy.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
         alat = 4.04
         structure = DataFactory('structure')(cell=larray * alat)
-        structure.append_atom(position=numpy.array([0, 0, 0]) * alat,
-                              symbols='Al')
-        structure.append_atom(position=numpy.array([0, .5, .5]) * alat,
-                              symbols='Al')
-        structure.append_atom(position=numpy.array([.5, 0, .5]) * alat,
-                              symbols='Al')
-        structure.append_atom(position=numpy.array([.5, .5, 0]) * alat,
-                              symbols='Al')
+        structure.append_atom(position=numpy.array([0, 0, 0]) * alat, symbols='Al')
+        structure.append_atom(position=numpy.array([0, .5, .5]) * alat, symbols='Al')
+        structure.append_atom(position=numpy.array([.5, 0, .5]) * alat, symbols='Al')
+        structure.append_atom(position=numpy.array([.5, .5, 0]) * alat, symbols='Al')
     elif request.param == 'str-InAs':
         structure_cls = DataFactory('structure')
-        structure = structure_cls(
-            cell=numpy.array([[0, .5, .5], [.5, 0, .5], [.5, .5, 0]]) * 6.058)
-        structure.append_atom(position=(0, 0, 0),
-                              symbols='In',
-                              name='Hamburger')
-        structure.append_atom(position=(0.25, 0.25, 0.25),
-                              symbols='As',
-                              name='Pizza')
+        structure = structure_cls(cell=numpy.array([[0, .5, .5], [.5, 0, .5], [.5, .5, 0]]) * 6.058)
+        structure.append_atom(position=(0, 0, 0), symbols='In', name='Hamburger')
+        structure.append_atom(position=(0.25, 0.25, 0.25), symbols='As', name='Pizza')
     return structure
 
 
@@ -224,8 +189,7 @@ def vasp_kpoints(request, fresh_aiida_env):
 
 
 @pytest.fixture()
-def vasp_inputs(fresh_aiida_env, vasp_params, vasp_kpoints, vasp_structure,
-                potentials, vasp_code):
+def vasp_inputs(fresh_aiida_env, vasp_params, vasp_kpoints, vasp_structure, potentials, vasp_code):
     """Inputs dictionary for CalcJob Processes."""
     from aiida.orm import Dict
 
@@ -233,14 +197,7 @@ def vasp_inputs(fresh_aiida_env, vasp_params, vasp_kpoints, vasp_structure,
 
         inputs = AttributeDict()
 
-        metadata = AttributeDict({
-            'options': {
-                'resources': {
-                    'num_machines': 1,
-                    'num_mpiprocs_per_machine': 1
-                }
-            }
-        })
+        metadata = AttributeDict({'options': {'resources': {'num_machines': 1, 'num_mpiprocs_per_machine': 1}}})
 
         if settings is not None:
             inputs.settings = Dict(dict=settings)
@@ -281,14 +238,7 @@ def vasp2w90_inputs(
 
         inputs = AttributeDict()
 
-        metadata = AttributeDict({
-            'options': {
-                'resources': {
-                    'num_machines': 1,
-                    'num_mpiprocs_per_machine': 1
-                }
-            }
-        })
+        metadata = AttributeDict({'options': {'resources': {'num_machines': 1, 'num_mpiprocs_per_machine': 1}}})
 
         if settings is not None:
             inputs.settings = Dict(dict=settings)
@@ -344,16 +294,13 @@ def mock_vasp(fresh_aiida_env, localhost):
         if not localhost.pk:
             localhost.store()
         # returns unicode
-        mock_vasp_path = sp.check_output(['which', 'mock-vasp'],
-                                         env=os_env,
-                                         universal_newlines=True).strip()
+        mock_vasp_path = sp.check_output(['which', 'mock-vasp'], env=os_env, universal_newlines=True).strip()
         code = Code()
         code.label = 'mock-vasp'
         code.description = 'Mock VASP for tests'
         code.set_remote_computer_exec((localhost, mock_vasp_path))
         code.set_input_plugin_name('vasp.vasp')
-        aiidapath = py_path.local(
-            fresh_aiida_env._manager.root_dir).join('.aiida')
+        aiidapath = py_path.local(fresh_aiida_env._manager.root_dir).join('.aiida')
         code.set_prepend_text('export AIIDA_PATH={}'.format(aiidapath))
 
     return code
@@ -442,15 +389,13 @@ def stdout_parser(request):
 
 
 def _ref_kp_list():
-    with open(data_path('kpoints', 'KPOINTS_list'),
-              'r') as reference_kpoints_fo:
+    with open(data_path('kpoints', 'KPOINTS_list'), 'r') as reference_kpoints_fo:
         ref_kp_str = reference_kpoints_fo.read()
     return ref_kp_str
 
 
 def _ref_kp_mesh():
-    with open(data_path('kpoints', 'KPOINTS_mesh'),
-              'r') as reference_kpoints_fo:
+    with open(data_path('kpoints', 'KPOINTS_mesh'), 'r') as reference_kpoints_fo:
         ref_kp_list = reference_kpoints_fo.read()
     return ref_kp_list
 

@@ -21,10 +21,10 @@ class VaspBandsWorkChain(WorkChain):
     3. Do a non-scf calculation for bands and dos.
 
     Inputs must be passed for the SCF calculation, others are optional. The dos calculation
-    will only run if the kpoints for DOS are passed. 
+    will only run if the kpoints for DOS are passed.
 
     Input for bands and dos calculations are optional. However, if they are needed, the full list of inputs must
-    be passed. For the `parameters` node, one may choose to only specify those fields that need to be updated. 
+    be passed. For the `parameters` node, one may choose to only specify those fields that need to be updated.
     """
     _base_wk_string = 'vasp.vasp'
     _relax_wk_string = 'vaspu.relax'
@@ -36,17 +36,9 @@ class VaspBandsWorkChain(WorkChain):
         relax_work = WorkflowFactory(cls._relax_wk_string)
         base_work = WorkflowFactory(cls._base_wk_string)
 
-        spec.input('structure',
-                   help='The input structure',
-                   valid_type=orm.StructureData)
-        spec.input('bands_kpoints',
-                   help='Explicit kpoints for the bands',
-                   valid_type=orm.KpointsData,
-                   required=False)
-        spec.input('bands_kpoints_distance',
-                   help='Spacing for band distances',
-                   valid_type=orm.Float,
-                   required=False)
+        spec.input('structure', help='The input structure', valid_type=orm.StructureData)
+        spec.input('bands_kpoints', help='Explicit kpoints for the bands', valid_type=orm.KpointsData, required=False)
+        spec.input('bands_kpoints_distance', help='Spacing for band distances', valid_type=orm.Float, required=False)
         spec.input(
             'dos_kpoints_density',
             help='Kpoints for running DOS calculations in A^-1 * 2pi',
@@ -55,16 +47,15 @@ class VaspBandsWorkChain(WorkChain):
         )
         spec.expose_inputs(relax_work,
                            namespace='relax',
-                           exclude=('structure', ),
+                           exclude=('structure',),
                            namespace_options={
                                'required': False,
                                'populate_defaults': False,
-                               'help':
-                               'Inputs for Relaxation workchain, if needed'
+                               'help': 'Inputs for Relaxation workchain, if needed'
                            })
         spec.expose_inputs(base_work,
                            namespace='scf',
-                           exclude=('structure', ),
+                           exclude=('structure',),
                            namespace_options={
                                'required': True,
                                'populate_defaults': True,
@@ -76,12 +67,11 @@ class VaspBandsWorkChain(WorkChain):
                            namespace_options={
                                'required': False,
                                'populate_defaults': False,
-                               'help':
-                               'Inputs for bands calculation, if needed'
+                               'help': 'Inputs for bands calculation, if needed'
                            })
         spec.expose_inputs(base_work,
                            namespace='dos',
-                           exclude=('structure', ),
+                           exclude=('structure',),
                            namespace_options={
                                'required': False,
                                'populate_defaults': False,
@@ -92,9 +82,7 @@ class VaspBandsWorkChain(WorkChain):
                    help='What part of the called children to clean',
                    required=False,
                    default=lambda: orm.Str('none'))
-        spec.input('only_dos',
-                   required=False,
-                   help='Flag for running only DOS calculations')
+        spec.input('only_dos', required=False, help='Flag for running only DOS calculations')
         spec.outline(
             cls.setup,
             if_(cls.should_do_relax)(
@@ -110,31 +98,16 @@ class VaspBandsWorkChain(WorkChain):
             cls.inspect_bands_dos,
         )
 
-        spec.output(
-            'primitive_structure',
-            required=False,
-            help='Primitive structure used for band structure calculations')
-        spec.output('band_structure',
-                    required=False,
-                    help='Computed band structure with labels')
-        spec.output('seekpath_parameters',
-                    help='Parameters used by seekpath',
-                    required=False)
+        spec.output('primitive_structure', required=False, help='Primitive structure used for band structure calculations')
+        spec.output('band_structure', required=False, help='Computed band structure with labels')
+        spec.output('seekpath_parameters', help='Parameters used by seekpath', required=False)
         spec.output('dos', required=False)
         spec.output('projectors', required=False)
 
-        spec.exit_code(501,
-                       'ERROR_SUB_PROC_RELAX_FAILED',
-                       message='Relaxation workchain failed')
-        spec.exit_code(502,
-                       'ERROR_SUB_PROC_SCF_FAILED',
-                       message='SCF workchain failed')
-        spec.exit_code(503,
-                       'ERROR_SUB_PROC_BANDS_FAILED',
-                       message='Band structure workchain failed')
-        spec.exit_code(504,
-                       'ERROR_SUB_PROC_DOS_FAILED',
-                       message='DOS workchain failed')
+        spec.exit_code(501, 'ERROR_SUB_PROC_RELAX_FAILED', message='Relaxation workchain failed')
+        spec.exit_code(502, 'ERROR_SUB_PROC_SCF_FAILED', message='SCF workchain failed')
+        spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
+        spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
 
     def setup(self):
         """Setup the calculation"""
@@ -142,7 +115,7 @@ class VaspBandsWorkChain(WorkChain):
         self.ctx.bands_kpoints = self.inputs.get('bands_kpoints')
         param = self.inputs.scf.parameters.get_dict()
         if 'magmom' in param['vasp'] and not self.inputs.get('only_dos'):
-            raise RuntimeError("Cannot treat magnetic systems for BS for now")
+            raise RuntimeError('Cannot treat magnetic systems for BS for now')
 
     def should_do_relax(self):
         """Wether we should do relax or not"""
@@ -179,27 +152,19 @@ class VaspBandsWorkChain(WorkChain):
         Seekpath should only run if no explicit bands is provided or we are just
         running for DOS, in which case the original structure is used.
         """
-        return 'bands_kpoints' not in self.inputs and (not self.inputs.get(
-            'only_dos', False))
+        return 'bands_kpoints' not in self.inputs and (not self.inputs.get('only_dos', False))
 
     def run_seekpath(self):
         """
         Run seekpath to obtain the primitive structure and bands
         """
 
-        inputs = {
-            'reference_distance': self.inputs.get('bands_kpoints_distance',
-                                                  None),
-            'metadata': {
-                'call_link_label': 'seekpath'
-            }
-        }
+        inputs = {'reference_distance': self.inputs.get('bands_kpoints_distance', None), 'metadata': {'call_link_label': 'seekpath'}}
 
-        results = seekpath_structure_analysis(self.ctx.current_structure,
-                                              **inputs)
+        results = seekpath_structure_analysis(self.ctx.current_structure, **inputs)
         self.ctx.current_structure = results['primitive_structure']
         if not np.allclose(self.ctx.structure.cell, self.inputs.structure.cell):
-            self.report("The primitive structure is not the same as the input structure - using the former for all calculations from now.")
+            self.report('The primitive structure is not the same as the input structure - using the former for all calculations from now.')
         self.ctx.bands_kpoints = results['explicit_kpoints']
         self.out('primitive_structure', results['primitive_structure'])
         self.out('seekpath_parameters', results['parameters'])
@@ -223,8 +188,7 @@ class VaspBandsWorkChain(WorkChain):
 
         # Ensure that writing the CHGCAR file is on
         pdict = inputs.parameters.get_dict()
-        if (pdict['vasp'].get('lcharg') == False) or (
-                pdict['vasp'].get('LCHARG') == False):
+        if (pdict['vasp'].get('lcharg') == False) or (pdict['vasp'].get('LCHARG') == False):
             pdict['vasp']['lcharg'] = True
             inputs.parameters = orm.Dict(dict=pdict)
             self.report('Correction: setting LCHARG to True')
@@ -246,7 +210,7 @@ class VaspBandsWorkChain(WorkChain):
         else:
             self.ctx.chgcar = None
         self.ctx.restart_folder = scf_workchain.outputs.remote_folder
-        self.report("SCF calculation {} completed".format(scf_workchain))
+        self.report('SCF calculation {} completed'.format(scf_workchain))
 
     def run_bands_dos(self):
         """Run the bands and the DOS calculations"""
@@ -265,14 +229,11 @@ class VaspBandsWorkChain(WorkChain):
 
         if (only_dos is None) or (only_dos.value is False):
             if 'bands' in self.inputs:
-                bands_input = AttributeDict(
-                    self.exposed_inputs(base_work, namespace='bands'))
+                bands_input = AttributeDict(self.exposed_inputs(base_work, namespace='bands'))
             else:
                 bands_input = AttributeDict({
-                    'settings':
-                    orm.Dict(dict={'add_bands': True}),
-                    'parameters':
-                    orm.Dict(dict={'charge': {
+                    'settings': orm.Dict(dict={'add_bands': True}),
+                    'parameters': orm.Dict(dict={'charge': {
                         'constant_charge': True
                     }}),
                 })
@@ -305,22 +266,18 @@ class VaspBandsWorkChain(WorkChain):
 
             bands_calc = self.submit(base_work, **inputs)
             running['bands_workchain'] = bands_calc
-            self.report(
-                'Submitted workchain {} for band structure'.format(bands_calc))
+            self.report('Submitted workchain {} for band structure'.format(bands_calc))
 
         # Do DOS calculation if dos input namespace is populated or a
         # dos_kpoints input is passed.
         if ('dos_kpoints_density' in self.inputs) or ('dos' in self.inputs):
 
             if 'dos' in self.inputs:
-                dos_input = AttributeDict(
-                    self.exposed_inputs(base_work, namespace='bands'))
+                dos_input = AttributeDict(self.exposed_inputs(base_work, namespace='bands'))
             else:
                 dos_input = AttributeDict({
-                    'settings':
-                    orm.Dict(dict={'add_dos': True}),
-                    'parameters':
-                    orm.Dict(dict={'charge': {
+                    'settings': orm.Dict(dict={'add_dos': True}),
+                    'parameters': orm.Dict(dict={'charge': {
                         'constant_charge': True
                     }}),
                 })
@@ -328,8 +285,7 @@ class VaspBandsWorkChain(WorkChain):
             if 'dos_kpoints_density' in self.inputs:
                 dos_kpoints = orm.KpointsData()
                 dos_kpoints.set_cell_from_structure(self.ctx.current_structure)
-                dos_kpoints.set_kpoints_mesh_from_density(
-                    self.inputs.dos_kpoints_density.value * 2 * np.pi)
+                dos_kpoints.set_kpoints_mesh_from_density(self.inputs.dos_kpoints_density.value * 2 * np.pi)
                 dos_input.kpoints = dos_kpoints
 
             # Special treatment - combine the parameters
@@ -369,23 +325,16 @@ class VaspBandsWorkChain(WorkChain):
         if 'bands_workchain' in self.ctx:
             bands = self.ctx.bands_workchain
             if not bands.is_finished_ok:
-                self.report(
-                    'Bands calculation finished with error, exit_status: {}'.
-                    format(bands, bands.exit_status))
+                self.report('Bands calculation finished with error, exit_status: {}'.format(bands, bands.exit_status))
                 exit_code = self.exit_codes.ERROR_SUB_PROC_BANDS_FAILED
-            self.out(
-                'band_structure',
-                compose_labelled_bands(bands.outputs.bands,
-                                       bands.inputs.kpoints))
+            self.out('band_structure', compose_labelled_bands(bands.outputs.bands, bands.inputs.kpoints))
         else:
             bands = None
 
         if 'dos_workchain' in self.ctx:
             dos = self.ctx.dos_workchain
             if not dos.is_finished_ok:
-                self.report(
-                    'DOS calculation finished with error, exit_status: {}'.
-                    format(dos.exit_status))
+                self.report('DOS calculation finished with error, exit_status: {}'.format(dos.exit_status))
                 exit_code = self.exit_codes.ERROR_SUB_PROC_DOS_FAILED
 
             # Attach outputs
@@ -415,9 +364,7 @@ class VaspBandsWorkChain(WorkChain):
                         pass
 
             if cleaned_calcs:
-                self.report(
-                    'cleaned remote folders of calculations: {}'.format(
-                        ' '.join(map(str, cleaned_calcs))))
+                self.report('cleaned remote folders of calculations: {}'.format(' '.join(map(str, cleaned_calcs))))
 
 
 def nested_update(dict_in, update_dict):
@@ -458,10 +405,7 @@ def seekpath_structure_analysis(structure, **kwargs):
     from aiida.tools import get_explicit_kpoints_path
 
     # All keyword arugments should be `Data` node instances of base type and so should have the `.value` attribute
-    unwrapped_kwargs = {
-        key: node.value
-        for key, node in kwargs.items() if isinstance(node, orm.Data)
-    }
+    unwrapped_kwargs = {key: node.value for key, node in kwargs.items() if isinstance(node, orm.Data)}
 
     return get_explicit_kpoints_path(structure, **unwrapped_kwargs)
 
