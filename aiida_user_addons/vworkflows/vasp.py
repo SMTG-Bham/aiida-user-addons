@@ -297,8 +297,8 @@ class VaspWorkChain(BaseRestartWorkChain):
 
         # Verify and set potentials (potcar)
         if not self.inputs.potential_family.value:
-            self.report(
-                'An empty string for the potential family name was detected.')  # pylint: disable=not-callable
+            self.report(  # pylint: disable=not-callable
+                'An empty string for the potential family name was detected.')
             return self.exit_codes.ERROR_NO_POTENTIAL_FAMILY_NAME  # pylint: disable=no-member
         try:
             self.ctx.inputs.potential = get_data_class(
@@ -334,8 +334,8 @@ class VaspWorkChain(BaseRestartWorkChain):
             last_calc = self.ctx.calculations[
                 -1] if self.ctx.calculations else None
             if last_calc is not None:
-                self.report(
-                    'Last calculation: {calc}'.format(calc=repr(last_calc)))  # pylint: disable=not-callable
+                self.report(  # pylint: disable=not-callable
+                    'Last calculation: {calc}'.format(calc=repr(last_calc)))
                 sched_err = last_calc.outputs.retrieved.get_file_content(
                     '_scheduler-stderr.txt')
                 sched_out = last_calc.outputs.retrieved.get_file_content(
