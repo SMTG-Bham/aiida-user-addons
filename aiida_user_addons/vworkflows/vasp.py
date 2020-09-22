@@ -4,18 +4,22 @@ VASP workchain.
 ---------------
 Contains the VaspWorkChain class definition which uses the BaseRestartWorkChain.
 """
+import numpy as np
+
 from aiida.engine import while_
 from aiida.common.lang import override
 #from aiida.engine.job_processes import override
 from aiida.common.extendeddicts import AttributeDict
-from aiida.common.exceptions import NotExistent
+from aiida.common.exceptions import NotExistent, InputValidationError
 from aiida.plugins import CalculationFactory
-from aiida.orm import Code
+from aiida.orm import Code, KpointsData
 
 from aiida_vasp.workchains.restart import BaseRestartWorkChain
 from aiida_vasp.utils.aiida_utils import get_data_class, get_data_node
 from aiida_vasp.utils.workchains import compose_exit_code
 from aiida_vasp.utils.parameters import ParametersMassage
+
+from ..common.inputset.vaspsets import get_ldau_keys
 
 
 class VaspWorkChain(BaseRestartWorkChain):
@@ -59,7 +63,7 @@ class VaspWorkChain(BaseRestartWorkChain):
                    required=True)
         spec.input('kpoints',
                    valid_type=get_data_class('array.kpoints'),
-                   required=True)
+                   required=False)
         spec.input('potential_family',
                    valid_type=get_data_class('str'),
                    required=True)
@@ -106,6 +110,14 @@ class VaspWorkChain(BaseRestartWorkChain):
                    help="""
             If True, enable more detailed output during workchain execution.
             """)
+        spec.input('ldau_mapping',
+                   valid_type=get_data_class('dict'),
+                   required=False,
+                   help="Mappings, see the doc string of 'get_ldau_keys'")
+        spec.input('kpoints_spacing',
+                   valid_type=get_data_class('float'),
+                   required=False,
+                   help='Spacing for the kpoints in units A^-1 * 2pi')
 
         spec.outline(
             cls.init_context,
@@ -224,7 +236,17 @@ class VaspWorkChain(BaseRestartWorkChain):
         self.ctx.inputs.structure = self.inputs.structure
 
         # Set the kpoints (kpoints)
-        self.ctx.inputs.kpoints = self.inputs.kpoints
+        if 'kpoints' in self.inputs:
+            self.ctx.inputs.kpoints = self.inputs.kpoints
+        elif 'kpoints_spacing' in self.inputs:
+            kpoints = KpointsData()
+            kpoints.set_cell_from_structure(self.ctx.inputs.structure)
+            kpoints.set_kpoints_mesh_from_density(
+                self.inputs.kpoints_spacing.value * np.pi * 2)
+            self.ctx.inputs.kpoints = kpoints
+        else:
+            raise InputValidationError(
+                "Must supply either 'kpoints' or 'kpoints_spacing'")
 
         # Perform inputs massage to accommodate generalization in higher lying workchains
         # and set parameters
@@ -233,6 +255,14 @@ class VaspWorkChain(BaseRestartWorkChain):
         if parameters_massager.exit_code is not None:
             return parameters_massager.exit_code
         self.ctx.inputs.parameters = parameters_massager.parameters
+
+        # Setup LDAU keys
+        if 'ldau_setings' in self.inputs:
+            ldau_settings = self.inputs.ldau_mapping.get_dict()
+            ldau_keys = get_ldau_keys(self.ctx.inputs.structure,
+                                      **ldau_settings)
+            # Directly update the raw inputs passed to VaspCalculation
+            self.ctx.inputs.parameters.update(ldau_keys)
 
         # Set settings
         if 'settings' in self.inputs:
@@ -247,13 +277,15 @@ class VaspWorkChain(BaseRestartWorkChain):
             options.update(self.inputs.options)
             self.ctx.inputs.metadata = {}
             self.ctx.inputs.metadata['options'] = options
+            # Override the parser name if it is supplied by the user.
+            parser_name = self.ctx.inputs.metadata['options'].get(
+                'parser_name')
+            if parser_name:
+                self.ctx.inputs.metadata['options'][
+                    'parser_name'] = parser_name
             # Also make sure we specify the entry point for the
-            # default parser if that is not already specified
-            default_parser = self.ctx.inputs.metadata['options'].get(
-                'parser_name', 'vasp.vasp')
             # Set MPI to True, unless the user specifies otherwise
             withmpi = self.ctx.inputs.metadata['options'].get('withmpi', True)
-            self.ctx.inputs.metadata['options']['parser_name'] = default_parser
             self.ctx.inputs.metadata['options']['withmpi'] = withmpi
         # Utilise default input/output selections
         self.ctx.inputs.metadata['options']['input_filename'] = 'INCAR'
