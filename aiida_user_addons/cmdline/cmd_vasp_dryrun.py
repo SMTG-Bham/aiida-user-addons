@@ -89,11 +89,18 @@ def parse_outcar(outcar_path):
             tokens = line.strip().split()
             output_dict['num_kpoints'] = int(tokens[tokens.index('NKPTS') + 2])
             output_dict['num_bands'] = int(tokens[-1])
-        elif 'NGX =' in line:
+        elif 'dimension x,y,z NGX =' in line:
             tokens = line.strip().split()
             output_dict['NGX'] = int(tokens[tokens.index('NGX') + 2])
             output_dict['NGY'] = int(tokens[tokens.index('NGY') + 2])
             output_dict['NGZ'] = int(tokens[tokens.index('NGZ') + 2])
+        elif 'FFT grid for exact exchange' in line:
+            tokens = lines[il + 1].replace(';', '').strip().split()
+            output_dict['EX NGX'] = int(tokens[tokens.index('NGX') + 2])
+            output_dict['EX NGY'] = int(tokens[tokens.index('NGY') + 2])
+            output_dict['EX NGZ'] = int(tokens[tokens.index('NGZ') + 2])
+        elif 'NPLWV' in line:
+            output_dict['num_plane_waves'] = int(line.split()[-1])
         elif 'k-points in reciprocal lattice and weights:' in line:
             kblock = lines[il + 1:il + 1 + output_dict['num_kpoints']]
             k_list = [[float(token) for token in subline.strip().split()] for subline in kblock]
