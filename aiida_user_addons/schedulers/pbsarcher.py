@@ -1,16 +1,16 @@
 """
 Module for the pbs pro on Archer
-ARCHER does not explicity MPI number definition, so the number of mpi process is
-not inlcluded in the submission script
+ARCHER does not like explicit MPI number definition, so the number of mpi process is
+not included in the submission script.
 
 In addition, ARCHER supports a `bigmem` flag that can be used to request nodes with
-larger memory size
+larger memory size. For this we have to tweak the `PbsJobResource`.
 """
 import logging
 
 from aiida.schedulers import Scheduler
-from aiida.schedulers.datastructures import NodeNumberJobResource
 from aiida.common.escaping import escape_for_bash
+from aiida.common.extendeddicts import AttributeDict
 from aiida.schedulers.plugins.pbsbaseclasses import PbsBaseClass, PbsJobResource
 
 _LOGGER = logging.getLogger(__name__)
@@ -20,30 +20,69 @@ class PbsArcherJobResource(PbsJobResource):
     """
     JobResource for ARCHER with bigmem flag for big memory nodes
     """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Add additonal bigmem attribute
-        """
-        self.bigmem = kwargs.pop('bigmem', None)
-        super(PbsArcherJobResource, self).__init__(*args, **kwargs)
+    _default_fields = ('num_machines', 'num_mpiprocs_per_machine', 'num_cores_per_machine', 'num_cores_per_mpiproc', 'bigmem')
 
     @classmethod
-    def get_valid_keys(cls):
-        """
-        Extend with bigmem flag
-        """
-        return super(PbsArcherJobResource, cls).get_valid_keys() + ['bigmem']
+    def validate_resources(cls, **kwargs):
+        """Validate the resources against the job resource class of this scheduler.
 
+        :param kwargs: dictionary of values to define the job resources
+        :return: attribute dictionary with the parsed parameters populated
+        :raises ValueError: if the resources are invalid or incomplete
+        """
+        resources = AttributeDict()
 
-def test_job_resource():
-    """
-    Simple test for the resource class
-    """
-    resource = PbsArcherJobResource(num_machines=1, num_mpiprocs_per_machine=16)
-    assert resource.bigmem is None
-    resource = PbsArcherJobResource(num_machines=1, bigmem=True, num_mpiprocs_per_machine=16)
-    assert resource.bigmem is True
+        def is_greater_equal_one(parameter):
+            value = getattr(resources, parameter, None)
+            if value is not None and value < 1:
+                raise ValueError('`{}` must be greater than or equal to one.'.format(parameter))
+
+        # Validate that all fields are valid integers if they are specified, otherwise initialize them to `None`
+        for parameter in list(cls._default_fields) + ['tot_num_mpiprocs']:
+            # Special case bigmem tag is a bool type
+            if parameter == 'bigmem':
+                try:
+                    value = kwargs.pop(parameter)
+                except KeyError:
+                    setattr(resources, parameter, None)
+                else:
+                    if isinstance(value, bool):
+                        setattr(resources, parameter, value)
+                    else:
+                        raise ValueError('`{}` must be an bool type when specified'.format(parameter))
+            else:
+                try:
+                    setattr(resources, parameter, int(kwargs.pop(parameter)))
+                except KeyError:
+                    setattr(resources, parameter, None)
+                except ValueError:
+                    raise ValueError('`{}` must be an integer when specified'.format(parameter))
+
+        if kwargs:
+            raise ValueError('these parameters were not recognized: {}'.format(', '.join(list(kwargs.keys()))))
+
+        # At least two of the following parameters need to be defined as non-zero
+        if [resources.num_machines, resources.num_mpiprocs_per_machine, resources.tot_num_mpiprocs].count(None) > 1:
+            raise ValueError('At least two among `num_machines`, `num_mpiprocs_per_machine` or `tot_num_mpiprocs` must be specified.')
+
+        for parameter in ['num_machines', 'num_mpiprocs_per_machine']:
+            is_greater_equal_one(parameter)
+
+        # Here we now that at least two of the three required variables are defined and greater equal than one.
+        if resources.num_machines is None:
+            resources.num_machines = resources.tot_num_mpiprocs // resources.num_mpiprocs_per_machine
+        elif resources.num_mpiprocs_per_machine is None:
+            resources.num_mpiprocs_per_machine = resources.tot_num_mpiprocs // resources.num_machines
+        elif resources.tot_num_mpiprocs is None:
+            resources.tot_num_mpiprocs = resources.num_mpiprocs_per_machine * resources.num_machines
+
+        if resources.tot_num_mpiprocs != resources.num_mpiprocs_per_machine * resources.num_machines:
+            raise ValueError('`tot_num_mpiprocs` is not equal to `num_mpiprocs_per_machine * num_machines`.')
+
+        is_greater_equal_one('num_mpiprocs_per_machine')
+        is_greater_equal_one('num_machines')
+
+        return resources
 
 
 class PbsArcherScheduler(PbsBaseClass, Scheduler):
