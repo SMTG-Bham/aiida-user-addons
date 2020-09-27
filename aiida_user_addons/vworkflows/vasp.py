@@ -6,18 +6,19 @@ Contains the VaspWorkChain class definition which uses the BaseRestartWorkChain.
 """
 import numpy as np
 
-from aiida.engine import while_
+from aiida.engine import while_, if_
 from aiida.common.lang import override
 #from aiida.engine.job_processes import override
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import NotExistent, InputValidationError
 from aiida.plugins import CalculationFactory
-from aiida.orm import Code, KpointsData
+from aiida.orm import Code, KpointsData, Dict
 
 from aiida_vasp.workchains.restart import BaseRestartWorkChain
 from aiida_vasp.utils.aiida_utils import get_data_class, get_data_node
 from aiida_vasp.utils.workchains import compose_exit_code
 from aiida_vasp.utils.parameters import ParametersMassage
+from aiida_vasp.utils.workchains import prepare_process_inputs
 
 from ..common.inputset.vaspsets import get_ldau_keys
 
@@ -49,6 +50,17 @@ class VaspWorkChain(BaseRestartWorkChain):
 
     To see a working example, including generation of input nodes from scratch, please
     refer to ``examples/run_vasp_lean.py``.
+
+
+    Additional functionalities:
+
+    - Automatic setting LDA+U key using the ``ldau_mapping`` input port.
+
+    - Set kpoints using spacing in A^-1 * 2pi with the ``kpoints_spacing`` input port.
+
+    - Perform dryrun and set parameters such as KPAR and NCORE automatically if ``auto_parallel`` input port exists.
+      this will give rise to an additional output node ``parallel_settings`` containing the strategy obtained.
+
     """
     _verbose = False
     _calculation = CalculationFactory('vasp.vasp')
@@ -101,10 +113,17 @@ class VaspWorkChain(BaseRestartWorkChain):
                    valid_type=get_data_class('float'),
                    required=False,
                    help='Spacing for the kpoints in units A^-1 * 2pi')
-
+        spec.input('auto_parallel',
+                   valid_type=get_data_class('dict'),
+                   required=False,
+                   help='Automatic parallelisation settings, keywords passed to `get_jobscheme` function.')
         spec.outline(
             cls.init_context,
             cls.init_inputs,
+            if_(cls.run_auto_parallel)(
+                cls.init_calculation,
+                cls.perform_autoparallel
+            ),
             while_(cls.run_calculations)(
                 cls.init_calculation,
                 cls.run_calculation,
@@ -133,6 +152,7 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.output('born_charges', valid_type=get_data_class('array'), required=False)
         spec.output('hessian', valid_type=get_data_class('array'), required=False)
         spec.output('dynmat', valid_type=get_data_class('array'), required=False)
+        spec.output('parallel_settings', valid_type=get_data_class('dict'), required=False)
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
         spec.exit_code(700, 'ERROR_NO_POTENTIAL_FAMILY_NAME', message='the user did not supply a potential family name')
         spec.exit_code(701, 'ERROR_POTENTIAL_VALUE_ERROR', message='ValueError was returned from get_potcars_from_structure')
@@ -254,6 +274,40 @@ class VaspWorkChain(BaseRestartWorkChain):
             self.ctx.inputs.wavefunctions = self.inputs.wavecar
 
         return self.exit_codes.NO_ERROR  # pylint: disable=no-member
+
+    def run_auto_parallel(self):
+        """Wether we should run auto-parallelisation test"""
+        return 'auto_parallel' in self.inputs
+
+    def perform_autoparallel(self):
+        """Dry run and obtain the best parallelisation settings"""
+        from aiida_user_addons.tools.dryrun import get_jobscheme
+        self.report(f'Performing local dryrun for auto-parallelisation')  # pylint: disable=not-callable
+
+        ind = prepare_process_inputs(self.ctx.inputs)
+
+        nprocs = self.ctx.inputs.metadata['options']['resources']['tot_num_mpiprocs']
+
+        # Take the settings pass it to the function
+        kwargs = self.inputs.auto_parallel.get_dict()
+        if 'cpus_per_node' not in kwargs:
+            kwargs['cpus_per_node'] = self.inputs.code.computer.get_default_mpiprocs_per_machine()
+
+        # If the dryrun errored, proceed the workchain
+        try:
+            scheme = get_jobscheme(ind, nprocs, **kwargs)
+        except Exception as error:
+            self.report(f'Dry-run errorred, process with cautions, message: {error.args}')  # pylint: disable=not-callable
+            return
+
+        if (scheme.ncore is None) or (scheme.kpar is None):
+            self.report(f'Error NCORE: {scheme.ncore}, KPAR: {scheme.kpar}')  # pylint: disable=not-callable
+            return
+
+        parallel_opts = {'ncore': scheme.ncore, 'kpar': scheme.kpar}
+        self.report(f'Found optimum KPAR={scheme.kpar}, NCORE={scheme.ncore}')  # pylint: disable=not-callable
+        self.ctx.inputs.parameters.update(parallel_opts)
+        self.out('parallel_settings', Dict(dict={'ncore': scheme.ncore, 'kpar': scheme.kpar}).store())
 
     @override
     def on_except(self, exc_info):

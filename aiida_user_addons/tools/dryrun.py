@@ -28,35 +28,24 @@ def dryrun_vasp(input_dict, vasp_exe='vasp_std', timeout=10, work_dir=None, keep
     """
     # Deal with passing an process builder
     if isinstance(input_dict, ProcessBuilder):
-        input_dict['metadata']['store_provenance'] = False
-        input_dict['metadata']['dry_run'] = True
         try:
-            output_node = run_get_node(input_dict).node
+            output_node = prepare_inputs(input_dict)
         except Exception as error:
             raise error
-        finally:
-            input_dict['metadata']['store_provenance'] = True
-            input_dict['metadata']['dry_run'] = False
     else:
-        input_dict['metadata']['store_provenance'] = False
-        input_dict['metadata']['dry_run'] = True
         try:
-            output_node = run_get_node(VaspCalculation, **input_dict).node
+            output_node = prepare_inputs(input_dict)
         except Exception as error:
             raise error
-        finally:
-            input_dict['metadata']['store_provenance'] = True
-            input_dict['metadata']['dry_run'] = False
 
-    info = output_node.dry_run_info
-    folder = info['folder']
+    folder = output_node.dry_run_info['folder']
     outcome = _vasp_dryrun(folder, vasp_exe=vasp_exe, timeout=timeout, work_dir=work_dir, keep=keep)
     shutil.rmtree(folder)
 
     return outcome
 
 
-def get_optimum_parallelisation(input_dict, nprocs, vasp_exe='vasp_std', **kwargs):
+def get_jobscheme(input_dict, nprocs, vasp_exe='vasp_std', **kwargs):
     """
     Perform a dryrun for the input and workout the best parallelisation strategy
     Args:
@@ -71,4 +60,19 @@ def get_optimum_parallelisation(input_dict, nprocs, vasp_exe='vasp_std', **kwarg
     """
     dryout = dryrun_vasp(input_dict, vasp_exe)
     scheme = JobScheme.from_dryrun(dryout, nprocs, **kwargs)
-    return scheme.kpar, scheme.ncore
+    return scheme
+
+
+def prepare_inputs(inputs):
+    vasp = VaspCalculation(inputs=inputs)
+    from aiida.common.folders import SubmitTestFolder
+    from aiida.engine.daemon.execmanager import upload_calculation
+    from aiida.transports.plugins.local import LocalTransport
+
+    with LocalTransport() as transport:
+        with SubmitTestFolder() as folder:
+            calc_info = vasp.presubmit(folder)
+            transport.chdir(folder.abspath)
+            upload_calculation(vasp.node, transport, calc_info, folder, inputs=vasp.inputs, dry_run=True)
+            vasp.node.dry_run_info = {'folder': folder.abspath, 'script_filename': vasp.node.get_option('submit_script_filename')}
+    return vasp.node
