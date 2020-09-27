@@ -2,6 +2,7 @@
 Module for finding optimum parallelisation strategy
 """
 from math import gcd, ceil
+from warnings import warn
 
 
 class JobScheme:
@@ -17,6 +18,7 @@ class JobScheme:
                  npw=None,
                  nbands=None,
                  ncore_within_node=True,
+                 ncore_strategy='maximise',
                  wf_size_limit=1000):
         """
         Instantiate a JobScheme object
@@ -29,6 +31,7 @@ class JobScheme:
             npw (int): Number of plane waves.
             nbands (int): Number of bands
             ncore_within_node (bool): If True, will limit plane-wave parallelisation to be within each node.
+            ncore_strategy (str): Strategy for optimise NCORE, choose from 'maximise' and 'balance'.
             wf_size_limit (float): Limit of the ideal wavefunction size per process in MB.
                 This should be set to less than the actual memory limit by a good margin (eg. 500 MB) as other
                 things such as the charge density, projector, and electronic solver will also occupy the memory.
@@ -43,6 +46,7 @@ class JobScheme:
         self.npw = npw
         self.nbands = nbands
         self.ncore_within_node = ncore_within_node
+        self.ncore_strategy = ncore_strategy
         self.wf_size_limit = wf_size_limit
 
         self.n_kgroup = None  # KPOINT groups
@@ -59,19 +63,36 @@ class JobScheme:
         self.solve_kpar()
         self.solve_ncore()
 
+    @classmethod
+    def from_dryrun(cls, dryrun_outcome, n_procs, **kwargs):
+        """Construct from dryrun results"""
+        kwargs['n_kpoints'] = dryrun_outcome.get('num_kpoints')
+        kwargs['nbands'] = dryrun_outcome.get('num_bands')
+        kwargs['npw'] = dryrun_outcome.get('num_plane_waves')
+        kwargs['n_procs'] = n_procs
+        return cls(**kwargs)
+
     def solve_kpar(self):
         """
         Solve for the optimum strategy
         """
         kpar = gcd(self.n_kpoints, self.n_procs)
         self.kpar = kpar
-        if self.size_wavefunction_per_proc > self.wf_size_limit:
-            for kcandidate in factors(kpar):
-                self.kpar = kcandidate
-                if self.size_wavefunction_per_proc < self.wf_size_limit:
-                    kpar = kcandidate
-                    break
+        # If we did not set nbands or npw, we cannot adjust KAR to avoid memory issues
+        if any(map(lambda x: x is None, [self.nbands, self.npw])):
+            warn('Cannot limit KAR for memory requirement without supplying both NBANDS and NPW', UserWarning)
+            return kpar
 
+        # Reduce the KPAR
+        if self.size_wavefunction_per_proc > self.wf_size_limit:
+            for candidate in factors(kpar):
+                self.kpar = candidate
+                if self.size_wavefunction_per_proc < self.wf_size_limit:
+                    kpar = candidate
+                    break
+        if self.size_wavefunction_per_proc > self.wf_size_limit:
+            warn(('Expected wavefunction size per process {} MB '
+                  'is large than the limit {} MB').format(self.size_wavefunction_per_proc, self.wf_size_limit), UserWarning)
         return kpar
 
     @property
@@ -110,7 +131,13 @@ class JobScheme:
             combs.append((ncore, factor, abs(ncore / npar - 1), new_nbands))  # Balance factor, the smaller the better
 
         combs = list(filter(lambda x: x[1] < 1.2, combs))
-        combs.sort(key=lambda x: x[2])  # Sort by increasing balance factor
+        if self.ncore_strategy == 'balance':
+            combs.sort(key=lambda x: x[2])  # Sort by increasing balance factor
+        elif self.ncore_strategy == 'maximise':
+            combs.sort(key=lambda x: x[0], reverse=True)  # Sort by decreasing NCORE
+        else:
+            raise RuntimeError(f'NCORE strategy: <{self.ncore_strategy}> is invalid')
+
         # Take the maximum ncore
         ncore, factor, balance, new_nbands = combs[0]
 
@@ -134,9 +161,9 @@ class JobScheme:
 
 
 def factors(num):
-    """Return all factors of a number"""
-    result = []
-    for i in range(1, num // 2 + 1):
+    """Return all factors of a number in descending order, including the number itself"""
+    result = [num]
+    for i in range(num // 2 + 1, 0, -1):
         if num % i == 0:
             result.append(i)
-    return list(reversed(result))
+    return result

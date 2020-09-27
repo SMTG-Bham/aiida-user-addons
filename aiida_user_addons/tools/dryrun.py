@@ -9,6 +9,8 @@ from aiida.engine import run_get_node
 from aiida_vasp.calcs.vasp import VaspCalculation
 from aiida_user_addons.cmdline.cmd_vasp_dryrun import vasp_dryrun as _vasp_dryrun
 
+from .optparallel import JobScheme
+
 
 def dryrun_vasp(input_dict, vasp_exe='vasp_std', timeout=10, work_dir=None, keep=False):
     """
@@ -52,3 +54,21 @@ def dryrun_vasp(input_dict, vasp_exe='vasp_std', timeout=10, work_dir=None, keep
     shutil.rmtree(folder)
 
     return outcome
+
+
+def get_optimum_parallelisation(input_dict, nprocs, vasp_exe='vasp_std', **kwargs):
+    """
+    Perform a dryrun for the input and workout the best parallelisation strategy
+    Args:
+        input_dict (dict,ProcessBuilder): Inputs of the VaspCalculation
+        nprocs (int): Target number of processes to be used
+        vasp_exe (str): The executable of local VASP program to be used
+        kwargs: Addition keyword arguments to be passed to `JobScheme`
+
+    Returns:
+        int, int: The KPAR and NCORE that should be used
+
+    """
+    dryout = dryrun_vasp(input_dict, vasp_exe)
+    scheme = JobScheme.from_dryrun(dryout, nprocs, **kwargs)
+    return scheme.kpar, scheme.ncore
