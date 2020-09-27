@@ -26,6 +26,14 @@ from aiida_phonopy.common.utils import (
 
 
 class VaspAutoPhononWorkChain(WorkChain):
+    """
+    VaspAutoPhononWorkChain
+
+    A workchain to perform automated relaxation followed by finite displacement
+    single point calculations and finally use phonopy to obtain the band structure
+    and density of states.
+
+    """
     _relax_entrypoint = 'vaspu.relax'
     _relax_chain = WorkflowFactory(_relax_entrypoint)
     _singlepoint_entrypoint = 'vaspu.vasp'
