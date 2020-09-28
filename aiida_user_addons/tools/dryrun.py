@@ -2,6 +2,7 @@
 Module to provide dryrun functionality
 """
 import shutil
+import numpy as np
 
 from aiida.engine.processes.builder import ProcessBuilder
 from aiida.engine import run_get_node
@@ -84,3 +85,26 @@ def prepare_inputs(inputs):
             upload_calculation(vasp.node, transport, calc_info, folder, inputs=vasp.inputs, dry_run=True)
             vasp.node.dry_run_info = {'folder': folder.abspath, 'script_filename': vasp.node.get_option('submit_script_filename')}
     return vasp.node
+
+
+def dryrun_relax_builder(builder, **kwargs):
+    """Dry run a relaxation workchain builder"""
+    from aiida_vasp.data.potcar import PotcarData
+    from aiida.orm import KpointsData, Dict
+    vasp_builder = VaspCalculation.get_builder()
+
+    # Setup the builder for the bare calculation
+    vasp_builder.code = builder.vasp.code
+    vasp_builder.parameters = Dict(dict=builder.vasp.parameters.get_dict()['vasp'])
+    if builder.vasp.kpoints is not None:
+        vasp_builder.kpoints = builder.vasp.kpoints
+    else:
+        vasp_builder.kpoints = KpointsData()
+        vasp_builder.kpoints.set_cell_from_structure(builder.structure)
+        vasp_builder.kpoints.set_kpoints_mesh_from_density(builder.vasp.kpoints_spacing.value * np.pi * 2)
+    vasp_builder.metadata.options = builder.vasp.options.get_dict()  # pylint: disable=no-member
+    vasp_builder.potential = PotcarData.get_potcars_from_structure(builder.structure, builder.vasp.potential_family.value,
+                                                                   builder.vasp.potential_mapping.get_dict())
+    vasp_builder.structure = builder.structure
+
+    return dryrun_vasp(vasp_builder, **kwargs)
