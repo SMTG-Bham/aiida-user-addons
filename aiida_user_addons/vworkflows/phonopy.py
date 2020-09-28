@@ -379,6 +379,7 @@ def collect_vasp_forces_and_energies(ctx, ctx_supercells, prefix='force_calc'):
 class PhononSettings(OptionHolder):
     """Options for phonon_settings input"""
     _allowed_options = ('supercell_matrix', 'mesh', 'distance', 'primitive_matrix', 'magmom')
+    _allowed_empty_fields = ('magmom', 'distance')
     supercell_matrix = required_field('supercell_matrix', (list,), 'Supercell matrix for phonons')
     primitive_matrix = typed_field('primitive_matrix', (list, str), 'primitive matrix for phonons', 'auto')
     mesh = required_field('mesh', (int,), 'Mesh for phonon calculation')

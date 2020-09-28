@@ -6,7 +6,7 @@ from aiida.common.exceptions import InputValidationError
 
 
 def typed_field(name, types, doc, default):
-    """A option of certain types"""
+    """A option of certain types, with default values"""
 
     def getter(self):
         output = self._get_opt(name)  # pylint: disable=protected-access
@@ -27,12 +27,12 @@ def typed_field(name, types, doc, default):
 
 
 def required_field(name, types, doc):
-    """A option of certain types"""
+    """A option of certain types, must be supplied"""
 
     def getter(self):
         output = self._get_opt(name)  # pylint: disable=protected-access
         if output is None:
-            raise ValueError(f'{name} is a required field!')
+            raise InputValidationError(f'{name} is a required field!')
         return output
 
     def setter(self, value):
@@ -51,11 +51,24 @@ class OptionHolder(object):
     """
     A container for holding a dictionary of options.
 
-    Valid options can be set using the standard `obj.<option> = <value>` syntex.
+    Valid options can be set using the standard `obj.<option> = <value>` syntax.
+    This is only a helper for getting the input dictionary of settings, and allow
+    populating such dictionary with the default values. This way, all settings will
+    be stored in AiiDA's database.
+
+    Example:
+        The `to_aiida_dict` method should be called for serving the options to an input
+        port::
+
+            builder.my_settings = OptionHolder(a=1).to_aiida_dict()
+
+    Workflows may choose to enable `validator` and/or `serializor` for additional checking
+    corrections.
+
     """
 
     _allowed_options = tuple()
-    _allow_empty_field = True
+    _allowed_empty_fields = []
 
     @classmethod
     def _validate_class(cls):
@@ -108,7 +121,9 @@ class OptionHolder(object):
 
     @classmethod
     def validate_dict(cls, input_dict, port=None):
-        """Vaildate a dictionary/Dict node"""
+        """
+        Vaildate a dictionary/Dict node
+        """
         cls._validate_class()
         all_options = list(cls._allowed_options)
         obj = cls()
@@ -124,9 +139,9 @@ class OptionHolder(object):
             setattr(obj, key, value)
             all_options.remove(key)
         # Check if any of the keys are not set
-        if all_options and not cls._allow_empty_field:
-            raise InputValidationError(f'Keys: {all_options} are missing')
-
+        missing = list(filter(lambda x: x not in cls._allowed_empty_fields, all_options))
+        if any(missing):
+            raise InputValidationError(f'Keys: {missing} are missing')
         try:
             obj.to_dict()
         except ValueError as error:

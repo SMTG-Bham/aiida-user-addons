@@ -23,6 +23,7 @@ import numpy as np
 
 import aiida.orm as orm
 from aiida.common.extendeddicts import AttributeDict
+from aiida.common.exceptions import InputValidationError
 from aiida.engine import WorkChain, append_, while_, if_, ToContext
 from aiida.plugins import WorkflowFactory
 
@@ -466,6 +467,7 @@ class RelaxOptions(OptionHolder):
     _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps', 'positions', 'shape', 'volume', 'convergence_on',
                         'convergence_mode', 'convergence_volume', 'convergence_absolute', 'convergence_max_iterations',
                         'convergence_positions', 'convergence_shape_lengths', 'convergence_shape_angles', 'perform')
+    _allowed_empty_fields = ('energy_cutoff', 'force_cutoff')  # Either one of them should be set if convergence is on
 
     algo = typed_field('algo', (str,), 'The algorithm to use for relaxation.', 'cg')
     energy_cutoff = typed_field('energy_cutoff', (float,), """
@@ -505,6 +507,17 @@ class RelaxOptions(OptionHolder):
         'Wether to perform the relaxation or not',
         True,
     )
+
+    @classmethod
+    def validate_dict(cls, indict, port=None):
+        """Validate the input dictionary"""
+        super().validate_dict(indict, port)
+        force_cut = indict.get('force_cutoff')
+        energy_cut = indict.get('energy_cutoff')
+        if force_cut is None and energy_cut is None:
+            raise InputValidationError("Either 'force_cutoff' or 'energy_cutoff' should be supplied")
+        if (force_cut is not None) and (energy_cut is not None):
+            raise InputValidationError("Cannot set both 'force_cutoff' and 'energy_cutoff'")
 
 
 def nested_update(dict_in, update_dict):
