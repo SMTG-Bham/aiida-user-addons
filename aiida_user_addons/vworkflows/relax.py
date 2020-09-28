@@ -512,6 +512,8 @@ class RelaxOptions(OptionHolder):
     def validate_dict(cls, indict, port=None):
         """Validate the input dictionary"""
         super().validate_dict(indict, port)
+        if isinstance(indict, orm.Dict):
+            indict = indict.get_dict()
         force_cut = indict.get('force_cutoff')
         energy_cut = indict.get('energy_cutoff')
         if force_cut is None and energy_cut is None:
