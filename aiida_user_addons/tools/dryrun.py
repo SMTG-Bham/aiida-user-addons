@@ -40,7 +40,8 @@ def dryrun_vasp(input_dict, vasp_exe='vasp_std', timeout=10, work_dir=None, keep
 
     folder = output_node.dry_run_info['folder']
     outcome = _vasp_dryrun(folder, vasp_exe=vasp_exe, timeout=timeout, work_dir=work_dir, keep=keep)
-    shutil.rmtree(folder)
+    if not keep:
+        shutil.rmtree(folder)
 
     return outcome
 
