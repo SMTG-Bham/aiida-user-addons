@@ -64,6 +64,13 @@ def get_jobscheme(input_dict, nprocs, vasp_exe='vasp_std', **kwargs):
 
 
 def prepare_inputs(inputs):
+    """Prepare inputs"""
+
+    # Have to turn store_provenance to False
+    inputs = dict(inputs)
+    inputs['metadata'] = dict(inputs['metadata'])
+    inputs['metadata']['store_provenance'] = False
+    inputs['metadata']['dry_run'] = True
     vasp = VaspCalculation(inputs=inputs)
     from aiida.common.folders import SubmitTestFolder
     from aiida.engine.daemon.execmanager import upload_calculation
