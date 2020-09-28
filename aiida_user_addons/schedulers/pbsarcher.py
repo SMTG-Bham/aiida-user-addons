@@ -8,6 +8,8 @@ larger memory size. For this we have to tweak the `PbsJobResource`.
 """
 import logging
 
+from math import ceil
+
 from aiida.schedulers import Scheduler
 from aiida.common.escaping import escape_for_bash
 from aiida.common.extendeddicts import AttributeDict
@@ -70,14 +72,14 @@ class PbsArcherJobResource(PbsJobResource):
 
         # Here we now that at least two of the three required variables are defined and greater equal than one.
         if resources.num_machines is None:
-            resources.num_machines = resources.tot_num_mpiprocs // resources.num_mpiprocs_per_machine
+            resources.num_machines = ceil(resources.tot_num_mpiprocs / resources.num_mpiprocs_per_machine)
         elif resources.num_mpiprocs_per_machine is None:
-            resources.num_mpiprocs_per_machine = resources.tot_num_mpiprocs // resources.num_machines
+            resources.num_mpiprocs_per_machine = 24  # Default for ARCHER
         elif resources.tot_num_mpiprocs is None:
             resources.tot_num_mpiprocs = resources.num_mpiprocs_per_machine * resources.num_machines
 
-        if resources.tot_num_mpiprocs != resources.num_mpiprocs_per_machine * resources.num_machines:
-            raise ValueError('`tot_num_mpiprocs` is not equal to `num_mpiprocs_per_machine * num_machines`.')
+        if resources.tot_num_mpiprocs > resources.num_mpiprocs_per_machine * resources.num_machines:
+            raise ValueError('`tot_num_mpiprocs` is more than the `num_mpiprocs_per_machine * num_machines`.')
 
         is_greater_equal_one('num_mpiprocs_per_machine')
         is_greater_equal_one('num_machines')

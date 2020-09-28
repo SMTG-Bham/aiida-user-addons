@@ -19,6 +19,20 @@ def test_archer_job_resource():
     with pytest.raises(ValueError):
         resource = PbsArcherJobResource(num_machines=1, bigmem=100, num_mpiprocs_per_machine=16)
 
+    resource = PbsArcherJobResource(num_machines=3, tot_num_mpiprocs=70)
+    assert resource.num_machines == 3
+    assert resource.tot_num_mpiprocs == 70
+    assert resource.num_mpiprocs_per_machine == 24
+
+    with pytest.raises(ValueError):
+        resource = PbsArcherJobResource(num_machines=2, num_mpiprocs_per_machine=12, tot_num_mpiprocs=25)
+
+    # Under populate
+    resource = PbsArcherJobResource(num_machines=2, num_mpiprocs_per_machine=12, tot_num_mpiprocs=20)
+    assert resource.num_machines == 2
+    assert resource.tot_num_mpiprocs == 20
+    assert resource.num_mpiprocs_per_machine == 12
+
 
 def test_sge_nodetail():
 
