@@ -500,7 +500,7 @@ class RelaxOptions(OptionHolder):
     convergence_shape_angles = typed_field(
         'convergence_shape_angles', (float,),
         'The cut off value for the convergence check on the angles of the unit cell vectors, between input and output structure.', 0.1)
-    convergence_mode = typed_field('convergence_mode', (str,), 'Mode of the convergence - select from \'inout\' and \'last\'', 'last')
+    convergence_mode = typed_field('convergence_mode', (str,), 'Mode of the convergence - select from \'inout\' and \'last\'', 'inout')
     perform = typed_field(
         'perform',
         (bool,),
