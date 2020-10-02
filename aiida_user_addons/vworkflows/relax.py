@@ -164,7 +164,7 @@ class VaspRelaxWorkChain(WorkChain):
 
         # Did not perform the relaxation - going into the final singlepoint directly
         if not self.perform_relaxation():
-            if self._verbose:
+            if self.ctx.verbose:
                 self.report('skipping structure relaxation and forwarding input to the next workchain.')
         else:
             # For the final static run we do not need to parse the output structure
@@ -179,7 +179,7 @@ class VaspRelaxWorkChain(WorkChain):
             if 'static_parameters' in self.inputs:
                 self.ctx.static_input_additions.parameters = nested_update_dict_node(self.inputs.vasp.parameters,
                                                                                      self.inputs.static_parameters.get_dict())
-            if self._verbose:
+            if self.ctx.verbose:
                 self.report('performing a final calculation using the relaxed structure.')
 
     def run_relax(self):
@@ -188,6 +188,14 @@ class VaspRelaxWorkChain(WorkChain):
 
         inputs = self.exposed_inputs(self._base_workchain, 'vasp')
         inputs.structure = self.ctx.current_structure
+
+        # Attach previous calculation's folder if requested
+        if self.ctx.relax_settings.get('reuse', False):
+            restart_folder = self.ctx.get('current_restart_folder')  # There might not be any yet
+            if restart_folder:
+                if self.ctx.verbose:
+                    self.report('Using previous remote folder <{}> for restart'.format(restart_folder))
+                inputs.restart_folder = restart_folder
 
         # Update the input with whatever stored in the relax_input_additions attribute dict
         inputs.update(self.ctx.relax_input_additions)
@@ -466,7 +474,7 @@ class RelaxOptions(OptionHolder):
     """
     _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps', 'positions', 'shape', 'volume', 'convergence_on',
                         'convergence_mode', 'convergence_volume', 'convergence_absolute', 'convergence_max_iterations',
-                        'convergence_positions', 'convergence_shape_lengths', 'convergence_shape_angles', 'perform')
+                        'convergence_positions', 'convergence_shape_lengths', 'convergence_shape_angles', 'perform', 'reuse')
     _allowed_empty_fields = ('energy_cutoff', 'force_cutoff')  # Either one of them should be set if convergence is on
 
     algo = typed_field('algo', (str,), 'The algorithm to use for relaxation.', 'cg')
@@ -501,6 +509,7 @@ class RelaxOptions(OptionHolder):
         'convergence_shape_angles', (float,),
         'The cut off value for the convergence check on the angles of the unit cell vectors, between input and output structure.', 0.1)
     convergence_mode = typed_field('convergence_mode', (str,), 'Mode of the convergence - select from \'inout\' and \'last\'', 'inout')
+    reuse = typed_field('reuse', (bool,), 'Whether reuse the previous calculation by copying over the remote folder.', False)
     perform = typed_field(
         'perform',
         (bool,),
