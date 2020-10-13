@@ -212,7 +212,7 @@ class VaspWorkChain(BaseRestartWorkChain):
         self.ctx.inputs.parameters = parameters_massager.parameters
 
         # Setup LDAU keys
-        if 'ldau_setings' in self.inputs:
+        if 'ldau_mapping' in self.inputs:
             ldau_settings = self.inputs.ldau_mapping.get_dict()
             ldau_keys = get_ldau_keys(self.ctx.inputs.structure, **ldau_settings)
             # Directly update the raw inputs passed to VaspCalculation
