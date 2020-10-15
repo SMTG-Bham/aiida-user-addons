@@ -159,12 +159,15 @@ class VaspAutoPhononWorkChain(WorkChain):
 
         # Check if we are doing magnetic calculations
         force_calc_inputs = self.exposed_inputs(self._singlepoint_chain, 'singlepoint')
-        relax_calc_inputs = self.exposed_inputs(self._relax_chain, 'relax')
 
-        # Fetch the magmom from the relaxation calculation (eg. for the starting structure)
-        try:
-            magmom = relax_calc_inputs.vasp.parameters['vasp'].get('magmom')
-        except AttributeError:
+        if self.should_run_relax():
+            relax_calc_inputs = self.exposed_inputs(self._relax_chain, 'relax')
+            # Fetch the magmom from the relaxation calculation (eg. for the starting structure)
+            try:
+                magmom = relax_calc_inputs.vasp.parameters['vasp'].get('magmom')
+            except AttributeError:
+                magmom = None
+        else:
             magmom = None
 
         # MAGMOM tag in the phonon_settings input port take the precedence
