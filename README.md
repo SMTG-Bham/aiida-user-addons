@@ -2,7 +2,18 @@
 
 Some addons to AiiDA
 
- ## Command line tools
+## Requirements
+
+`aiida-phonopy` needs to be at commit *d410a9a309ff45d4c25a9b24bcaf06b65f0c4f1a*.
+https://github.com/aiida-phonopy/aiida-phonopy/commit/d410a9a309ff45d4c25a9b24bcaf06b65f0c4f1a
+
+for magnetic material, a patched versions is needed:
+https://github.com/zhubonan/aiida-phonopy/commit/7cfe9d357348606ea4914e935beb282e573f2e22
+
+`aiida-core>1.3.0`
+
+
+## Command line tools
 
 `vasp-dryrun` is a tool to *dryrun* VASP calculations. It can obtain key information such as the number of kpoints and bands for working out the best parallelisation strategy.
 ```
