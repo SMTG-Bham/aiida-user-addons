@@ -164,7 +164,7 @@ class VaspRelaxWorkChain(WorkChain):
 
         # Did not perform the relaxation - going into the final singlepoint directly
         if not self.perform_relaxation():
-            if self.ctx.verbose:
+            if self.is_verbose():
                 self.report('skipping structure relaxation and forwarding input to the next workchain.')
         else:
             # For the final static run we do not need to parse the output structure
@@ -179,7 +179,7 @@ class VaspRelaxWorkChain(WorkChain):
             if 'static_parameters' in self.inputs:
                 self.ctx.static_input_additions.parameters = nested_update_dict_node(self.inputs.vasp.parameters,
                                                                                      self.inputs.static_parameters.get_dict())
-            if self.ctx.verbose:
+            if self.is_verbose():
                 self.report('performing a final calculation using the relaxed structure.')
 
     def run_relax(self):
@@ -193,7 +193,7 @@ class VaspRelaxWorkChain(WorkChain):
         if self.ctx.relax_settings.get('reuse', False):
             restart_folder = self.ctx.get('current_restart_folder')  # There might not be any yet
             if restart_folder:
-                if self.ctx.verbose:
+                if self.ctx.get('verbose'):
                     self.report('Using previous remote folder <{}> for restart'.format(restart_folder))
                 inputs.restart_folder = restart_folder
 
@@ -284,7 +284,7 @@ class VaspRelaxWorkChain(WorkChain):
         converged = True
         relax_settings = self.ctx.relax_settings
         if relax_settings.convergence_on:
-            if self.ctx.verbose:
+            if self.is_verbose():
                 self.report('Checking the convergence of the relaxation.')
             comparison = compare_structures(compare_from, compare_to)
             delta = comparison.absolute if relax_settings.convergence_absolute else comparison.relative
@@ -303,18 +303,18 @@ class VaspRelaxWorkChain(WorkChain):
             if force_cut_off is not None and max_force > force_cut_off:
                 self.report(f'Maximum force in the structure {max_force:.4g} excess the cut-off limit {force_cut_off:.4g} - NOT OK')
                 converged = False
-            elif self.ctx.verbose:
+            elif self.is_verbose():
                 self.report(f'Maximum force in the structure {max_force:.4g} - OK')
 
             if not converged:
                 self.ctx.current_restart_folder = workchain.outputs.remote_folder
-                if self.ctx.verbose:
+                if self.ctx.get('verbose', self._verbose):
                     self.report('Relaxation did not converge, restarting the relaxation.')
             else:
-                if self.ctx.verbose:
+                if self.is_verbose():
                     self.report('Relaxation is converged, finishing with a final static calculation.')
         else:
-            if self.ctx.verbose:
+            if self.is_verbose():
                 self.report('Convergence checking is not enabled - finishing with a final static calculation.')
 
         self.ctx.is_converged = converged
@@ -329,13 +329,13 @@ class VaspRelaxWorkChain(WorkChain):
         if not lengths_converged:
             self.report('cell lengths changed by max {:.4g}, tolerance is {:.4g} - NOT OK'.format(delta.cell_lengths.max(),
                                                                                                   threshold_lengths))
-        elif self.ctx.verbose:
+        elif self.is_verbose():
             self.report('cell lengths changed by max {:.4g}, tolerance is {:.4g} - OK'.format(delta.cell_lengths.max(), threshold_lengths))
 
         angles_converged = bool(delta.cell_angles.max() <= threshold_angles)
         if not angles_converged:
             self.report('cell angles changed by max {:.4g}, tolerance is {:.4g} - NOT OK'.format(delta.cell_angles.max(), threshold_angles))
-        elif self.ctx.verbose:
+        elif self.is_verbose():
             self.report('cell angles changed by max {:.4g}, tolerance is {:.4g} - OK'.format(delta.cell_angles.max(), threshold_angles))
 
         return bool(lengths_converged and angles_converged)
@@ -346,7 +346,7 @@ class VaspRelaxWorkChain(WorkChain):
         volume_converged = bool(delta.volume <= threshold)
         if not volume_converged:
             self.report('cell volume changed by {:.4g}, tolerance is {:.4g} - NOT OK'.format(delta.volume, threshold))
-        elif self.ctx.verbose:
+        elif self.is_verbose():
             self.report('cell volume changed by {:.4g}, tolerance is {:.4g} - OK'.format(delta.volume, threshold))
 
         return volume_converged
@@ -370,7 +370,7 @@ class VaspRelaxWorkChain(WorkChain):
                     np.nanmax(delta.pos_lengths), threshold))
             except RuntimeWarning:
                 pass
-        elif self.ctx.verbose:
+        elif self.is_verbose():
             try:
                 self.report('max site position change is {:.4g}, tolerance is {:.4g} - OK'.format(np.nanmax(delta.pos_lengths), threshold))
             except RuntimeWarning:
@@ -383,7 +383,7 @@ class VaspRelaxWorkChain(WorkChain):
         workchain = self.ctx.workchains[-1]
 
         relaxed_structure = workchain.outputs.structure
-        if self.ctx.verbose:
+        if self.is_verbose():
             self.report("attaching the node {}<{}> as '{}'".format(relaxed_structure.__class__.__name__, relaxed_structure.pk,
                                                                    'relax.structure'))
         self.out('relax.structure', relaxed_structure)
@@ -423,6 +423,10 @@ class VaspRelaxWorkChain(WorkChain):
             return True
         # Otherwise, we skip the final calculation
         return False
+
+    def is_verbose(self):
+        """Are we in the verbose mode?"""
+        return self.ctx.get('verbose', self._verbose)
 
 
 def compare_structures(structure_a, structure_b):
