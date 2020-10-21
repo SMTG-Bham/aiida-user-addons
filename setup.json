@@ -27,7 +27,9 @@
             "vaspu.vasp = aiida_user_addons.vworkflows.vasp:VaspWorkChain",
             "vaspu.bands = aiida_user_addons.vworkflows.new_bands:VaspBandsWorkChain",
             "vaspu.master = aiida_user_addons.vworkflows.master:MasterWorkChain",
-            "vaspu.phonopy = aiida_user_addons.vworkflows.phonopy:VaspAutoPhononWorkChain"
+            "vaspu.phonopy = aiida_user_addons.vworkflows.phonopy:VaspAutoPhononWorkChain",
+            "vaspu.magnetic = aiida_user_addons.vworkflows.magnetic:SpinEnumerateWorkChain",
+            "vaspu.delithiate = aiida_user_addons.vworkflows.delithiate:SimpleDelithiateWorkChain"
         ]
     },
     "extras_require": {
