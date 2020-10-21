@@ -10,7 +10,8 @@
     "version": "0.1.0",
     "install_requires": [
         "aiida-vasp>=1.0",
-        "aiida-core>=1.1.0"
+        "aiida-core>=1.1.0",
+        "bsym==1.1.1"
     ],
     "entry_points": {
         "console_scripts":
