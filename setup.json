@@ -31,6 +31,9 @@
             "vaspu.phonopy = aiida_user_addons.vworkflows.phonopy:VaspAutoPhononWorkChain",
             "vaspu.magnetic = aiida_user_addons.vworkflows.magnetic:SpinEnumerateWorkChain",
             "vaspu.delithiate = aiida_user_addons.vworkflows.delithiate:SimpleDelithiateWorkChain"
+        ],
+        "aiida.cmdline.data": [
+            "addons = aiida_user_addons.cmdline.cmd_addons:addons"
         ]
     },
     "extras_require": {
