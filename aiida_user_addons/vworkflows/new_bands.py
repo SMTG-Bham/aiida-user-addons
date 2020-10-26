@@ -21,7 +21,10 @@ class VaspBandsWorkChain(WorkChain):
     3. Do a non-scf calculation for bands and dos.
 
     Inputs must be passed for the SCF calculation, others are optional. The dos calculation
-    will only run if the kpoints for DOS are passed.
+    will only run if the kpoints for DOS are passed or a full specification is given under the
+    `dos` input namesace.
+
+    The band structure calculation will run unless `only_dos` is set to `Bool(True)`.
 
     Input for bands and dos calculations are optional. However, if they are needed, the full list of inputs must
     be passed. For the `parameters` node, one may choose to only specify those fields that need to be updated.
