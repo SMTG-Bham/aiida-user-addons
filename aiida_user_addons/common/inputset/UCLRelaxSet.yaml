@@ -10,7 +10,6 @@ global:
   sigma: 0.05
   ispin: 2
   algo: normal
-  nwrite: 1
   icorelevel: 1
   lwave: False  # Don't write the wave function
   nelm: 200
