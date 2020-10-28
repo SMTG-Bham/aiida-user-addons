@@ -40,11 +40,17 @@ class VaspBandsWorkChain(WorkChain):
         base_work = WorkflowFactory(cls._base_wk_string)
 
         spec.input('structure', help='The input structure', valid_type=orm.StructureData)
-        spec.input('bands_kpoints', help='Explicit kpoints for the bands', valid_type=orm.KpointsData, required=False)
-        spec.input('bands_kpoints_distance', help='Spacing for band distances', valid_type=orm.Float, required=False)
+        spec.input('bands_kpoints',
+                   help='Explicit kpoints for the bands. Will not generate kpoints if supplied.',
+                   valid_type=orm.KpointsData,
+                   required=False)
+        spec.input('bands_kpoints_distance',
+                   help='Spacing for band distances for automatic kpoints generation.',
+                   valid_type=orm.Float,
+                   required=False)
         spec.input(
             'dos_kpoints_density',
-            help='Kpoints for running DOS calculations in A^-1 * 2pi',
+            help='Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.',
             required=False,
             valid_type=orm.Float,
         )
@@ -166,7 +172,7 @@ class VaspBandsWorkChain(WorkChain):
 
         results = seekpath_structure_analysis(self.ctx.current_structure, **inputs)
         self.ctx.current_structure = results['primitive_structure']
-        if not np.allclose(self.ctx.structure.cell, self.inputs.structure.cell):
+        if not np.allclose(self.ctx.current_structure.cell, self.inputs.structure.cell):
             self.report('The primitive structure is not the same as the input structure - using the former for all calculations from now.')
         self.ctx.bands_kpoints = results['explicit_kpoints']
         self.out('primitive_structure', results['primitive_structure'])
@@ -180,6 +186,7 @@ class VaspBandsWorkChain(WorkChain):
         base_work = WorkflowFactory(self._base_wk_string)
         inputs = AttributeDict(self.exposed_inputs(base_work, namespace='scf'))
         inputs.metadata.call_link_label = 'scf'
+        inputs.metadata.label = self.inputs.metadata.label + ' SCF'
         inputs.structure = self.ctx.current_structure
 
         # Turn off cleaning of the working directory
@@ -218,6 +225,7 @@ class VaspBandsWorkChain(WorkChain):
     def run_bands_dos(self):
         """Run the bands and the DOS calculations"""
         base_work = WorkflowFactory(self._base_wk_string)
+
         # Use the SCF inputs as the base
         inputs = AttributeDict(self.exposed_inputs(base_work, namespace='scf'))
         inputs.structure = self.ctx.current_structure
@@ -267,6 +275,9 @@ class VaspBandsWorkChain(WorkChain):
             # Swap with the default kpoints generated
             inputs.kpoints = self.ctx.bands_kpoints
 
+            # Tag the calculation
+            bands_input.metadata.label = self.inputs.metadata.label + ' BS'
+
             bands_calc = self.submit(base_work, **inputs)
             running['bands_workchain'] = bands_calc
             self.report('Submitted workchain {} for band structure'.format(bands_calc))
@@ -313,6 +324,9 @@ class VaspBandsWorkChain(WorkChain):
                 inputs.settings = orm.Dict(dict=essential)
             else:
                 inputs.settings = nested_update_dict_node(settings, essential)
+
+            # Set the label
+            inputs.metadata.label = self.inputs.metadata.label + ' DOS'
 
             dos_calc = self.submit(base_work, **inputs)
             running['dos_workchain'] = dos_calc
