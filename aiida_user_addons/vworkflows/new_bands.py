@@ -276,7 +276,7 @@ class VaspBandsWorkChain(WorkChain):
             inputs.kpoints = self.ctx.bands_kpoints
 
             # Tag the calculation
-            bands_input.metadata.label = self.inputs.metadata.label + ' BS'
+            inputs.metadata.label = self.inputs.metadata.label + ' BS'
 
             bands_calc = self.submit(base_work, **inputs)
             running['bands_workchain'] = bands_calc
