@@ -12,28 +12,39 @@ from sumo.plotting.bs_plotter import SBSPlotter
 from aiida.orm import BandsData
 
 
-def get_pmg_bandstructure(bands_node, efermi=None):
-    """Return a pmg BandStructureSymmLine object from BandsData"""
+def get_pmg_bandstructure(bands_node, structure=None, efermi=None):
+    """
+    Return a pymatgen `BandStructureSymmLine` object from BandsData
+
+    Arguments:
+        bands_node: A BandsData object
+        structure (optionsal): a StructureData object, required if `bands_node`
+          does not have information about the cell.
+        efermi (float): Explicit value of the fermi energy.
+
+    Returns:
+        A `BandStructureSymmLine` object
+    """
     if not isinstance(bands_node, BandsData):
         raise ValueError('The input argument must be a BandsData')
-    node = bands_node
     # Load the data
-    bands = node.get_array('bands')  # In (num_spin, kpoints, bands) or just (kpoints, bands)
-    kpoints = node.get_array('kpoints')  # in (num_kpoints, 3)
+    bands = bands_node.get_array('bands')  # In (num_spin, kpoints, bands) or just (kpoints, bands)
+    kpoints = bands_node.get_array('kpoints')  # in (num_kpoints, 3)
     try:
-        occupations = node.get_array('occupations')
+        occupations = bands_node.get_array('occupations')
     except (KeyError, AttributeError):
         occupations = None
+
     try:
-        efermi_raw = node.get_attribute('efermi')
+        efermi_raw = bands_node.get_attribute('efermi')
     except (KeyError, AttributeError):
         efermi_raw = None
 
     if efermi:
         efermi_raw = efermi
 
-    labels = node.get_attribute('labels')
-    label_numbers = node.get_attribute('label_numbers')
+    labels = bands_node.get_attribute('labels')
+    label_numbers = bands_node.get_attribute('label_numbers')
 
     # Construct the band_dict
     bands_shape = bands.shape
@@ -46,7 +57,10 @@ def get_pmg_bandstructure(bands_node, efermi=None):
     else:
         bands_dict = {Spin.up: bands.T}
 
-    lattice = Lattice(node.get_attribute('cell'))
+    if 'cell' in bands_node.attribute_keys():
+        lattice = Lattice(bands_node.get_attribute('cell'))
+    else:
+        lattice = Lattice(structure.cell)
 
     # Constructure the label dictionary
     labels_dict = {}
@@ -68,7 +82,18 @@ def get_pmg_bandstructure(bands_node, efermi=None):
 
 
 def get_sumo_bands_plotter(bands, efermi=None):
-    """Return the sumo bands plotter"""
+    """
+    Return a sumo `SBSPlotter` object
+
+    Arguments:
+        bands_node: A BandsData object
+        structure (optionsal): a StructureData object, required if `bands_node`
+          does not have information about the cell.
+        efermi (float): Explicit value of the fermi energy.
+
+    Returns:
+        A `SBSPlotter` object
+    """
     bands_structure = get_pmg_bandstructure(bands, efermi)
     return SBSPlotter(bands_structure)
 
