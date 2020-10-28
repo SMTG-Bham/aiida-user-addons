@@ -57,7 +57,7 @@ def get_pmg_bandstructure(bands_node, structure=None, efermi=None):
     else:
         bands_dict = {Spin.up: bands.T}
 
-    if 'cell' in bands_node.attribute_keys():
+    if 'cell' in bands_node.attributes_keys():
         lattice = Lattice(bands_node.get_attribute('cell'))
     else:
         lattice = Lattice(structure.cell)
