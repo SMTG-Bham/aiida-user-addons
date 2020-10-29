@@ -5,7 +5,7 @@ import pytest
 
 from aiida.common.extendeddicts import AttributeDict
 
-from aiida_vasp.utils.parameters import ParametersMassage
+from aiida_vasp.assistant.parameters import ParametersMassage
 
 
 @pytest.fixture
@@ -303,7 +303,7 @@ def test_vasp_parameter_override(init_relax_parameters):
 def test_inherit_and_merge():
     """Test the inherit and merge functionality for the parameters and inputs."""
     from aiida.plugins import DataFactory
-    from aiida_vasp.utils.parameters import inherit_and_merge_parameters
+    from aiida_vasp.assistant.parameters import inherit_and_merge_parameters
 
     inputs = AttributeDict()
     inputs.bands = AttributeDict()
