@@ -18,9 +18,6 @@ from aiida_phonopy.common.utils import (
     get_nac_params,
     get_phonon,
     generate_phonopy_cells,
-    check_imported_supercell_structure,
-    from_node_id_to_aiida_node_id,
-    get_data_from_node_id,
     get_vasp_force_sets_dict,
 )
 
