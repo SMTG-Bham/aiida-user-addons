@@ -19,9 +19,9 @@ from aiida_vasp.utils.aiida_utils import get_data_class, get_data_node
 from aiida_vasp.utils.workchains import compose_exit_code
 from aiida_vasp.utils.workchains import prepare_process_inputs
 try:
-    from aiida_vasp.assistant.parameters import inherit_and_merge_parameters
+    from aiida_vasp.assistant.parameters import ParametersMassage
 except ImportError:
-    from aiida_vasp.utils.parameters import inherit_and_merge_parameters
+    from aiida_vasp.utils.parameters import ParametersMassage
 
 from ..common.inputset.vaspsets import get_ldau_keys
 

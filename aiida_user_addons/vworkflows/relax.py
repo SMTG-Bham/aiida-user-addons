@@ -27,13 +27,8 @@ from aiida.common.exceptions import InputValidationError
 from aiida.engine import WorkChain, append_, while_, if_, ToContext
 from aiida.plugins import WorkflowFactory
 
-from aiida_vasp.utils.aiida_utils import get_data_class, get_data_node
-from aiida_vasp.utils.workchains import prepare_process_inputs, compose_exit_code
-from aiida_vasp.utils.extended_dicts import update_nested_dict
-try:
-    from aiida_vasp.assistant.parameters import inherit_and_merge_parameters
-except ImportError:
-    from aiida_vasp.utils.parameters import inherit_and_merge_parameters
+from aiida_vasp.utils.aiida_utils import get_data_class
+from aiida_vasp.utils.workchains import compose_exit_code
 
 from ..common.opthold import OptionHolder, typed_field
 
