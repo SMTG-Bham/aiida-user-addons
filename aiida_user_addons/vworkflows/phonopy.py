@@ -12,6 +12,8 @@ from aiida.engine import WorkChain, if_, ToContext
 import aiida.orm as orm
 
 from aiida.plugins import WorkflowFactory
+from aiida.common.extendeddicts import AttributeDict
+from aiida.common.exceptions import InputValidationError
 from ..common.opthold import OptionHolder, typed_field, required_field
 from aiida_phonopy.common.utils import (
     get_force_constants,
@@ -44,6 +46,10 @@ class VaspAutoPhononWorkChain(WorkChain):
             cls.setup,
             if_(cls.should_run_relax)(cls.run_relaxation, cls.inspect_relaxation),
             cls.create_displacements,
+            if_(cls.should_run_supercell_chgcar)(
+                cls.run_supercell_chgcar,
+                cls.inspect_supercell_calc,
+            ),
             cls.run_force_and_nac_calcs,
             cls.create_force_set_and_constants,
             if_(cls.remote_phonopy)(cls.run_phonopy_remote, cls.collect_remote_run_data).else_(
@@ -88,6 +94,12 @@ class VaspAutoPhononWorkChain(WorkChain):
                    help='Settings for the underlying phonopy calculations')
         spec.input('phonon_code', valid_type=orm.Code, help='Code for the phonopy for remote calculations', required=False)
         spec.input('options', valid_type=orm.Dict, help='Options for the remote phonopy calculation', required=False)
+        spec.input('reuse_supercell_calc',
+                   valid_type=orm.Str,
+                   validator=validate_reuse_supercell_calc,
+                   required=False,
+                   help=('Perform calculation for the perfect supercell and use its CHGCAR to bootstrap displacement calculations.',
+                         'Choose from: <retrieve> or <restart>'))
 
         # Phonon specific outputs
         spec.output('force_constants', valid_type=orm.ArrayData, required=False)
@@ -116,8 +128,13 @@ class VaspAutoPhononWorkChain(WorkChain):
     def should_run_relax(self):
         if 'relax' in self.inputs:
             return True
-        else:
-            self.report('Not performing relaxation - assuming the input structure is fully relaxed.')
+        self.report('Not performing relaxation - assuming the input structure is fully relaxed.')
+        return False
+
+    def should_run_supercell_chgcar(self):
+        """Wether to run additional supercell calculation to get CHGCAR"""
+        value = self.inputs.get('reuse_supercell_calc', None)
+        return bool(value)
 
     def run_relaxation(self):
         """Perform high-precision relaxation of the initial structure"""
@@ -200,10 +217,68 @@ class VaspAutoPhononWorkChain(WorkChain):
 
         self.report('Supercells for phonon calculations created')
 
+    def run_supercell_chgcar(self):
+        """Run a supercell calculatio to boot strap the calculations"""
+
+        calc_inputs = self.exposed_inputs(self._singlepoint_chain, 'singlepoint')
+        calc_inputs.structure = self.ctx.supercell
+
+        # For magnetisation
+        magmom = self.ctx.phonon_setting_info.get_dict().get('_supercell_magmom')
+        if magmom:
+            self.report('Using MAGMOM from the phonopy output')
+            param = calc_inputs.parameters.get_dict()
+            param['vasp']['magmom'] = magmom
+            calc_inputs.parameters = orm.Dict(dict=param)
+
+        # Ensure either the chgcar is retrieved or the remote workdir is not cleaned
+        if self.inputs.reuse_supercell_calc.value == 'retrieve':
+            ensure_parse_objs(calc_inputs, ['chgcar'])
+            ensure_retrieve_objs(calc_inputs, ['CHGCAR'], temp=False)
+        else:
+            # Ensure that the remote folder is not cleaned
+            calc_inputs.clean_workdir = orm.Bool(False)
+
+        calc_inputs.metadata.label = self.ctx.label + ' SUPERCELL'
+        calc_inputs.metadata.call_link_label = 'supercell_calc'
+        running = self.submit(self._singlepoint_chain, **calc_inputs)
+        self.report('Submitted {} for {}'.format(running, 'Supercell calculation'))
+        self.to_context(supercell_calc=running)
+
+    def inspect_supercell_calc(self):
+        """Check if the supercell calculation went OK"""
+        if 'supercell_calc' not in self.ctx:
+            raise RuntimeError('Supercell workchain not found in the context')
+
+        workchain = self.ctx.supercell_calc
+        if not workchain.is_finished_ok:
+            self.report('Supercell calculation finished with error, abort further actions')
+            return self.exit_codes.ERROR_RELAX_FAILURE  # pylint: disable=no-member
+
+        if 'chgcar' in workchain.outputs:
+            self.ctx.supercell_chgcar = workchain.outputs.chgcar
+            self.ctx.supercell_remote_folder = None
+            self.report('Supercell calculation finished OK, recorded the CHGCAR')
+        else:
+            self.ctx.supercell_chgcar = None
+            self.ctx.supercell_remote_folder = workchain.outputs.remote_folder
+            self.report('Supercell calculation finished OK, will reuse the restart folder')
+        return None
+
     def run_force_and_nac_calcs(self):
         """Submit the force and non-analytical correction calculations"""
         # Forces
         force_calc_inputs = self.exposed_inputs(self._singlepoint_chain, 'singlepoint')
+
+        # Set the CHGCAR or restart folder
+        if self.should_run_supercell_chgcar():
+            # Set start from constant charge
+            force_calc_inputs.parameters = nested_update_dict_node(force_calc_inputs.parameters, {'charge': {'from_charge': True}})
+            # Supply the inputs if needed
+            if self.ctx.supercell_chgcar:
+                force_calc_inputs.chgcar = self.ctx.chgcar
+            else:
+                force_calc_inputs.restart_folder = self.ctx.supercell_remote_folder
 
         magmom = self.ctx.phonon_setting_info.get_dict().get('_supercell_magmom')
         if magmom:
@@ -240,8 +315,6 @@ class VaspAutoPhononWorkChain(WorkChain):
             running = self.submit(self._singlepoint_chain, **nac_inputs)
             self.report('Submissted calculation for nac: {}'.format(running))
             self.to_context(**{'born_and_epsilon_calc': running})
-
-        return
 
     def create_force_set_and_constants(self):
         """Create the force set and constants from the finished calculations"""
@@ -393,7 +466,7 @@ class PhononSettings(OptionHolder):
 def nested_update(dict_in, update_dict):
     """Update the dictionary - combine nested subdictionary with update as well"""
     for key, value in update_dict.items():
-        if key in dict_in and isinstance(value, (dict, orm.AttributeDict)):
+        if key in dict_in and isinstance(value, (dict, AttributeDict)):
             nested_update(dict_in[key], value)
         else:
             dict_in[key] = value
@@ -429,3 +502,33 @@ def ensure_parse_objs(input_port, objs):
         nested_update_dict_node(settings, update)
         input_port.settings = settings
     return input_port
+
+
+def ensure_retrieve_objs(input_port, fnames, temp=False):
+    """
+    Ensure files to be retrieved
+
+    Arguments:
+        input_port: input port to be update, assume the existence of `settings`
+        fnames: a list of file names to include, for example ['CHGCAR', 'WAVECAR']
+
+    Returns:
+        process_port: the port with the new settings
+    """
+    if temp:
+        update = {'ADDITIONAL_RETRIEVE_TEMPORARY_LIST': fnames}
+    else:
+        update = {'ADDITIONAL_RETRIEVE_LIST': fnames}
+    if 'settings' not in input_port:
+        input_port.settings = orm.Dict(dict=update)
+    else:
+        settings = input_port.settings
+        nested_update_dict_node(settings, update)
+        input_port.settings = settings
+    return input_port
+
+
+def validate_reuse_supercell_calc(node, port=None):
+    """Validate the reuse_supercell_calc port"""
+    if not node.value in ['restart', 'retrieve']:
+        raise InputValidationError("Valid options for <reuse_supercell_calc> are: 'retrieve' and 'restart'")
