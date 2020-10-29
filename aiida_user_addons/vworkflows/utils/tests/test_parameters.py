@@ -5,7 +5,10 @@ import pytest
 
 from aiida.common.extendeddicts import AttributeDict
 
-from aiida_vasp.assistant.parameters import ParametersMassage
+try:
+    from aiida_vasp.assistant.parameters import inherit_and_merge_parameters
+except ImportError:
+    from aiida_vasp.utils.parameters import inherit_and_merge_parameters
 
 
 @pytest.fixture
