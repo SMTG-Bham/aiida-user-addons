@@ -239,6 +239,9 @@ class VaspAutoPhononWorkChain(WorkChain):
             # Ensure that the remote folder is not cleaned
             calc_inputs.clean_workdir = orm.Bool(False)
 
+        # Make sure the calculation writes CHGCAR
+        calc_inputs.parameters = nested_update_dict_node(calc_inputs.parameters, {'vasp': {'lcharg': True}})
+
         calc_inputs.metadata.label = self.ctx.label + ' SUPERCELL'
         calc_inputs.metadata.call_link_label = 'supercell_calc'
         running = self.submit(self._singlepoint_chain, **calc_inputs)
