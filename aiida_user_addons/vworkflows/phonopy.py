@@ -98,7 +98,7 @@ class VaspAutoPhononWorkChain(WorkChain):
                    valid_type=orm.Str,
                    validator=validate_reuse_supercell_calc,
                    required=False,
-                   help=('Perform calculation for the perfect supercell and use its CHGCAR to bootstrap displacement calculations.',
+                   help=('Perform calculation for the perfect supercell and use its CHGCAR to bootstrap displacement calculations.'
                          'Choose from: <retrieve> or <restart>'))
 
         # Phonon specific outputs
