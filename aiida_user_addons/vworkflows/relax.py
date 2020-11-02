@@ -124,10 +124,11 @@ class VaspRelaxWorkChain(WorkChain):
 
         # Make sure we parse the output structure when we want to perform
         # relaxations (override if contrary entry exists).
-        if 'settings' in self.inputs:
-            settings = self.inputs.settings
+        if 'settings' in self.inputs.vasp:
+            settings = self.inputs.vasp.settings
         else:
             settings = orm.Dict(dict={})
+
         if self.perform_relaxation():
             settings = nested_update_dict_node(settings, {'parser_settings': {
                 'add_structure': True,
