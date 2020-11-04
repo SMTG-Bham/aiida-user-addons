@@ -502,7 +502,7 @@ def ensure_parse_objs(input_port, objs):
         input_port.settings = orm.Dict(dict=update)
     else:
         settings = input_port.settings
-        nested_update_dict_node(settings, update)
+        settings = nested_update_dict_node(settings, update)
         input_port.settings = settings
     return input_port
 
