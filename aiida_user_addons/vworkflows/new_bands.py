@@ -124,7 +124,7 @@ class VaspBandsWorkChain(WorkChain):
         self.ctx.bands_kpoints = self.inputs.get('bands_kpoints')
         param = self.inputs.scf.parameters.get_dict()
         if 'magmom' in param['vasp'] and not self.inputs.get('only_dos'):
-            raise RuntimeError('Cannot treat magnetic systems for BS for now')
+            self.report('Magnetic system passed for BS - band path might not be correct.')
 
     def should_do_relax(self):
         """Wether we should do relax or not"""
