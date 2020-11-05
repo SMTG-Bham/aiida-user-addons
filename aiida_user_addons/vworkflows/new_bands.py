@@ -29,7 +29,7 @@ class VaspBandsWorkChain(WorkChain):
     Input for bands and dos calculations are optional. However, if they are needed, the full list of inputs must
     be passed. For the `parameters` node, one may choose to only specify those fields that need to be updated.
     """
-    _base_wk_string = 'vasp.vasp'
+    _base_wk_string = 'vaspu.vasp'
     _relax_wk_string = 'vaspu.relax'
 
     @classmethod
