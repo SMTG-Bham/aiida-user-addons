@@ -187,7 +187,7 @@ class SimpleDelithiateWorkChain(WorkChain):
             inputs.metadata.call_link_label = f'relax_{istruc}'
 
             # Setup the parameters - update the magnetic moments
-            param_dict = inputs.parameters.get_dict()
+            param_dict = inputs.vasp.parameters.get_dict()
             magmom = param_dict['vasp'].get('magmom')
             if magmom:
                 magarray = np.array(magmom)
@@ -200,7 +200,7 @@ class SimpleDelithiateWorkChain(WorkChain):
             ldau_keys = get_ldau_keys(frame, **ldau_settings)
             param_dict['vasp'].update(ldau_keys)
 
-            inputs.parameters = orm.Dict(dict=param_dict)
+            inputs.vasp.parameters = orm.Dict(dict=param_dict)
 
             # Submit the calculation - the order does not matter here
             running = self.submit(Relax, **inputs)
