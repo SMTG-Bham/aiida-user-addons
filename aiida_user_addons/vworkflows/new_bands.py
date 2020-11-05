@@ -287,7 +287,7 @@ class VaspBandsWorkChain(WorkChain):
         if ('dos_kpoints_density' in self.inputs) or ('dos' in self.inputs):
 
             if 'dos' in self.inputs:
-                dos_input = AttributeDict(self.exposed_inputs(base_work, namespace='bands'))
+                dos_input = AttributeDict(self.exposed_inputs(base_work, namespace='dos'))
             else:
                 dos_input = AttributeDict({
                     'settings': orm.Dict(dict={'add_dos': True}),
