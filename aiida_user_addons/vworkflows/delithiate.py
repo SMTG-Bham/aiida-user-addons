@@ -50,6 +50,7 @@ class SimpleDelithiateWorkChain(WorkChain):
             required=True,  # I set it to be mandatory here as in most cases we will need a U
             help='Mapping for LDA+U, see `get_ldau_keys` function for details',
             valid_type=orm.Dict)
+        spec.input('deli_magmom_mapping', required=True, help='Mapping for MAGMOM for the delithiated state', valid_type=orm.Dict)
         spec.outline(
             cls.setup,
             if_(cls.should_run_initial_relax)(
@@ -187,13 +188,24 @@ class SimpleDelithiateWorkChain(WorkChain):
             inputs.metadata.call_link_label = f'relax_{istruc}'
 
             # Setup the parameters - update the magnetic moments
+            deli_magmom_mapping = self.inputs.deli_magmom_mapping.get_dict()
             param_dict = inputs.vasp.parameters.get_dict()
-            magmom = param_dict['vasp'].get('magmom')
-            if magmom:
-                magarray = np.array(magmom)
-                new_array = magarray[mapping]  # Use the mapping to get a new list of MAGMOM
-                new_magmom = new_array.tolist()
-                param_dict['vasp']['magmom'] = new_magmom
+            if not deli_magmom_mapping:
+                self.report('WARNING: Empty mapping given for magmom - keeping the original')
+                magmom = param_dict['vasp'].get('magmom')
+                # Keep the original MAGMOM used for relaxation
+                if magmom:
+                    magarray = np.array(magmom)
+                    new_array = magarray[mapping]  # Use the mapping to get a new list of MAGMOM
+                    new_magmom = new_array.tolist()
+                    param_dict['vasp']['magmom'] = new_magmom
+            else:
+                # Apply the supplied mapping for relaxing delithiated structure
+                magmom = []
+                default = deli_magmom_mapping.get('default', 0.6)  # Default MAGMOM is 0.6
+                for site in frame.sites:
+                    magmom.append(deli_magmom_mapping.get(site.kind_name, default))
+                param_dict['vasp']['magmom'] = magmom
 
             # Setup LDA+U
             ldau_settings = self.inputs.ldau_mapping.get_dict()
