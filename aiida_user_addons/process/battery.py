@@ -34,10 +34,12 @@ def compute_li_voltage(lithiated_structure, lithiated_res, delithiated_structure
 
 def compute_li_voltage_shortcut(lithiated, delithiated, li_ref=None, store_provenance=True):
     """
-    Compute voltage from three calculations
+    Compute voltage from three calculations.
+
+    WARNING: This works for only calculation performed using PBE pseudopotentials
     """
     if li_ref is None:
-        indict = lithiated.inputs.parameters.get_dict()
+        indict = get_input_parameters_dict(lithiated.outputs.misc)
         encut = _get_incar_tag('encut', indict)
         gga = _get_incar_tag('gga', indict)
         li_ref = _obtain_li_ref_calc(encut, gga)
@@ -59,37 +61,54 @@ def compute_li_voltage_shortcut(lithiated, delithiated, li_ref=None, store_prove
     if not store_provenance:
         metadata['store_provenance'] = False
 
-    return compute_li_voltage(lith_struct, lith_res, deli_struct, deli_res, li_ref_struct, li_ref_res, metadata=metadata)
+    return compute_li_voltage(  # pylint: disable=unexpected-keyword-arg
+        lith_struct,
+        lith_res,
+        deli_struct,
+        deli_res,
+        li_ref_struct,
+        li_ref_res,
+        metadata=metadata)
 
 
 def _get_incar_tag(tag, input_dict):
-    """Obtain incar tag from dict"""
+    """
+    Obtain incar tag from dict. Handle special cases. Return value in lowercase.
+    """
     if 'vasp' in input_dict:
         input_dict = input_dict['vasp']
     value = input_dict.get(tag)
     # Special case the GGA tag - None is pe
     if (tag == 'gga') and (value is None):
         return 'pe'
+    if isinstance(value, str):
+        return value.lower()
     return value
 
 
 def _obtain_li_ref_calc(encut, gga, group_name='li-metal-refs'):
-    """Return the reference calculation for Li metal"""
+    """
+    Return the reference calculation for Li metal
+
+    WARNING: This works for only calculation performed using PBE pseudopotentials
+    """
     from aiida.orm import QueryBuilder, Group, WorkChainNode, Dict
     if gga is None:
         gga = 'pe'
-    q = QueryBuilder()
-    q.append(Group, filters={'label': group_name})
-    q.append(WorkChainNode, with_group=Group, filters={'attributes.exit_status': 0}, project=['*'])
-    q.append(Dict,
-             with_outgoing=WorkChainNode,
-             filters={
-                 'attributes.vasp.encut': encut,
-                 'attributes.vasp.gga': gga
-             },
-             edge_filters={'label': 'parameters'})
+    qdb = QueryBuilder()
+    qdb.append(Group, filters={'label': group_name})
+    qdb.append(WorkChainNode, with_group=Group, filters={'attributes.exit_status': 0}, project=['*'])
+    qdb.append(Dict,
+               with_outgoing=WorkChainNode,
+               filters={
+                   'attributes.vasp.encut': encut,
+                   'attributes.vasp.gga': {
+                       'ilike': gga
+                   },
+               },
+               edge_filters={'label': 'parameters'})
 
-    matches = q.all()
+    matches = qdb.all()
     if len(matches) > 1:
         print(f'WARNING: more than one matches found for gga:{gga} encut:{encut}')
     if len(matches) == 0:
@@ -100,12 +119,12 @@ def _obtain_li_ref_calc(encut, gga, group_name='li-metal-refs'):
 def list_li_ref_calcs(group_name='li-metal-refs'):
     """Return the reference calculation for Li metal"""
     from aiida.orm import QueryBuilder, Group, WorkChainNode, Dict
-    q = QueryBuilder()
-    q.append(Group, filters={'label': group_name})
-    q.append(WorkChainNode, with_group=Group, project=['*'])
-    q.append(Dict, with_outgoing=WorkChainNode, project=['attributes.vasp'], edge_filters={'label': 'parameters'})
+    qdb = QueryBuilder()
+    qdb.append(Group, filters={'label': group_name})
+    qdb.append(WorkChainNode, with_group=Group, project=['*'])
+    qdb.append(Dict, with_outgoing=WorkChainNode, project=['attributes.vasp'], edge_filters={'label': 'parameters'})
 
-    matches = q.all()
+    matches = qdb.all()
     return matches
 
 
@@ -113,8 +132,8 @@ def _is_comparable(calc1, calc2):
     """Check wether two calculations can be compared"""
     critical_keys = ['encut', 'lreal', 'prec', 'gga']
     warn_keys = ['ismear', 'sigma']
-    indict1 = calc1.inputs.parameters.get_dict()
-    indict2 = calc2.inputs.parameters.get_dict()
+    indict1 = get_input_parameters_dict(calc1.outputs.misc)
+    indict2 = get_input_parameters_dict(calc2.outputs.misc)
     for key in critical_keys:
         v1 = _get_incar_tag(key, indict1)
         v2 = _get_incar_tag(key, indict2)
@@ -125,3 +144,17 @@ def _is_comparable(calc1, calc2):
         if _get_incar_tag(key, indict1) != _get_incar_tag(key, indict2):
             print(f'WARNING: mismatch in key {key} - two calculation may not be comparable')
     return True
+
+
+def get_input_parameters_dict(out_node):
+    """
+    Get the input parameters for the output.
+    This can be used to trace the exact inputs (not those for the workchain)
+    that used to obtain the misc.
+    """
+    from aiida.orm import QueryBuilder, Node, CalcJobNode, Dict
+    qdb = QueryBuilder()
+    qdb.append(Node, filters={'id': out_node.pk}, tag='out')
+    qdb.append(CalcJobNode, with_outgoing='out')
+    qdb.append(Dict, with_outgoing=CalcJobNode, edge_filters={'label': 'parameters'})
+    return qdb.one()[0].get_dict()
