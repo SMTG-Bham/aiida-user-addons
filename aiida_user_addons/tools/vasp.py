@@ -88,10 +88,13 @@ def export_vasp_calc(node, folder, decompress=False, include_potcar=True):
         calcjob = node
     elif isinstance(node, WorkChainNode):
         # In this case the node is an workchain we export the
-        # 'retrieved' output link and trace to its ancester
+        # 'retrieved' output link and trace to its ancestor
         calcjob = retrieved.get_incoming(link_label_filter='retrieved', link_type=LinkType.CREATE).one().node
     else:
         raise RuntimeError(f'The node {node} is not a valid calculation')
+    info_file = folder / ('aiida_info')
+    info_content = f'Label: {calcjob.label}\nDescription: {calcjob.description}\nUUID: {calcjob.uuid}\n'
+    info_file.write_text(info_content)
     save_node_objects(retrieved)
     save_node_objects(calcjob)
     if include_potcar:
