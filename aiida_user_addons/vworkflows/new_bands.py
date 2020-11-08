@@ -277,6 +277,7 @@ class VaspBandsWorkChain(WorkChain):
 
             # Tag the calculation
             inputs.metadata.label = self.inputs.metadata.label + ' BS'
+            inputs.metadata.call_link_label = 'bs'
 
             bands_calc = self.submit(base_work, **inputs)
             running['bands_workchain'] = bands_calc
@@ -327,6 +328,7 @@ class VaspBandsWorkChain(WorkChain):
 
             # Set the label
             inputs.metadata.label = self.inputs.metadata.label + ' DOS'
+            inputs.metadata.call_link_label = 'dos'
 
             dos_calc = self.submit(base_work, **inputs)
             running['dos_workchain'] = dos_calc
