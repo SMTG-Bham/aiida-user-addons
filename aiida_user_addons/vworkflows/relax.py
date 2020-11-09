@@ -1,8 +1,5 @@
 """
-Relax workchain.
-
-----------------
-Relaxation workchain for VASP.
+Relaxation workchain for VASP
 
 Unfortunately, VASP does not check the convergence criteria properly:
 - it only check *either* force or energy convergence between the last two iterations
@@ -16,6 +13,11 @@ and perform additional singlepoint calculation where necessary.
 In addition, using this workchain, there is no need to set the IBRION, NSW, ISIF and ALGO tags explicitly,
 the action can be controlled using the `relax_setting` input port. This will be merged with the `parameters` and
 passed downstream to the `VaspBaseWorkChain` which will work out the correct combinations for the three.
+
+CHANGELOG
+
+0.2.1 - added `hybrid_calc_bootstrap` options
+
 
 """
 # pylint: disable=attribute-defined-outside-init
@@ -31,6 +33,8 @@ from aiida_vasp.utils.aiida_utils import get_data_class
 from aiida_vasp.utils.workchains import compose_exit_code
 
 from ..common.opthold import OptionHolder, typed_field
+
+__version__ = '0.2.1'
 
 
 class VaspRelaxWorkChain(WorkChain):
@@ -134,9 +138,26 @@ class VaspRelaxWorkChain(WorkChain):
                 'add_structure': True,
                 'add_trajectory': True,
             }})
+
         # Update the settings for the relaxation
         if settings.get_dict():
             self.ctx.relax_input_additions.settings = settings
+
+        # Hybrid calculation boot-strapping
+        if self.ctx.relax_settings.get('hybrid_calc_bootstrap'):
+            self.ctx.hybrid_status = 'dft'
+            if not self.ctx.relax_settings.get('reuse'):
+                self.report('Enable `reuse` mode because hybrid calculation bootstrapping has been requested.')
+                self.ctx.relax_settings['reuse'] = True
+        else:
+            self.ctx.hybrid_status = None
+
+        # If we are reusing existing calculations, make sure the remote folders are not cleaned
+        if self.ctx.relax_settings.get('reuse'):
+            clean_tmp = self.inputs.vasp.get('clean_workdir')
+            if clean_tmp and clean_tmp.value:
+                self.report('Disable clean_workdir for downstream workflows since `reuse` is requested.')
+                self.ctx.relax_input_additions['clean_workdir'] = orm.Bool(False)
 
     def _init_relax_input_additions(self):
         """
@@ -201,6 +222,29 @@ class VaspRelaxWorkChain(WorkChain):
         if 'label' not in inputs.metadata:
             inputs.metadata.label = self.inputs.metadata.get('label', '')
 
+        # Check if we need to boot strap hybrid calculation
+        if self.ctx.get('hybrid_status') == 'dft':
+            # Turn off HF and turn off relaxation
+            inputs.parameters = nested_update_dict_node(
+                inputs.parameters,
+                {
+                    'vasp': {
+                        'lhfcalc': False
+                    },
+                    'relax': {
+                        # This turns off any relaxation
+                        'positions': False,
+                        'volume': False,
+                        'shape': False,
+                    }
+                })
+            # Decrease the iteration number
+            self.ctx.iteration -= 1
+            # Update the wallclock seconds
+            wallclock = self.ctx.relax_settings.get('hybrid_calc_bootstrap_wallclock')
+            if wallclock:
+                inputs.options = nested_update_dict_node(inputs.options, {'max_wallclock_seconds': wallclock})
+
         running = self.submit(self._base_workchain, **inputs)
         self.report('launching {}<{}> iterations #{}'.format(self._base_workchain.__name__, running.pk, self.ctx.iteration))
 
@@ -260,6 +304,12 @@ class VaspRelaxWorkChain(WorkChain):
                         'its exit status was zero.'.format(workchain.__class__.__name__, workchain.pk))
             return self.exit_codes.ERROR_NO_RELAXED_STRUCTURE  # pylint: disable=no-member
 
+        if self.ctx.hybrid_status == 'dft':
+            self.report('Competed initial DFT calculation - skipping convergence checks and process to hybrid calculation.')
+            self.ctx.hybrid_status = 'hybrid'
+            self.ctx.current_restart_folder = workchain.outputs.remote_folder
+            return self.exit_codes.NO_ERROR  # pylint: disable=no-member
+
         self.ctx.previous_structure = self.ctx.current_structure
         self.ctx.current_structure = workchain.outputs.structure
 
@@ -271,8 +321,8 @@ class VaspRelaxWorkChain(WorkChain):
         elif conv_mode == 'last':
             traj = workchain.outputs.trajectory
             if traj.numsteps > 1:
-                compare_from = get_step_structure_from_frac_pos(workchain.outputs.trajectory, -2)  # take take second last structure
-                compare_to = get_step_structure_from_frac_pos(workchain.outputs.trajectory, -1)  # take take second last structure
+                compare_from = get_step_structure(workchain.outputs.trajectory, -2)  # take take second last structure
+                compare_to = get_step_structure(workchain.outputs.trajectory, -1)  # take take second last structure
             else:
                 self.report('Warning - no enough number of steps to compare - using input/output structures instead.')
                 compare_from = self.ctx.previous_structure
@@ -306,7 +356,6 @@ class VaspRelaxWorkChain(WorkChain):
                 self.report(f'Maximum force in the structure {max_force:.4g} - OK')
 
             if not converged:
-                self.ctx.current_restart_folder = workchain.outputs.remote_folder
                 if self.ctx.get('verbose', self._verbose):
                     self.report('Relaxation did not converge, restarting the relaxation.')
             else:
@@ -315,6 +364,7 @@ class VaspRelaxWorkChain(WorkChain):
         else:
             if self.is_verbose():
                 self.report('Convergence checking is not enabled - finishing with a final static calculation.')
+        self.ctx.current_restart_folder = workchain.outputs.remote_folder
 
         self.ctx.is_converged = converged
         return self.exit_codes.NO_ERROR  # pylint: disable=no-member
@@ -475,10 +525,28 @@ class RelaxOptions(OptionHolder):
     """
     Options for relaxations
     """
-    _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps', 'positions', 'shape', 'volume', 'convergence_on',
-                        'convergence_mode', 'convergence_volume', 'convergence_absolute', 'convergence_max_iterations',
-                        'convergence_positions', 'convergence_shape_lengths', 'convergence_shape_angles', 'perform', 'reuse')
-    _allowed_empty_fields = ('energy_cutoff', 'force_cutoff')  # Either one of them should be set if convergence is on
+    _allowed_options = (
+        'algo',
+        'energy_cutoff',
+        'force_cutoff',
+        'steps',
+        'positions',
+        'shape',
+        'volume',
+        'convergence_on',
+        'convergence_mode',
+        'convergence_volume',
+        'convergence_absolute',
+        'convergence_max_iterations',
+        'convergence_positions',
+        'convergence_shape_lengths',
+        'convergence_shape_angles',
+        'perform',
+        'reuse',
+        'hybrid_calc_bootstrap',
+    )
+    _allowed_empty_fields = ('energy_cutoff', 'force_cutoff', 'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock'
+                            )  # Either one of them should be set if convergence is on
 
     algo = typed_field('algo', (str,), 'The algorithm to use for relaxation.', 'cg')
     energy_cutoff = typed_field('energy_cutoff', (float,), """
@@ -519,15 +587,19 @@ class RelaxOptions(OptionHolder):
         'Wether to perform the relaxation or not',
         True,
     )
+    hybrid_calc_bootstrap = typed_field('hybrid_calc_bootstrap', (bool,),
+                                        'Wether to bootstrap hybrid calculation by performing standard DFT first', None)
+    hybrid_calc_bootstrap_wallclock = typed_field('hybrid_calc_bootstrap_wallclock', (int,),
+                                                  'Wallclock limit in second for the bootstrap calculation', None)
 
     @classmethod
-    def validate_dict(cls, indict, port=None):
+    def validate_dict(cls, input_dict, port=None):
         """Validate the input dictionary"""
-        super().validate_dict(indict, port)
-        if isinstance(indict, orm.Dict):
-            indict = indict.get_dict()
-        force_cut = indict.get('force_cutoff')
-        energy_cut = indict.get('energy_cutoff')
+        super().validate_dict(input_dict, port)
+        if isinstance(input_dict, orm.Dict):
+            input_dict = input_dict.get_dict()
+        force_cut = input_dict.get('force_cutoff')
+        energy_cut = input_dict.get('energy_cutoff')
         if force_cut is None and energy_cut is None:
             raise InputValidationError("Either 'force_cutoff' or 'energy_cutoff' should be supplied")
         if (force_cut is not None) and (energy_cut is not None):
@@ -546,22 +618,20 @@ def nested_update(dict_in, update_dict):
 
 def nested_update_dict_node(dict_node, update_dict):
     """Utility to update a Dict node in a nested way"""
-    import aiida.orm as orm
     pydict = dict_node.get_dict()
     nested_update(pydict, update_dict)
     if pydict == dict_node.get_dict():
         return dict_node
-    else:
-        return orm.Dict(dict=pydict)
+    return orm.Dict(dict=pydict)
 
 
-def get_step_structure_from_frac_pos(traj, step):
+def get_step_structure(traj, step):
     """Get the step structure, but assume the positions are fractional"""
     _, _, cell, symbols, positions, _ = traj.get_step_data(step)
     # Convert to cartesian coorindates
     positions = positions @ cell
-    struc = orm.StructureData(cell=cell)
+    structure = orm.StructureData(cell=cell)
     for _s, _p in zip(symbols, positions):
         # Automatic species generation
-        struc.append_atom(symbols=_s, position=_p)
-    return struc
+        structure.append_atom(symbols=_s, position=_p)
+    return structure
