@@ -526,26 +526,10 @@ class RelaxOptions(OptionHolder):
     """
     Options for relaxations
     """
-    _allowed_options = (
-        'algo',
-        'energy_cutoff',
-        'force_cutoff',
-        'steps',
-        'positions',
-        'shape',
-        'volume',
-        'convergence_on',
-        'convergence_mode',
-        'convergence_volume',
-        'convergence_absolute',
-        'convergence_max_iterations',
-        'convergence_positions',
-        'convergence_shape_lengths',
-        'convergence_shape_angles',
-        'perform',
-        'reuse',
-        'hybrid_calc_bootstrap',
-    )
+    _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps', 'positions', 'shape', 'volume', 'convergence_on',
+                        'convergence_mode', 'convergence_volume', 'convergence_absolute', 'convergence_max_iterations',
+                        'convergence_positions', 'convergence_shape_lengths', 'convergence_shape_angles', 'perform', 'reuse',
+                        'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock')
     _allowed_empty_fields = ('energy_cutoff', 'force_cutoff', 'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock'
                             )  # Either one of them should be set if convergence is on
 
