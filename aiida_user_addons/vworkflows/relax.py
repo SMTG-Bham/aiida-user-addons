@@ -229,7 +229,8 @@ class VaspRelaxWorkChain(WorkChain):
                 inputs.parameters,
                 {
                     'vasp': {
-                        'lhfcalc': False
+                        'lhfcalc': False,
+                        'isym': 2,  # Standard DFT needs ISYM=2
                     },
                     'relax': {
                         # This turns off any relaxation
