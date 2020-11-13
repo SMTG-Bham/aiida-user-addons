@@ -195,7 +195,7 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
         if job_tmpl.queue_name:
             lines.append('#PBS -q {}'.format(job_tmpl.queue_name))
 
-        queue_override = os.enviorn.get('ARCHER_QUEUE')
+        queue_override = os.environ.get('ARCHER_QUEUE')
         if queue_override:
             lines.append('#PBS -q {}'.format(queue_override))
 
