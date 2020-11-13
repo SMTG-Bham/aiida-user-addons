@@ -6,6 +6,7 @@ not included in the submission script.
 In addition, ARCHER supports a `bigmem` flag that can be used to request nodes with
 larger memory size. For this we have to tweak the `PbsJobResource`.
 """
+import os
 import logging
 
 from math import ceil
@@ -193,6 +194,10 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
 
         if job_tmpl.queue_name:
             lines.append('#PBS -q {}'.format(job_tmpl.queue_name))
+
+        queue_override = os.enviorn.get('ARCHER_QUEUE')
+        if queue_override:
+            lines.append('#PBS -q {}'.format(queue_override))
 
         if job_tmpl.account:
             lines.append('#PBS -A {}'.format(job_tmpl.account))
