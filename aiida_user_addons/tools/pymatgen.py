@@ -19,11 +19,16 @@ def load_mp_struct(mp_id):
         return exist[0]
     # No data in the db yet - import from pymatgen
     struc = pmg.get_structure_from_mp(mp_id)
+    magmom = struc.site_properties.get('magmom')
     strucd = StructureData(pymatgen=struc)
     strucd.label = strucd.get_formula()
     strucd.description = 'Imported from Materials Project ID={}'.format(mp_id)
     strucd.set_attribute('mp_id', mp_id)
+    if magmom:
+        strucd.set_attribute('mp_magmom', magmom)
     strucd.store()
     strucd.set_extra('mp_id', mp_id)
+    if magmom:
+        strucd.set_extra('mp_magmom', magmom)
 
     return strucd

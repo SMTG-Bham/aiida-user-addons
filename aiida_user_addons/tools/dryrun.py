@@ -108,3 +108,26 @@ def dryrun_relax_builder(builder, **kwargs):
     vasp_builder.structure = builder.structure
 
     return dryrun_vasp(vasp_builder, **kwargs)
+
+
+def dryrun_vaspu_builder(builder, **kwargs):
+    """Dry run a vaspu.vasp workchain builder"""
+    from aiida_vasp.data.potcar import PotcarData
+    from aiida.orm import KpointsData, Dict
+    vasp_builder = VaspCalculation.get_builder()
+
+    # Setup the builder for the bare calculation
+    vasp_builder.code = builder.code
+    vasp_builder.parameters = Dict(dict=builder.parameters.get_dict()['vasp'])
+    if builder.kpoints is not None:
+        vasp_builder.kpoints = builder.kpoints
+    else:
+        vasp_builder.kpoints = KpointsData()
+        vasp_builder.kpoints.set_cell_from_structure(builder.structure)
+        vasp_builder.kpoints.set_kpoints_mesh_from_density(builder.kpoints_spacing.value * np.pi * 2)
+    vasp_builder.metadata.options = builder.options.get_dict()  # pylint: disable=no-member
+    vasp_builder.potential = PotcarData.get_potcars_from_structure(builder.structure, builder.potential_family.value,
+                                                                   builder.potential_mapping.get_dict())
+    vasp_builder.structure = builder.structure
+
+    return dryrun_vasp(vasp_builder, **kwargs)
