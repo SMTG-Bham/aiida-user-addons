@@ -75,6 +75,7 @@ class InputSet:
         """
         Get a input dictionary for VASP
         """
+        from aiida.orm import Dict
         out_dict = deepcopy(self._presets['global'])
 
         # Set-per atom properties
@@ -86,9 +87,7 @@ class InputSet:
 
         if raw_python:
             return out_dict
-        else:
-            from aiida.orm import Dict
-            return Dict(dict=out_dict)
+        return Dict(dict=out_dict)
 
     def _load_data(self):
         """Load stored data"""
@@ -120,7 +119,8 @@ class InputSet:
     def apply_overrides(self, out_dict):
         """Apply overrides stored in self.overrides to the dictionary passed"""
         for name, value in self.overides.items():
-            if '_' in name:
+            # Keys ends with '_mapping' are treated differently here
+            if '_mapping' in name:
                 continue
             # Delete the key
             if value is None:
