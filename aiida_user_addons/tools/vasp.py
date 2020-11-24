@@ -80,6 +80,7 @@ def export_vasp_calc(node, folder, decompress=False, include_potcar=True):
                     out_decompress = True
                 else:
                     out_decompress = False
+                    out_name = name
                 with (folder / out_name).open('wb') as fin:
                     # Automaticall decompress gzipped files
                     if out_decompress:
