@@ -23,6 +23,8 @@ from aiida_phonopy.common.utils import (
     get_vasp_force_sets_dict,
 )
 
+__version__ = '0.1.0'
+
 
 class VaspAutoPhononWorkChain(WorkChain):
     """
@@ -389,7 +391,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         params = {}
         if 'nac_params' in self.ctx:
             params['nac_params'] = self.ctx.nac_params
-        result = get_phonon(self.inputs.structure, self.ctx.phonon_setting_info, self.ctx.force_constants, **params)
+        result = get_phonon(self.ctx.current_structure, self.ctx.phonon_setting_info, self.ctx.force_constants, **params)
         self.out('thermal_properties', result['thermal_properties'])
         self.out('dos', result['dos'])
         self.out('band_structure', result['band_structure'])
