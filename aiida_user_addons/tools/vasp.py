@@ -75,9 +75,14 @@ def export_vasp_calc(node, folder, decompress=False, include_potcar=True):
             if otype.name == 'DIRECTORY':
                 continue
             with node.open(name, 'rb') as fout:
-                with (folder / name).open('wb') as fin:
+                if name.endswith('.gz') and decompress:
+                    out_name = name[:-3]
+                    out_decompress = True
+                else:
+                    out_decompress = False
+                with (folder / out_name).open('wb') as fin:
                     # Automaticall decompress gzipped files
-                    if name.endswith('.gz') and decompress:
+                    if out_decompress:
                         gobj = gzip.GzipFile(fileobj=fout, mode='rb')
                         fin.write(gobj.read())
                     else:
