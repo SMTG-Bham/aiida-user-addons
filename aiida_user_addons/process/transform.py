@@ -4,11 +4,57 @@ Collection of process functions for AiiDA, used for structure transformation
 import re
 import numpy as np
 from ase.build import sort
-from aiida.orm import StructureData, List, ArrayData, Node, QueryBuilder, CalcFunctionNode
+from aiida.orm import StructureData, List, ArrayData, Node, QueryBuilder, CalcFunctionNode, Dict
 from aiida.engine import calcfunction
 
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen import Structure
+
+
+@calcfunction
+def magnetic_structure_decorate(structure, magmom):
+    """
+    Create Quantum Espresso style decroated structure with
+    given magnetic moments
+    """
+    from aiida_user_addons.common.magmapping import create_additional_species
+    magmom = magmom.get_list()
+    old_species = [structure.get_kind(site.kind_name).symbol for site in structure.sites]
+    new_species, magmom_mapping = create_additional_species(old_species, magmom)
+    new_structure = StructureData()
+    new_structure.set_cell(structure.cell)
+    new_structure.set_pbc(structure.pbc)
+    for site, name in zip(structure.sites, new_species):
+        this_symbol = structure.get_kind(site.kind_name).symbol
+        new_structure.append_atom(position=site.position, symbols=this_symbol, name=name)
+
+    # Keep the label
+    new_structure.label = structure.label
+    return {'structure': new_structure, 'mapping': Dict(dict=magmom_mapping)}
+
+
+@calcfunction
+def magnetic_structure_dedecorate(structure, mapping):
+    """
+    Remove decorations of a structure with multiple names for the same specie
+    given that the decoration was previously created to give different species
+    name for different initialisation of magnetic moments.
+    """
+    from aiida_user_addons.common.magmapping import convert_to_plain_list
+    mapping = mapping.get_dict()
+    # Get a list of decroated names
+    old_species = [structure.get_kind(site.kind_name).name for site in structure.sites]
+    new_species, magmom = convert_to_plain_list(old_species, mapping)
+
+    new_structure = StructureData()
+    new_structure.set_cell(structure.cell)
+    new_structure.set_pbc(structure.pbc)
+
+    for site, name in zip(structure.sites, new_species):
+        this_symbol = structure.get_kind(site.kind_name).symbol
+        new_structure.append_atom(position=site.position, symbols=this_symbol, name=name)
+    new_structure.label = structure.label
+    return {'structure': new_structure, 'magmom': List(list=magmom)}
 
 
 @calcfunction
