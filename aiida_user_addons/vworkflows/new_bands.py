@@ -3,11 +3,14 @@ Bands workchain with a more flexible input
 """
 from copy import deepcopy
 
+import numpy as np
 import aiida.orm as orm
 from aiida.common.extendeddicts import AttributeDict
 from aiida.engine import WorkChain, calcfunction, if_
 from aiida.plugins import WorkflowFactory
-import numpy as np
+
+from aiida_user_addons.process.transform import magnetic_structure_decorate, magnetic_structure_dedecorate
+from aiida_user_addons.common.magmapping import create_additional_species
 
 
 class VaspBandsWorkChain(WorkChain):
@@ -124,7 +127,10 @@ class VaspBandsWorkChain(WorkChain):
         self.ctx.bands_kpoints = self.inputs.get('bands_kpoints')
         param = self.inputs.scf.parameters.get_dict()
         if 'magmom' in param['vasp'] and not self.inputs.get('only_dos'):
-            self.report('Magnetic system passed for BS - magnetic symmetry is ignored')
+            self.report('Magnetic system passed for BS')
+            self.ctx.magmom = param['vasp']['magmom']
+        else:
+            self.ctx.magmom = None
 
     def should_do_relax(self):
         """Wether we should do relax or not"""
@@ -168,15 +174,33 @@ class VaspBandsWorkChain(WorkChain):
         Run seekpath to obtain the primitive structure and bands
         """
 
+        current_structure_backup = self.ctx.current_structure
         inputs = {'reference_distance': self.inputs.get('bands_kpoints_distance', None), 'metadata': {'call_link_label': 'seekpath'}}
-
-        results = seekpath_structure_analysis(self.ctx.current_structure, **inputs)
-        self.ctx.current_structure = results['primitive_structure']
-        if not np.allclose(self.ctx.current_structure.cell, self.inputs.structure.cell):
+        magmom = self.ctx.get('magmom', None)
+        is_afm = False
+        if magmom:
+            species = [site.kind_name for site in self.ctx.current_structure.sites]
+            new_species, _ = create_additional_species(species, magmom)
+            if species != new_species:
+                is_afm = True
+        if is_afm:
+            # For AFM structures, create different kinds for the analysis
+            decorate_result = magnetic_structure_decorate(self.ctx.current_structure, orm.List(list=magmom))
+            decorated = decorate_result['structure']
+            seekpath_results = seekpath_structure_analysis(decorated, **inputs)
+            decorated_primitive = seekpath_results['primitive_structure']
+            # Convert back to undecorated structures and add consistent magmom input
+            dedecorate_result = magnetic_structure_dedecorate(decorated_primitive, decorate_result['mapping'])
+            self.ctx.magmom = dedecorate_result['magmom'].get_list()
+            self.ctx.current_structure = dedecorate_result['structure']
+        else:
+            seekpath_results = seekpath_structure_analysis(self.ctx.current_structure, **inputs)
+        self.ctx.current_structure = seekpath_results['primitive_structure']
+        if not np.allclose(self.ctx.current_structure.cell, current_structure_backup.cell):
             self.report('The primitive structure is not the same as the input structure - using the former for all calculations from now.')
-        self.ctx.bands_kpoints = results['explicit_kpoints']
-        self.out('primitive_structure', results['primitive_structure'])
-        self.out('seekpath_parameters', results['parameters'])
+        self.ctx.bands_kpoints = seekpath_results['explicit_kpoints']
+        self.out('primitive_structure', self.ctx.current_structure)
+        self.out('seekpath_parameters', seekpath_results['parameters'])
 
     def run_scf(self):
         """
