@@ -17,6 +17,7 @@ passed downstream to the `VaspBaseWorkChain` which will work out the correct com
 CHANGELOG
 
 0.2.1 - added `hybrid_calc_bootstrap` options
+0.3.0 - make singpoint calculation reuse the `restart_folder`
 
 
 """
@@ -34,7 +35,7 @@ from aiida_vasp.utils.workchains import compose_exit_code
 
 from ..common.opthold import OptionHolder, typed_field
 
-__version__ = '0.2.1'
+__version__ = '0.3.0'
 
 
 class VaspRelaxWorkChain(WorkChain):
@@ -257,6 +258,14 @@ class VaspRelaxWorkChain(WorkChain):
 
         inputs = self.exposed_inputs(self._base_workchain, 'vasp')
         inputs.structure = self.ctx.current_structure
+
+        # Attach previous calculation's folder if requested
+        if self.ctx.relax_settings.get('reuse', False):
+            restart_folder = self.ctx.get('current_restart_folder')  # There might not be any yet
+            if restart_folder:
+                if self.ctx.get('verbose'):
+                    self.report('Using previous remote folder <{}> for restart'.format(restart_folder))
+                inputs.restart_folder = restart_folder
 
         if 'label' not in inputs.metadata:
             inputs.metadata.label = self.inputs.metadata.get('label', '') + ' SP'
