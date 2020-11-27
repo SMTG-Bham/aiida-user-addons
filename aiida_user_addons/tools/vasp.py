@@ -148,6 +148,34 @@ def pmg_vasprun(node, parse_xml=True, parse_potcar_file=False, parse_outcar=True
     return vrun, outcar
 
 
+def export_relax(work, dst, include_potcar=False):
+    """
+    Export a relaxation workflow
+
+    This function exports a series of relaxation calculations in sub-folders
+    """
+    from aiida.orm import Node, QueryBuilder, StructureData, CalcFunctionNode, WorkChainNode
+    from aiida_vasp.parsers.file_parsers.poscar import PoscarParser
+
+    dst = Path(dst)
+    dst.mkdir(exist_ok=True)
+    q = QueryBuilder()
+    q.append(Node, filters={'id': work.pk})
+    q.append(WorkChainNode, tag='vaspwork', project=['id', '*'])
+    q.order_by({'vaspwork': {'id': 'asc'}})  # Sort by ascending PK
+    for index, (pk, node) in enumerate((q.iterall())):
+        relax_folder = (dst / f'relax_calc_{index:03d}')
+        try:
+            export_vasp_calc(node, relax_folder, decompress=True, include_potcar=include_potcar)
+        except (ValueError, AttributeError, KeyError):
+            print(f'Error exporting calculation {pk}')
+
+    # Write POSCAR file for the input
+    input_structure = work.inputs.structure
+    poscar_parser = PoscarParser(data=input_structure, precision=10)
+    poscar_parser.write(str(dst / 'POSCAR'))
+
+
 def get_kpn_density(node, kgrid):
     """
     Get tbe kpoint density in 1/AA for a given StructureData node
