@@ -18,6 +18,7 @@ CHANGELOG
 
 0.2.1 - added `hybrid_calc_bootstrap` options
 0.3.0 - make singpoint calculation reuse the `restart_folder`
+0.3.1 - called processes now have link labels. Added customisable `settings` and `options` for the final relaxation.
 
 
 """
@@ -35,7 +36,7 @@ from aiida_vasp.utils.workchains import compose_exit_code
 
 from ..common.opthold import OptionHolder, typed_field
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 
 
 class VaspRelaxWorkChain(WorkChain):
@@ -54,6 +55,18 @@ class VaspRelaxWorkChain(WorkChain):
                    required=False,
                    help="""
                    The parameters (INCAR) to be used in the final static calculation.
+                   """)
+        spec.input('static_calc_settings',
+                   valid_type=get_data_class('dict'),
+                   required=False,
+                   help="""
+                   The full settings Dict to be used in the final static calculation.
+                   """)
+        spec.input('static_calc_options',
+                   valid_type=get_data_class('dict'),
+                   required=False,
+                   help="""
+                   The full options Dict to be used in the final static calculation.
                    """)
         spec.input('relax_settings',
                    valid_type=get_data_class('dict'),
@@ -109,14 +122,6 @@ class VaspRelaxWorkChain(WorkChain):
         # Storage space for the inputs
         self.ctx.relax_input_additions = self._init_relax_input_additions()
         self.ctx.static_input_additions = AttributeDict()
-
-        # The static parameters is the parameters to be used for the static calculation
-        # TODO refactor this to allow tweaking the options of the static calculation
-        static_parameters_node = self.inputs.get('static_calc_parameters')
-        if static_parameters_node:
-            self.ctx.static_parameters = static_parameters_node.get_dict()
-        else:
-            self.ctx.static_parameters = None
 
         # Set the verbose flag
         if 'verbose' in self.inputs:
@@ -189,12 +194,19 @@ class VaspRelaxWorkChain(WorkChain):
                 self.report('skipping structure relaxation and forwarding input to the next workchain.')
         else:
             # For the final static run we do not need to parse the output structure
-            if 'settings' in self.inputs:
+            if 'settings' in self.inputs.vasp:
                 self.ctx.static_input_additions.settings = nested_update_dict_node(
-                    self.inputs.settings, {'parser_settings': {
+                    self.inputs.vasp.settings, {'parser_settings': {
                         'add_structure': False,
                         'add_trajectory': False,
                     }})
+
+            # Apply overrides if supplied
+            if 'static_calc_settings' in self.inputs:
+                self.ctx.static_input_additions.settings = self.inputs.static_calc_settings
+
+            if 'static_calc_options' in self.inputs:
+                self.ctx.static_input_additions.options = self.inputs.static_calc_options
 
             # Override INCARs for the final relaxation
             if 'static_parameters' in self.inputs:
@@ -247,6 +259,10 @@ class VaspRelaxWorkChain(WorkChain):
             if wallclock:
                 inputs.options = nested_update_dict_node(inputs.options, {'max_wallclock_seconds': wallclock})
 
+        # Label the calculation and links by iteration number
+        inputs.metadata.label += ' ITER {:02d}'.format(self.ctx.iteration)
+        inputs.metadata.call_link_label = 'relax_{:02d}'.format(self.ctx.iteration)
+
         running = self.submit(self._base_workchain, **inputs)
         self.report('launching {}<{}> iterations #{}'.format(self._base_workchain.__name__, running.pk, self.ctx.iteration))
 
@@ -269,6 +285,9 @@ class VaspRelaxWorkChain(WorkChain):
 
         if 'label' not in inputs.metadata:
             inputs.metadata.label = self.inputs.metadata.get('label', '') + ' SP'
+
+        # Label the calculation and links by iteration number
+        inputs.metadata.call_link_label = 'singlepoint'
 
         # Update the input with whatever stored in the relax_input_additions attribute dict
         inputs.update(self.ctx.static_input_additions)
