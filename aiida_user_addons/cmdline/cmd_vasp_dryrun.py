@@ -46,20 +46,23 @@ def vasp_dryrun(input_dir, vasp_exe='vasp_std', timeout=10, work_dir=None, keep=
     shutil.copytree(str(input_dir), str(work_dir))
 
     process = sb.Popen(vasp_exe, cwd=str(work_dir))
-    time.sleep(0.5)  # Sleep for 5 seconds
     launch_start = time.time()
     outcar = work_dir / 'OUTCAR'
+    time.sleep(3.0)  # Sleep for 3 seconds to wait for VASP creating the file
     dryrun_finish = False
-    while (time.time() - launch_start < timeout) and not dryrun_finish:
-        with open(outcar, 'r') as fhandle:
-            for line in fhandle:
-                if 'INWAV' in line:
-                    dryrun_finish = True
-                    break
-        time.sleep(0.2)
-
-    # Once we are out side the loop, kill VASP process
-    process.kill()
+    try:
+        while (time.time() - launch_start < timeout) and not dryrun_finish:
+            with open(outcar, 'r') as fhandle:
+                for line in fhandle:
+                    if 'INWAV' in line:
+                        dryrun_finish = True
+                        break
+            time.sleep(0.2)
+    except Exception as error:
+        raise error
+    finally:
+        # Once we are out side the loop, kill VASP process
+        process.kill()
     result = parse_outcar(outcar)
 
     if not keep:
