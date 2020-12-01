@@ -29,6 +29,11 @@ class VaspBandsWorkChain(WorkChain):
 
     The band structure calculation will run unless `only_dos` is set to `Bool(True)`.
 
+    For magnetic structures, the workchain will internally create additional species for the symmetry
+    analysis and regenerate "undecorated" structures with corresponding initial magnetic moments. This
+    works for both FM and AFM species. Care should be taken when the MAGMOM is obtained from site projected
+    values in case of unexpected symmetry breaking.
+
     Input for bands and dos calculations are optional. However, if they are needed, the full list of inputs must
     be passed. For the `parameters` node, one may choose to only specify those fields that need to be updated.
     """
@@ -191,7 +196,8 @@ class VaspBandsWorkChain(WorkChain):
             self.ctx.current_structure = dedecorate_result['structure']
         else:
             seekpath_results = seekpath_structure_analysis(self.ctx.current_structure, **inputs)
-        self.ctx.current_structure = seekpath_results['primitive_structure']
+            self.ctx.current_structure = seekpath_results['primitive_structure']
+
         if not np.allclose(self.ctx.current_structure.cell, current_structure_backup.cell):
             self.report('The primitive structure is not the same as the input structure - using the former for all calculations from now.')
         self.ctx.bands_kpoints = seekpath_results['explicit_kpoints']
