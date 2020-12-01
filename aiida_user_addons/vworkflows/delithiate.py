@@ -29,7 +29,7 @@ class SimpleDelithiateWorkChain(WorkChain):
 
         spec.expose_inputs(Relax, 'relax', exclude=('structure',))
         spec.input('structure', valid_type=orm.StructureData)
-        spec.input('strategy', valid_type=orm.Str, help='Delithiation strategy to be used.')
+        spec.input('strategy', valid_type=orm.Str, help='Delithiation strategy to be used. Choose from: full, unique, wyckoff.')
         spec.input('rattle_amp',
                    valid_type=orm.Float,
                    help='Rattle the structure after delithiate',
@@ -40,7 +40,7 @@ class SimpleDelithiateWorkChain(WorkChain):
                    default=lambda: orm.Bool(True),
                    required=False,
                    help='Whether to run the initial relaxation.')
-        spec.input('wyckoff_sites', valid_type=orm.List, required=False, help='Wyckoff sites to remove')
+        spec.input('wyckoff_sites', valid_type=orm.List, required=False, help='Wyckoff sites to remove for the wyckoff mode.')
         spec.input_namespace('unique_options', required=False, populate_defaults=False, help='Options for delithiate by unique sites')
         spec.input('unique_options.excluded_sites', required=False, default=lambda: orm.List(list=[]), help='Excluded site indices.')
         spec.input('unique_options.nsub', required=False, default=lambda: orm.Int(1), help='Number of Li to remove')
