@@ -185,7 +185,10 @@ class SimpleDelithiateWorkChain(WorkChain):
 
             # Set the call link label to identify the relaxation
             # Note this may not be the same as the actual link name
-            inputs.metadata.call_link_label = f'relax_{istruc}'
+            inputs.metadata.call_link_label = f'relax_{istruc:02d}'
+            # Label the frame by formula and iterations
+            if not inputs.metadata.get('label'):
+                inputs.metadata.label = frame.get_formula('count') + f' DELI {istruc:02d}'
 
             # Setup the parameters - update the magnetic moments
             deli_magmom_mapping = self.inputs.deli_magmom_mapping.get_dict()
