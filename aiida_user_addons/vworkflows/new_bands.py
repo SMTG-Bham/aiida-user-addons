@@ -177,16 +177,12 @@ class VaspBandsWorkChain(WorkChain):
         current_structure_backup = self.ctx.current_structure
         inputs = {'reference_distance': self.inputs.get('bands_kpoints_distance', None), 'metadata': {'call_link_label': 'seekpath'}}
         magmom = self.ctx.get('magmom', None)
-        is_afm = False
+        # For magnetic structures, create different kinds for the analysis in case that the
+        # symmetry should be lowered. This also makes sure that the magnetic moments are consistent
         if magmom:
-            species = [site.kind_name for site in self.ctx.current_structure.sites]
-            new_species, _ = create_additional_species(species, magmom)
-            if species != new_species:
-                is_afm = True
-        if is_afm:
-            # For AFM structures, create different kinds for the analysis
             decorate_result = magnetic_structure_decorate(self.ctx.current_structure, orm.List(list=magmom))
             decorated = decorate_result['structure']
+            # Run seekpath on the decorated structure
             seekpath_results = seekpath_structure_analysis(decorated, **inputs)
             decorated_primitive = seekpath_results['primitive_structure']
             # Convert back to undecorated structures and add consistent magmom input
@@ -226,6 +222,11 @@ class VaspBandsWorkChain(WorkChain):
             pdict['vasp']['lcharg'] = True
             inputs.parameters = orm.Dict(dict=pdict)
             self.report('Correction: setting LCHARG to True')
+
+        # Take magmom from the context, in case that the magmom is rearranged in the primitive cell
+        magmom = self.ctx.get('magmom')
+        if magmom:
+            inputs.parameters = nested_update_dict_node(inputs.parameters, {'vasp': {'magmom': magmom}})
 
         running = self.submit(base_work, **inputs)
         self.report('Running SCF calculation {}'.format(running))
