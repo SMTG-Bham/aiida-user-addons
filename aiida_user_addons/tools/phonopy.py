@@ -80,7 +80,7 @@ def get_phonon_obj(work, nac='auto'):
         phonon = get_phonopy_instance(work.outputs.relaxed_structure, work.outputs.phonon_setting_info, params)
     else:
         # No relaxation - use the input structure directly
-        phonon = get_phonopy_instance(work.inptus.structure, work.outputs.phonon_setting_info, params)
+        phonon = get_phonopy_instance(work.inputs.structure, work.outputs.phonon_setting_info, params)
 
     # Treat the magmom
     try:
