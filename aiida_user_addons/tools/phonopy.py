@@ -32,7 +32,6 @@ def export_phonon_work(work, dst, include_potcar=False):
     nac_calc = work.get_outgoing(link_label_filter='nac_calc').first().node
     if nac_calc:
         export_vasp_calc(nac_calc, (dst / 'nac_calc'), decompress=True, include_potcar=include_potcar)
-        warn('NAC calculation')
 
     # Write POSCAR file used from creating the displacements
     q = QueryBuilder()
@@ -59,7 +58,7 @@ def export_phonon_work(work, dst, include_potcar=False):
 
     # Export BORN FILE
     if nac_calc:
-        write_BORN(pobj.primitive, pobj.nac_params['borns'], pobj.nac_params['dielectric'], dst / 'BORN')
+        write_BORN(pobj.primitive, pobj.nac_params['born'], pobj.nac_params['dielectric'], dst / 'BORN')
 
 
 def get_phonon_obj(work, nac='auto'):
