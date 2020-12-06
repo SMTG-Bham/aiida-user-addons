@@ -27,7 +27,7 @@ def export_phonon_work(work, dst, include_potcar=False):
         fc_folder = (dst / triple.link_label)
         export_vasp_calc(fc_calc, fc_folder, decompress=True, include_potcar=include_potcar)
 
-    nac_calc = work.get_outgoing(link_label_filter='nac_calc').first()
+    nac_calc = work.get_outgoing(link_label_filter='nac_calc').first().node
     if nac_calc:
         export_vasp_calc(nac_calc, (dst / 'nac_calc'), decompress=True, include_potcar=include_potcar)
 
