@@ -241,8 +241,8 @@ class VaspAutoPhononWorkChain(WorkChain):
             # Ensure that the remote folder is not cleaned
             calc_inputs.clean_workdir = orm.Bool(False)
 
-        # Make sure the calculation writes CHGCAR
-        calc_inputs.parameters = nested_update_dict_node(calc_inputs.parameters, {'vasp': {'lcharg': True}})
+        # Make sure the calculation writes CHGCAR and WAVECAR
+        calc_inputs.parameters = nested_update_dict_node(calc_inputs.parameters, {'vasp': {'lcharg': True, 'lwave': True}})
 
         calc_inputs.metadata.label = self.ctx.label + ' SUPERCELL'
         calc_inputs.metadata.call_link_label = 'supercell_calc'
@@ -320,6 +320,21 @@ class VaspAutoPhononWorkChain(WorkChain):
             running = self.submit(self._singlepoint_chain, **nac_inputs)
             self.report('Submissted calculation for nac: {}'.format(running))
             self.to_context(**{'born_and_epsilon_calc': running})
+
+    def check_wavecar_chgcar(self):
+        """Check if WAVECAR and CHGCAR exits and valid in the remote folder"""
+        remote = self.ctx.supercell_remote_folder
+        if not remote:
+            return False, False
+        content = remote.listdir_withattributes()
+        has_wavecar = False
+        has_chgcar = False
+        for entry in content:
+            if entry['name'] == 'WAVECAR' and entry['attributes'].st_size > 10:
+                has_wavecar = True
+            if entry['name'] == 'CHGCAR' and entry['attributes'].st_size > 10:
+                has_wavecar = True
+        return has_wavecar, has_chgcar
 
     def create_force_set_and_constants(self):
         """Create the force set and constants from the finished calculations"""

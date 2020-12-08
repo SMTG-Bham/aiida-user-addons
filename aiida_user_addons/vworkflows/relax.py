@@ -331,7 +331,7 @@ class VaspRelaxWorkChain(WorkChain):
             self.report('The {}<{}> for the relaxation run did not have an '
                         'output structure and most likely failed. However, '
                         'its exit status was zero.'.format(workchain.__class__.__name__, workchain.pk))
-            return self.exit_codes.ERROR_NO_RELAXED_STRUCTURE  # pylint: disable=no-member
+            return self.exit_codes.ERROR_MISSING_REQUIRED_OUTPUT  # pylint: disable=no-member
 
         if self.ctx.hybrid_status == 'dft':
             self.report('Competed initial DFT calculation - skipping convergence checks and process to hybrid calculation.')
