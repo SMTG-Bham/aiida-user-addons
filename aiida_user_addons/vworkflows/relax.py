@@ -491,9 +491,7 @@ class VaspRelaxWorkChain(WorkChain):
 
         # Fence this section to avoid unnecessary process exceptions.
         try:
-            if not self.inputs.vasp.get('clean_workdir') and rlx_settings.get('reuse') \
-                and rlx_settings.get('clean_reuse', True):
-
+            if rlx_settings.get('reuse') and rlx_settings.get('clean_reuse', True):
                 self.report('Cleaning remote working directory for the called CalcJobs.')
                 cleaned_calcs = []
                 qbd = orm.QueryBuilder()
