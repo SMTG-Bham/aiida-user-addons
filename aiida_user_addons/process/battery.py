@@ -142,7 +142,7 @@ def _is_comparable(calc1, calc2):
             return False
     for key in warn_keys:
         if _get_incar_tag(key, indict1) != _get_incar_tag(key, indict2):
-            print(f'WARNING: mismatch in key {key} - two calculation may not be comparable')
+            print(f'WARNING: mismatch in key {key} - two calculations may not be comparable')
     return True
 
 

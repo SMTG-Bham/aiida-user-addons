@@ -483,7 +483,54 @@ class VaspRelaxWorkChain(WorkChain):
         self.out_many(self.exposed_outputs(workchain, self._base_workchain))
 
     def finalize(self):
-        """Finalize the workchain."""
+        """
+        Finalize the workchain.
+        Clean the remote working directories of the called calcjobs
+        """
+        rlx_settings = self.ctx.relax_settings
+
+        # Fence this section to avoid unnecessary process exceptions.
+        try:
+            if not self.inputs.vasp.get('clean_workdir') and rlx_settings.get('reuse') \
+                and rlx_settings.get('clean_reuse', True):
+
+                self.report('Cleaning remote working directory for the called CalcJobs.')
+                cleaned_calcs = []
+                qbd = orm.QueryBuilder()
+                qbd.append(orm.WorkChainNode, filters={'id': self.node.pk})
+
+                # Options for keeping the single point calculation work directory
+                if rlx_settings.get('keep_sp_workdir', False):
+                    qbd.append(orm.WorkChainNode, filters={'id': {'in': [node.pk for node in self.ctx.workchains]}})
+                else:
+                    qbd.append(orm.WorkChainNode,
+                               edge_filters={'label': {
+                                   'like': 'relax_%'
+                               }},
+                               filters={'id': {
+                                   'in': [node.pk for node in self.ctx.workchains]
+                               }})
+
+                qbd.append(orm.CalcJobNode)
+
+                # Find the CalcJobs to clean
+                if qbd.count() > 0:
+                    calcjobs = [tmp[0] for tmp in qbd.all()]
+                else:
+                    self.report('Cannot found called CalcJobNodes to clean.')
+                    return
+                # Clean the remote directories one by one
+                for calculation in calcjobs:
+                    try:
+                        calculation.outputs.remote_folder._clean()  # pylint: disable=protected-access
+                        cleaned_calcs.append(calculation.pk)
+                    except BaseException:
+                        pass
+
+                if cleaned_calcs:
+                    self.report('cleaned remote folders of calculations: {}'.format(' '.join(map(str, cleaned_calcs))))  # pylint: disable=not-callable
+        except BaseException as exception:
+            self.report('Exception occurred during the cleaning of the remote contents: {}'.format(exception.args))
 
     def perform_relaxation(self):
         """Check if a relaxation is to be performed."""
@@ -557,7 +604,7 @@ class RelaxOptions(OptionHolder):
     _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps', 'positions', 'shape', 'volume', 'convergence_on',
                         'convergence_mode', 'convergence_volume', 'convergence_absolute', 'convergence_max_iterations',
                         'convergence_positions', 'convergence_shape_lengths', 'convergence_shape_angles', 'perform', 'reuse',
-                        'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock')
+                        'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock', 'clean_reuse', 'keep_sp_workdir')
     _allowed_empty_fields = ('energy_cutoff', 'force_cutoff', 'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock'
                             )  # Either one of them should be set if convergence is on
 
@@ -594,6 +641,8 @@ class RelaxOptions(OptionHolder):
         'The cut off value for the convergence check on the angles of the unit cell vectors, between input and output structure.', 0.1)
     convergence_mode = typed_field('convergence_mode', (str,), 'Mode of the convergence - select from \'inout\' and \'last\'', 'inout')
     reuse = typed_field('reuse', (bool,), 'Whether reuse the previous calculation by copying over the remote folder.', False)
+    clean_reuse = typed_field('clean_reuse', (bool,), 'Whether to perform a final cleaning of the reused calculations.', True)
+    keep_sp_workdir = typed_field('keep_sp_workdir', (bool,), 'Whether to keep the workdir of the final singlepoint calculation', False)
     perform = typed_field(
         'perform',
         (bool,),
