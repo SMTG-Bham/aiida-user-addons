@@ -49,11 +49,16 @@ def get_pmg_bandstructure(bands_node, structure=None, efermi=None):
     # Construct the band_dict
     bands_shape = bands.shape
     if len(bands_shape) == 3:
-        bands_dict = {
-            Spin.up: bands[0].T,  # Have to be (bands, kpoints)
-            Spin.down:
-                bands[1].T  # Have to be (bands, kpoints)
-        }
+        if bands_shape[0] == 2:
+            bands_dict = {
+                Spin.up: bands[0].T,  # Have to be (bands, kpoints)
+                Spin.down:
+                    bands[1].T  # Have to be (bands, kpoints)
+            }
+        else:
+            bands_dict = {
+                Spin.up: bands[0].T,  # Have to be (bands, kpoints)
+            }
     else:
         bands_dict = {Spin.up: bands.T}
 
