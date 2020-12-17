@@ -66,7 +66,7 @@ def make_vac(cell, indices, supercell):
     supercell = supercell[~mask]  ## Remove any atoms in the original indices
     supercell.set_tags(None)
     supercell.set_masses(None)
-    # Now I sort the supercell in the order of chemcial symbols
+    # Now I sort the supercell in the order of chemical symbols
     supercell = sort(supercell)
     output = StructureData(ase=supercell)
     return output
@@ -252,20 +252,34 @@ def get_conventional_standard_structure(structure, symprec, angle_tolerance):
 
 
 @calcfunction
-def make_supercell(structure, supercell, tags):
+def make_supercell(structure, supercell, **kwargs):
     """Make supercell structure, keep the tags in order"""
+    from ase.build.supercells import make_supercell as ase_supercell
+    if 'tags' in kwargs:
+        tags = kwargs['tags']
+    else:
+        tags = None
+
     atoms = structure.get_ase()
     atoms.set_tags(tags)
 
-    satoms = atoms.repeat(supercell.get_list())
+    slist = supercell.get_list()
+    if isinstance(slist[0], int):
+        satoms = atoms.repeat(slist)
+    else:
+        satoms = ase_supercell(atoms, np.array(slist))
     satoms = sort(satoms)
-    stags = satoms.get_tags().tolist()
+    if tags:
+        stags = satoms.get_tags().tolist()
     satoms.set_tags(None)
 
     out = StructureData(ase=satoms)
-    out.label = structure.label + ' SUPER {} {} {}'.format(*supercell.get_list())
+    out.label = structure.label + ' SUPER {} {} {}'.format(*slist)
 
-    return {'structure': out, 'tags': List(list=stags)}
+    if tags:
+        return {'structure': out, 'tags': List(list=stags)}
+    else:
+        return {'structure': out}
 
 
 @calcfunction
