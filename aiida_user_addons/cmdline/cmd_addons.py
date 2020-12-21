@@ -53,7 +53,9 @@ def export_vasp(process, folder, decompress, include_potcar):
 @addons.command('export_relax')
 @WORKFLOW('workflow')
 @click.argument('folder')
-def export_vasp(workflow, folder, decompress, include_potcar):
+@click.option('--include-potcar', default=False, is_flag=True, help='Wether to include POTCAR in the export folder')
+@click.option('--decompress', default=False, is_flag=True, help='Wether to decompress the contents')
+def export_relax(workflow, folder, decompress, include_potcar):
     """Export a VASP relaxation workflow"""
     from aiida_user_addons.tools.vasp import export_relax
     export_relax(workflow, folder, decompress=decompress, include_potcar=include_potcar)
