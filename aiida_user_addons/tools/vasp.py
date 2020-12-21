@@ -148,7 +148,7 @@ def pmg_vasprun(node, parse_xml=True, parse_potcar_file=False, parse_outcar=True
     return vrun, outcar
 
 
-def export_relax(work, dst, include_potcar=False):
+def export_relax(work, dst, include_potcar=False, decompress=False):
     """
     Export a relaxation workflow
 
@@ -166,7 +166,7 @@ def export_relax(work, dst, include_potcar=False):
     for index, (pk, node) in enumerate((q.iterall())):
         relax_folder = (dst / f'relax_calc_{index:03d}')
         try:
-            export_vasp_calc(node, relax_folder, decompress=True, include_potcar=include_potcar)
+            export_vasp_calc(node, relax_folder, decompress=decompress, include_potcar=include_potcar)
         except (ValueError, AttributeError, KeyError):
             print(f'Error exporting calculation {pk}')
 

@@ -6,6 +6,7 @@ from tqdm import tqdm
 
 from aiida_user_addons.tools.scfcheck import database_sweep
 from aiida.cmdline.commands.cmd_data import verdi_data
+from aiida.cmdline.params.arguments import PROCESS, WORKFLOW
 
 
 @verdi_data.group('addons')
@@ -36,3 +37,23 @@ def check_nelm(reset):
             node.delete_extra('nelm_breach')
     else:
         database_sweep()
+
+
+@addons.command('export_vasp')
+@PROCESS('process')
+@click.argument('folder')
+@click.option('--include-potcar', default=False, is_flag=True, help='Wether to include POTCAR in the export folder')
+@click.option('--decompress', default=False, is_flag=True, help='Wether to decompress the contents')
+def export_vasp(process, folder, decompress, include_potcar):
+    """Export a VASP calculation, works for both `VaspCalculation` or `VaspWorkChain`"""
+    from aiida_user_addons.tools.vasp import export_vasp_calc
+    export_vasp_calc(process, folder, decompress=decompress, include_potcar=include_potcar)
+
+
+@addons.command('export_relax')
+@WORKFLOW('workflow')
+@click.argument('folder')
+def export_vasp(workflow, folder, decompress, include_potcar):
+    """Export a VASP relaxation workflow"""
+    from aiida_user_addons.tools.vasp import export_relax
+    export_relax(workflow, folder, decompress=decompress, include_potcar=include_potcar)
