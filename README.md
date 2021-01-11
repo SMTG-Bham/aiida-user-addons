@@ -16,6 +16,7 @@ https://github.com/zhubonan/aiida-phonopy/commit/7cfe9d357348606ea4914e935beb282
 ## Command line tools
 
 `vasp-dryrun` is a tool to *dryrun* VASP calculations. It can obtain key information such as the number of kpoints and bands for working out the best parallelisation strategy.
+
 ```
 Usage: vasp-dryrun [OPTIONS]
 
@@ -35,13 +36,33 @@ Options:
   --help                 Show this message and exit.
 ```
 
+`verdi data addons` is the entry point for additional commands, availiable commands are:
+
+```
+Usage: verdi data addons [OPTIONS] COMMAND [ARGS]...
+
+  Entry point for commands under aiida-user-addons
+
+Options:
+  -h, --help  Show this message and exit.
+
+Commands:
+  check-nelm    Perform a sweep to check if any VaspCalculation have...
+  export_relax  Export a VASP relaxation workflow
+  export_vasp   Export a VASP calculation, works for both `VaspCalculation`...
+```
+
+
 ## Additional VASP workflows
 
-- `vaspu.relax`: `RelaxWorkChain` with additional check and bug fixes
-- `vaspu.converge`: A convergence testing workchain that runs tests in parallel as much as possbile.
-- `vaspu.vasp`: Same as the original, not used.
-- `vaspu.bands`: Same as the original for now, not used.
-- `vaspu.master`: Same as the original for now, not used.
+- `vaspu.relax`: `RelaxWorkChain` with additional check and bug fixes.
+- `vaspu.converge`: A convergence testing workchain that runs tests in parallel as much as possbile (NOT WORKING AT THE MOMENT).
+- `vaspu.vasp`: Almost as the original one, used by other workcahins.
+- `vaspu.bands`: Includes pre-relaxation of the input structure with more functionalities such as dealing with AFM spin arrangement. Based on `castep.bands`.
+- `vaspu.phonopy`: Fully automated Phonon workflow from initial relaxation to final bandstructure/thermal properties.
+- `vaspu.magnetic`: Magnetic enumeration workflow for finding lowest energy magnetic states.
+- `vaspu.delithiate`: Workchain for delithiate structures and performing relaxation.
+- `vaspu.master`: Same as the original, not used.
 
 ## Additional Scheduler plugins
 
