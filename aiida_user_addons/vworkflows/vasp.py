@@ -120,6 +120,13 @@ class VaspWorkChain(BaseRestartWorkChain):
                    valid_type=get_data_class('dict'),
                    required=False,
                    help='Automatic parallelisation settings, keywords passed to `get_jobscheme` function.')
+        spec.input('dynamics.positions_dof',
+                   valid_type=get_data_class('list'),
+                   required=False,
+                   help="""
+            Site dependent flag for selective dynamics when performing relaxation
+            """)
+
         spec.outline(
             cls.init_context,
             cls.init_inputs,
@@ -155,6 +162,7 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.output('born_charges', valid_type=get_data_class('array'), required=False)
         spec.output('hessian', valid_type=get_data_class('array'), required=False)
         spec.output('dynmat', valid_type=get_data_class('array'), required=False)
+        spec.output('site_magnetization', valid_type=get_data_class('dict'), required=False)
         spec.output('parallel_settings', valid_type=get_data_class('dict'), required=False)
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
         spec.exit_code(700, 'ERROR_NO_POTENTIAL_FAMILY_NAME', message='the user did not supply a potential family name')
@@ -206,13 +214,31 @@ class VaspWorkChain(BaseRestartWorkChain):
         else:
             raise InputValidationError("Must supply either 'kpoints' or 'kpoints_spacing'")
 
+    # Set settings
+        unsupported_parameters = None
+        if 'settings' in self.inputs:
+            self.ctx.inputs.settings = self.inputs.settings
+            # Also check if the user supplied additional tags that is not in the supported file.
+            try:
+                unsupported_parameters = self.ctx.inputs.settings.unsupported_parameters
+            except AttributeError:
+                pass
+
         # Perform inputs massage to accommodate generalization in higher lying workchains
-        # and set parameters
-        parameters_massager = ParametersMassage(self, self.inputs.parameters)
-        # Check exit codes from the parameter massager and set it if it exists
-        if parameters_massager.exit_code is not None:
-            return parameters_massager.exit_code
-        self.ctx.inputs.parameters = parameters_massager.parameters
+        # and set parameters.
+        try:
+            parameters_massager = ParametersMassage(self.ctx.inputs.parameters, unsupported_parameters)
+        except Exception as exception:  # pylint: disable=broad-except
+            return self.exit_codes.ERROR_IN_PARAMETER_MASSAGER.format(exception=exception)  # pylint: disable=no-member
+        try:
+            # Only set if they exists
+            # Set any INCAR tags
+            self.ctx.inputs.parameters = parameters_massager.parameters.incar
+            # Set any dynamics input (currently only for selective dynamics, e.g. custom write to POSCAR)
+            self.ctx.inputs.dynamics = parameters_massager.parameters.dynamics
+            # Here we could set additional override flags, but those are not relevant for this VASP plugin
+        except AttributeError:
+            pass
 
         # Setup LDAU keys
         if 'ldau_mapping' in self.inputs:

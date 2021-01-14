@@ -77,6 +77,9 @@ def _get_incar_tag(tag, input_dict):
     """
     if 'vasp' in input_dict:
         input_dict = input_dict['vasp']
+    elif 'incar' in input_dict:
+        input_dict = input_dict['incar']
+
     value = input_dict.get(tag)
     # Special case the GGA tag - None is pe
     if (tag == 'gga') and (value is None):

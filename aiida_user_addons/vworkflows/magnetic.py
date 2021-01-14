@@ -70,14 +70,14 @@ class SpinEnumerateWorkChain(WorkChain):
             inputs = self.exposed_inputs(WorkflowFactory(self._relax_workchain), 'relax')
             inputs.structure = mag_struct
             # Apply the MAGMOM to the input parameters
-            inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {'vasp': {'magmom': magmom}})
-            incar_dict = inputs.vasp.parameters.get_dict()['vasp']
+            inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {'incar': {'magmom': magmom}})
+            incar_dict = inputs.vasp.parameters.get_dict()['incar']
 
             # Setup LDA+U - we cannot use the original since atoms can be reordered!!
             if 'ldau_mapping' in self.inputs:
                 ldau_settings = self.inputs.ldau_mapping.get_dict()
                 ldau_keys = get_ldau_keys(mag_struct, **ldau_settings)
-                inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {'vasp': ldau_keys})
+                inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {'incar': ldau_keys})
             elif 'laduu' in incar_dict:
                 raise RuntimeError('Using LDA+U but not explicity mapping given. Please set ldu_mapping input.')
 

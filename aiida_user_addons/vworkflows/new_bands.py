@@ -131,9 +131,9 @@ class VaspBandsWorkChain(WorkChain):
         self.ctx.current_structure = self.inputs.structure
         self.ctx.bands_kpoints = self.inputs.get('bands_kpoints')
         param = self.inputs.scf.parameters.get_dict()
-        if 'magmom' in param['vasp'] and not self.inputs.get('only_dos'):
+        if 'magmom' in param['incar'] and not self.inputs.get('only_dos'):
             self.report('Magnetic system passed for BS')
-            self.ctx.magmom = param['vasp']['magmom']
+            self.ctx.magmom = param['incar']['magmom']
         else:
             self.ctx.magmom = None
 
@@ -224,15 +224,15 @@ class VaspBandsWorkChain(WorkChain):
 
         # Ensure that writing the CHGCAR file is on
         pdict = inputs.parameters.get_dict()
-        if (pdict['vasp'].get('lcharg') == False) or (pdict['vasp'].get('LCHARG') == False):
-            pdict['vasp']['lcharg'] = True
+        if (pdict['incar'].get('lcharg') == False) or (pdict['incar'].get('LCHARG') == False):
+            pdict['incar']['lcharg'] = True
             inputs.parameters = orm.Dict(dict=pdict)
             self.report('Correction: setting LCHARG to True')
 
         # Take magmom from the context, in case that the magmom is rearranged in the primitive cell
         magmom = self.ctx.get('magmom')
         if magmom:
-            inputs.parameters = nested_update_dict_node(inputs.parameters, {'vasp': {'magmom': magmom}})
+            inputs.parameters = nested_update_dict_node(inputs.parameters, {'incar': {'magmom': magmom}})
 
         running = self.submit(base_work, **inputs)
         self.report('Running SCF calculation {}'.format(running))

@@ -36,7 +36,10 @@ from aiida_vasp.utils.workchains import compose_exit_code
 
 from ..common.opthold import OptionHolder, typed_field
 
-__version__ = '0.3.1'
+__version__ = '0.4.0'
+
+# Change log
+# 0.4.0 update such `vasp` namespace in `parameters` is renamed to `incar`
 
 
 class VaspRelaxWorkChain(WorkChain):
@@ -241,7 +244,7 @@ class VaspRelaxWorkChain(WorkChain):
             inputs.parameters = nested_update_dict_node(
                 inputs.parameters,
                 {
-                    'vasp': {
+                    'incar': {
                         'lhfcalc': False,
                         'isym': 2,  # Standard DFT needs ISYM=2
                     },
