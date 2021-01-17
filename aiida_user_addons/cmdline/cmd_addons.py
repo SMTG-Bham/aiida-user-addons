@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 from aiida_user_addons.tools.scfcheck import database_sweep
 from aiida.cmdline.commands.cmd_data import verdi_data
-from aiida.cmdline.params.arguments import PROCESS, WORKFLOW
+from aiida.cmdline.params.arguments import PROCESS, WORKFLOW, CALCULATION
 
 
 @verdi_data.group('addons')
@@ -59,3 +59,30 @@ def export_relax(workflow, folder, decompress, include_potcar):
     """Export a VASP relaxation workflow"""
     from aiida_user_addons.tools.vasp import export_relax as _export_relax
     _export_relax(workflow, folder, decompress=decompress, include_potcar=include_potcar)
+
+
+@addons.command('remotecat')
+@CALCULATION('calcjob')
+@click.argument('fname')
+@click.option('--save-to', '-s', help='Name of the file to save to')
+def remotecat(calcjob, fname, save_to):
+    """Cat the content of an file lying on the remote folder of the calculation"""
+    import tempfile
+    from shutil import copyfileobj
+    import os
+    import sys
+
+    rfolder = calcjob.outputs.remote_folder
+    if save_to is None:
+        fd, temppath = tempfile.mkstemp()
+    else:
+        temppath = save_to
+
+    rfolder.getfile(fname, temppath)
+
+    with open(temppath, 'rb') as fhandle:
+        copyfileobj(fhandle, sys.stdout.buffer)
+
+    if save_to is None:
+        os.close(fd)
+        os.remove(temppath)
