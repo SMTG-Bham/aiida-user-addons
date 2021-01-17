@@ -143,6 +143,7 @@ def tailf_command(transport, remotedir, fname):
     Specific gotocomputer string to connect to a given remote computer via
     ssh and directly go to the calculation folder and then do tail -f of the target file.
     """
+    from aiida.common.escaping import escape_for_bash
     further_params = []
     if 'username' in transport._connect_args:
         further_params.append('-l {}'.format(escape_for_bash(transport._connect_args['username'])))
