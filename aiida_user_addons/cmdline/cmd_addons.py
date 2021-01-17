@@ -7,7 +7,7 @@ from tqdm import tqdm
 from aiida_user_addons.tools.scfcheck import database_sweep
 from aiida.cmdline.commands.cmd_data import verdi_data
 from aiida.cmdline.params.arguments import PROCESS, WORKFLOW, CALCULATION
-from aiida.cmdline.utils.echo import echo_success, echo_info, echo_error
+from aiida.cmdline.utils.echo import echo_success, echo_info, echo_error, echo_critical
 
 
 @verdi_data.group('addons')
@@ -114,3 +114,58 @@ def remotepull(calcjob, dest, max_size):
         echo_error('Failled to pull data using rsync')
     else:
         echo_success('Remote folder pulled to {}'.format(dest))
+
+
+@addons.command('remotetail')
+@CALCULATION('calcjob')
+@click.argument('fname')
+def remotetail(calcjob, fname):
+    """Use `tail -f` to follow a specific file on the remote computer"""
+    import os
+    from aiida.common.exceptions import NotExistent
+
+    try:
+        transport = calcjob.get_transport()
+    except NotExistent as exception:
+        echo_critical(repr(exception))
+
+    remote_workdir = calcjob.get_remote_workdir()
+
+    if not remote_workdir:
+        echo_critical('no remote work directory for this calcjob, maybe the daemon did not submit it yet')
+
+    command = tailf_command(transport, remote_workdir, fname)
+    os.system(command)
+
+
+def tailf_command(transport, remotedir, fname):
+    """
+    Specific gotocomputer string to connect to a given remote computer via
+    ssh and directly go to the calculation folder and then do tail -f of the target file.
+    """
+    further_params = []
+    if 'username' in transport._connect_args:
+        further_params.append('-l {}'.format(escape_for_bash(transport._connect_args['username'])))
+
+    if 'port' in transport._connect_args and transport._connect_args['port']:
+        further_params.append('-p {}'.format(transport._connect_args['port']))
+
+    if 'key_filename' in transport._connect_args and transport._connect_args['key_filename']:
+        further_params.append('-i {}'.format(escape_for_bash(transport._connect_args['key_filename'])))
+
+    further_params_str = ' '.join(further_params)
+
+    connect_string = (""" "if [ -d {escaped_remotedir} ] ;"""
+                      """ then cd {escaped_remotedir} ; {bash_command} -c 'tail -f {fname}' ; else echo '  ** The directory' ; """
+                      """echo '  ** {remotedir}' ; echo '  ** seems to have been deleted, I logout...' ; fi" """.format(
+                          bash_command=transport._bash_command_str,
+                          escaped_remotedir="'{}'".format(remotedir),
+                          remotedir=remotedir,
+                          fname=fname))
+
+    cmd = 'ssh -t {machine} {further_params} {connect_string}'.format(
+        further_params=further_params_str,
+        machine=transport._machine,
+        connect_string=connect_string,
+    )
+    return cmd
