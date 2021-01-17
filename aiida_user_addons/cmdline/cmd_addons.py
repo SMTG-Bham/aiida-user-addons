@@ -67,7 +67,13 @@ def export_relax(workflow, folder, decompress, include_potcar):
 @click.argument('fname')
 @click.option('--save-to', '-s', help='Name of the file to save to')
 def remotecat(calcjob, fname, save_to):
-    """Cat the content of an file lying on the remote folder of the calculation"""
+    """
+    Print the conetent of a remote file to STDOUT
+
+    This command for printing the content of a remote file to STDOUT.
+    Useful for analysing running calculations.
+    """
+
     import tempfile
     from shutil import copyfileobj
     import os
@@ -94,7 +100,12 @@ def remotecat(calcjob, fname, save_to):
 @click.argument('dest')
 @click.option('--max-size', '-m', help='Maximum size of the files to be retrieved - this is passed to rsync')
 def remotepull(calcjob, dest, max_size):
-    """Cat the content of an file lying on the remote folder of the calculation"""
+    """
+    Pull a calculation folder from the remote
+
+    This command for pull a calculation folder to a local folder.
+    `rsync` is used for doing the heavy lifting.
+    """
     import subprocess
     rfolder = calcjob.outputs.remote_folder
     cmd_args = ['rsync', '-av']
@@ -120,7 +131,12 @@ def remotepull(calcjob, dest, max_size):
 @CALCULATION('calcjob')
 @click.argument('fname')
 def remotetail(calcjob, fname):
-    """Use `tail -f` to follow a specific file on the remote computer"""
+    """
+    Follow a file on the remote computer
+
+    This command will launch a ssh session dedicated for following a file
+    using the `tail -f` command
+    """
     import os
     from aiida.common.exceptions import NotExistent
 
