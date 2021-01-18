@@ -154,6 +154,23 @@ def remotetail(calcjob, fname):
     os.system(command)
 
 
+@addons.command('relaxcat')
+@WORKFLOW('workflow')
+@click.argument('fname')
+def relaxcat(workflow, fname):
+    """Cat the output of the last calculation of a finished workflow"""
+    from aiida.orm import QueryBuilder, WorkChainNode, CalcJobNode
+    from aiida.cmdline.commands.cmd_calcjob import calcjob_outputcat
+
+    q = QueryBuilder(WorkChainNode, filters={'id': workflow.id})
+    q.append(WorkChainNode)
+    q.append(CalcJobNode, tag='calc', project=['id', 'ctime'])
+    q.order_by({'calc': {'ctime': 'desc'}})
+    calc, ctime = q.first()
+
+    click.Context(calcjob_outputcat).invoke(calcjob_outputcat, calcjob=calc, path=fname)
+
+
 def tailf_command(transport, remotedir, fname):
     """
     Specific gotocomputer string to connect to a given remote computer via
