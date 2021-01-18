@@ -162,7 +162,8 @@ def relaxcat(workflow, fname):
     from aiida.orm import QueryBuilder, WorkChainNode, CalcJobNode
     from aiida.cmdline.commands.cmd_calcjob import calcjob_outputcat
 
-    q = QueryBuilder(WorkChainNode, filters={'id': workflow.id})
+    q = QueryBuilder()
+    q.append(WorkChainNode, filters={'id': workflow.id})
     q.append(WorkChainNode)
     q.append(CalcJobNode, tag='calc', project=['id', 'ctime'])
     q.order_by({'calc': {'ctime': 'desc'}})
