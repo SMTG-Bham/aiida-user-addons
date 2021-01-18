@@ -165,11 +165,10 @@ def relaxcat(workflow, fname):
     q = QueryBuilder()
     q.append(WorkChainNode, filters={'id': workflow.id})
     q.append(WorkChainNode)
-    q.append(CalcJobNode, tag='calc', project=['id', 'ctime'])
+    q.append(CalcJobNode, tag='calc', project=['*', 'ctime'])
     q.order_by({'calc': {'ctime': 'desc'}})
     calc, ctime = q.first()
 
-    print(calc, fname)
     click.Context(calcjob_outputcat).invoke(calcjob_outputcat, calcjob=calc, path=fname)
 
 
