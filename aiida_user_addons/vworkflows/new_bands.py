@@ -8,6 +8,7 @@ import aiida.orm as orm
 from aiida.common.extendeddicts import AttributeDict
 from aiida.engine import WorkChain, calcfunction, if_
 from aiida.plugins import WorkflowFactory
+from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_user_addons.process.transform import magnetic_structure_decorate, magnetic_structure_dedecorate
 from aiida_user_addons.common.magmapping import create_additional_species
@@ -61,6 +62,7 @@ class VaspBandsWorkChain(WorkChain):
         spec.input(
             'dos_kpoints_density',
             help='Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.',
+            serializer=to_aiida_type,
             required=False,
             valid_type=orm.Float,
         )
@@ -98,10 +100,17 @@ class VaspBandsWorkChain(WorkChain):
                            })
         spec.input('clean_children_workdir',
                    valid_type=orm.Str,
+                   serializer=to_aiida_type,
                    help='What part of the called children to clean',
                    required=False,
                    default=lambda: orm.Str('none'))
-        spec.input('only_dos', required=False, help='Flag for running only DOS calculations')
+        spec.input(
+            'only_dos',
+            required=False,
+            help='Flag for running only DOS calculations',
+            valid_type=orm.Bool,
+            serializer=to_aiida_type,
+        )
         spec.outline(
             cls.setup,
             if_(cls.should_do_relax)(

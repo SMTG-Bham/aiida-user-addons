@@ -9,6 +9,7 @@ from aiida.engine import WorkChain, calcfunction, append_
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.links import LinkType
 from aiida.plugins import WorkflowFactory
+from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 
@@ -36,11 +37,12 @@ class SpinEnumerateWorkChain(WorkChain):
         spec.input('structure', valid_type=orm.StructureData)
         spec.input(
             'ldau_mapping',
+            serializer=to_aiida_type,
             required=False,  # I set it to be mandatory here as in most cases we will need a U
             help='Mapping for LDA+U, see `get_ldau_keys` function for details.',
             valid_type=orm.Dict)
-        spec.input('moment_map', valid_type=orm.Dict, help='Mapping of the mangetic moments')
-        spec.input('enum_options', valid_type=orm.Dict, help='Additional options to the Enumerator')
+        spec.input('moment_map', serializer=to_aiida_type, valid_type=orm.Dict, help='Mapping of the mangetic moments')
+        spec.input('enum_options', serializer=to_aiida_type, valid_type=orm.Dict, help='Additional options to the Enumerator')
 
         spec.outline(
             cls.setup,

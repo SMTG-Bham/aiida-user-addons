@@ -13,17 +13,17 @@ from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import NotExistent, InputValidationError
 from aiida.plugins import CalculationFactory
 from aiida.orm import Code, KpointsData, Dict
+from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_vasp.workchains.restart import BaseRestartWorkChain
 from aiida_vasp.utils.aiida_utils import get_data_class, get_data_node
 from aiida_vasp.utils.workchains import compose_exit_code
 from aiida_vasp.utils.workchains import prepare_process_inputs
-try:
-    from aiida_vasp.assistant.parameters import ParametersMassage
-except ImportError:
-    from aiida_vasp.utils.parameters import ParametersMassage
+from aiida_vasp.assistant.parameters import ParametersMassage
 
 from ..common.inputset.vaspsets import get_ldau_keys
+
+from .common import parameters_validator
 
 
 class VaspWorkChain(BaseRestartWorkChain):
@@ -74,11 +74,11 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.input('code', valid_type=Code)
         spec.input('structure', valid_type=(get_data_class('structure'), get_data_class('cif')), required=True)
         spec.input('kpoints', valid_type=get_data_class('array.kpoints'), required=False)
-        spec.input('potential_family', valid_type=get_data_class('str'), required=True)
-        spec.input('potential_mapping', valid_type=get_data_class('dict'), required=True)
-        spec.input('parameters', valid_type=get_data_class('dict'), required=True)
-        spec.input('options', valid_type=get_data_class('dict'), required=True)
-        spec.input('settings', valid_type=get_data_class('dict'), required=False)
+        spec.input('potential_family', valid_type=get_data_class('str'), required=True, serializer=to_aiida_type)
+        spec.input('potential_mapping', valid_type=get_data_class('dict'), required=True, serializer=to_aiida_type)
+        spec.input('parameters', valid_type=get_data_class('dict'), required=True, validator=parameters_validator)
+        spec.input('options', valid_type=get_data_class('dict'), required=True, serializer=to_aiida_type)
+        spec.input('settings', valid_type=get_data_class('dict'), required=False, serializer=to_aiida_type)
         spec.input('wavecar', valid_type=get_data_class('vasp.wavefun'), required=False)
         spec.input('chgcar', valid_type=get_data_class('vasp.chargedensity'), required=False)
         spec.input('restart_folder',
@@ -91,12 +91,14 @@ class VaspWorkChain(BaseRestartWorkChain):
                    valid_type=get_data_class('int'),
                    required=False,
                    default=lambda: get_data_node('int', 5),
+                   serializer=to_aiida_type,
                    help="""
             The maximum number of iterations to perform.
             """)
         spec.input('clean_workdir',
                    valid_type=get_data_class('bool'),
                    required=False,
+                   serializer=to_aiida_type,
                    default=lambda: get_data_node('bool', True),
                    help="""
             If True, clean the work dir upon the completion of a successfull calculation.
@@ -104,6 +106,7 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.input('verbose',
                    valid_type=get_data_class('bool'),
                    required=False,
+                   serializer=to_aiida_type,
                    default=lambda: get_data_node('bool', False),
                    help="""
             If True, enable more detailed output during workchain execution.
@@ -111,17 +114,21 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.input('ldau_mapping',
                    valid_type=get_data_class('dict'),
                    required=False,
+                   serializer=to_aiida_type,
                    help="Mappings, see the doc string of 'get_ldau_keys'")
         spec.input('kpoints_spacing',
                    valid_type=get_data_class('float'),
                    required=False,
+                   serializer=to_aiida_type,
                    help='Spacing for the kpoints in units A^-1 * 2pi')
         spec.input('auto_parallel',
                    valid_type=get_data_class('dict'),
+                   serializer=to_aiida_type,
                    required=False,
                    help='Automatic parallelisation settings, keywords passed to `get_jobscheme` function.')
         spec.input('dynamics.positions_dof',
                    valid_type=get_data_class('list'),
+                   serializer=to_aiida_type,
                    required=False,
                    help="""
             Site dependent flag for selective dynamics when performing relaxation
@@ -209,7 +216,7 @@ class VaspWorkChain(BaseRestartWorkChain):
         else:
             raise InputValidationError("Must supply either 'kpoints' or 'kpoints_spacing'")
 
-    # Set settings
+        # Set settings
         unsupported_parameters = None
         if 'settings' in self.inputs:
             self.ctx.inputs.settings = self.inputs.settings
