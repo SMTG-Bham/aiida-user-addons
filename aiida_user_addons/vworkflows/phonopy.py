@@ -550,5 +550,7 @@ def ensure_retrieve_objs(input_port, fnames, temp=False):
 
 def validate_reuse_supercell_calc(node, port=None):
     """Validate the reuse_supercell_calc port"""
+    if not node:
+        return
     if not node.value in ['restart', 'retrieve']:
         raise InputValidationError("Valid options for <reuse_supercell_calc> are: 'retrieve' and 'restart'")
