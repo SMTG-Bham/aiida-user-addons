@@ -23,6 +23,8 @@ from aiida_phonopy.common.utils import (
     get_vasp_force_sets_dict,
 )
 
+from .common import OVERRIDE_NAMESPACE
+
 __version__ = '0.1.0'
 
 
@@ -180,7 +182,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             relax_calc_inputs = self.exposed_inputs(self._relax_chain, 'relax')
             # Fetch the magmom from the relaxation calculation (eg. for the starting structure)
             try:
-                magmom = relax_calc_inputs.vasp.parameters['incar'].get('magmom')
+                magmom = relax_calc_inputs.vasp.parameters[OVERRIDE_NAMESPACE].get('magmom')
             except AttributeError:
                 magmom = None
         else:
@@ -230,7 +232,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         if magmom:
             self.report('Using MAGMOM from the phonopy output')
             param = calc_inputs.parameters.get_dict()
-            param['incar']['magmom'] = magmom
+            param[OVERRIDE_NAMESPACE]['magmom'] = magmom
             calc_inputs.parameters = orm.Dict(dict=param)
 
         # Ensure either the chgcar is retrieved or the remote workdir is not cleaned
@@ -242,7 +244,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             calc_inputs.clean_workdir = orm.Bool(False)
 
         # Make sure the calculation writes CHGCAR and WAVECAR
-        calc_inputs.parameters = nested_update_dict_node(calc_inputs.parameters, {'incar': {'lcharg': True, 'lwave': True}})
+        calc_inputs.parameters = nested_update_dict_node(calc_inputs.parameters, {OVERRIDE_NAMESPACE: {'lcharg': True, 'lwave': True}})
 
         calc_inputs.metadata.label = self.ctx.label + ' SUPERCELL'
         calc_inputs.metadata.call_link_label = 'supercell_calc'
@@ -289,7 +291,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         if magmom:
             self.report('Using MAGMOM from the phonopy output')
             param = force_calc_inputs.parameters.get_dict()
-            param['incar']['magmom'] = magmom
+            param[OVERRIDE_NAMESPACE]['magmom'] = magmom
             force_calc_inputs.parameters = orm.Dict(dict=param)
 
         # Ensure we parser the forces

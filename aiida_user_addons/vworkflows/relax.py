@@ -35,6 +35,7 @@ from aiida_vasp.utils.aiida_utils import get_data_class
 from aiida_vasp.utils.workchains import compose_exit_code
 
 from ..common.opthold import OptionHolder, typed_field
+from .common import OVERRIDE_NAMESPACE
 
 __version__ = '0.4.0'
 
@@ -244,7 +245,7 @@ class VaspRelaxWorkChain(WorkChain):
             inputs.parameters = nested_update_dict_node(
                 inputs.parameters,
                 {
-                    'incar': {
+                    OVERRIDE_NAMESPACE: {
                         'lhfcalc': False,
                         'isym': 2,  # Standard DFT needs ISYM=2
                     },

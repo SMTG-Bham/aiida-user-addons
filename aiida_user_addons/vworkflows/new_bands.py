@@ -12,6 +12,8 @@ from aiida.plugins import WorkflowFactory
 from aiida_user_addons.process.transform import magnetic_structure_decorate, magnetic_structure_dedecorate
 from aiida_user_addons.common.magmapping import create_additional_species
 
+from .common import OVERRIDE_NAMESPACE
+
 
 class VaspBandsWorkChain(WorkChain):
     """
@@ -131,9 +133,9 @@ class VaspBandsWorkChain(WorkChain):
         self.ctx.current_structure = self.inputs.structure
         self.ctx.bands_kpoints = self.inputs.get('bands_kpoints')
         param = self.inputs.scf.parameters.get_dict()
-        if 'magmom' in param['incar'] and not self.inputs.get('only_dos'):
+        if 'magmom' in param[OVERRIDE_NAMESPACE] and not self.inputs.get('only_dos'):
             self.report('Magnetic system passed for BS')
-            self.ctx.magmom = param['incar']['magmom']
+            self.ctx.magmom = param[OVERRIDE_NAMESPACE]['magmom']
         else:
             self.ctx.magmom = None
 
@@ -224,15 +226,15 @@ class VaspBandsWorkChain(WorkChain):
 
         # Ensure that writing the CHGCAR file is on
         pdict = inputs.parameters.get_dict()
-        if (pdict['incar'].get('lcharg') == False) or (pdict['incar'].get('LCHARG') == False):
-            pdict['incar']['lcharg'] = True
+        if (pdict[OVERRIDE_NAMESPACE].get('lcharg') == False) or (pdict[OVERRIDE_NAMESPACE].get('LCHARG') == False):
+            pdict[OVERRIDE_NAMESPACE]['lcharg'] = True
             inputs.parameters = orm.Dict(dict=pdict)
             self.report('Correction: setting LCHARG to True')
 
         # Take magmom from the context, in case that the magmom is rearranged in the primitive cell
         magmom = self.ctx.get('magmom')
         if magmom:
-            inputs.parameters = nested_update_dict_node(inputs.parameters, {'incar': {'magmom': magmom}})
+            inputs.parameters = nested_update_dict_node(inputs.parameters, {OVERRIDE_NAMESPACE: {'magmom': magmom}})
 
         running = self.submit(base_work, **inputs)
         self.report('Running SCF calculation {}'.format(running))
