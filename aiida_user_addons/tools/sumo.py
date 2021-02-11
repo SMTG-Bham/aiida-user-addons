@@ -8,8 +8,29 @@ from pymatgen.electronic_structure.bandstructure import BandStructureSymmLine, S
 from pymatgen import Lattice
 
 from sumo.plotting.bs_plotter import SBSPlotter
+from sumo.electronic_structure.dos import load_dos
+from sumo.plotting import dos_plotter
 
 from aiida.orm import BandsData
+
+from aiida_user_addons.tools.vasp import pmg_vasprun
+
+
+def get_sumo_dos_plotter(scf_node, **kwargs):
+    """
+    Get density of state by raeding directly from the vasprun.xml file
+
+    Args:
+        scf_node (ProcessNode): A node with `retrieved` output attached.
+        kwargs: additional parameters passed to `load_dos` function from sumo
+
+    Returns:
+        A `SDOSPlotter` object to be used for plotting the density of states.
+    """
+    vasprun, _ = pmg_vasprun(scf_node, parse_outcar=False)
+    tdos, pdos = load_dos(vasprun, **kwargs)
+    dp = dos_plotter.SDOSPlotter(tdos, pdos)
+    return dp
 
 
 def get_pmg_bandstructure(bands_node, structure=None, efermi=None):
