@@ -14,6 +14,7 @@ from aiida_user_addons.process.transform import magnetic_structure_decorate, mag
 from aiida_user_addons.common.magmapping import create_additional_species
 
 from .common import OVERRIDE_NAMESPACE
+from aiida_vasp.utils.aiida_utils import get_data_class
 
 
 class VaspBandsWorkChain(WorkChain):
@@ -29,6 +30,9 @@ class VaspBandsWorkChain(WorkChain):
     Inputs must be passed for the SCF calculation, others are optional. The dos calculation
     will only run if the kpoints for DOS are passed or a full specification is given under the
     `dos` input namesace.
+
+    The SCF calculation may be skipped by passing a CHGCAR file/remote folder. In which case the SCF inputs
+    are carried on for non-scf calculations.
 
     The band structure calculation will run unless `only_dos` is set to `Bool(True)`.
 
@@ -111,6 +115,14 @@ class VaspBandsWorkChain(WorkChain):
             valid_type=orm.Bool,
             serializer=to_aiida_type,
         )
+        spec.input('chgcar',
+                   required=False,
+                   valid_type=get_data_class('vasp.chargedensity'),
+                   help='Explicit CHGCAR file used for DOS/Bands calculations')
+        spec.input('restart_folder',
+                   required=False,
+                   valid_type=get_data_class('remote'),
+                   help='A remote folder containing the CHGCAR file to be used')
         spec.outline(
             cls.setup,
             if_(cls.should_do_relax)(
@@ -136,6 +148,20 @@ class VaspBandsWorkChain(WorkChain):
         spec.exit_code(502, 'ERROR_SUB_PROC_SCF_FAILED', message='SCF workchain failed')
         spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
         spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
+
+    def select_chgcar_from_inputs(self):
+        """Setup CHGCAR from inputs"""
+        if self.inputs.get('chgcar'):
+            self.ctx.chgcar = self.inputs.chgcar
+            self.report('Using CHGCAR {} from input'.format(self.inputs.chgcar))
+        else:
+            self.ctx.chgcar = None
+
+        if self.inputs.get('restart_folder'):
+            self.ctx.restart_folder = self.inputs.restart_folder
+            self.report('Using remote folder {} for restart'.format(self.inputs.restart_folder))
+        else:
+            self.ctx.restart_folder = None
 
     def setup(self):
         """Setup the calculation"""
@@ -175,8 +201,10 @@ class VaspBandsWorkChain(WorkChain):
 
     def should_run_scf(self):
         """Wether we should run SCF calculation"""
-        # TODO - skip if relax gives chgcar and no change in primitive structure
-        return True
+        # Setup the CHGCAR and remote folder input if necessary
+        self.select_chgcar_from_inputs()
+        # Only need to run SCF calculation when no explicity CHGCAR or folder set
+        return not (self.ctx.chgcar or self.ctx.restart_folder)
 
     def should_run_seekpath(self):
         """
@@ -271,10 +299,15 @@ class VaspBandsWorkChain(WorkChain):
         # Use the SCF inputs as the base
         inputs = AttributeDict(self.exposed_inputs(base_work, namespace='scf'))
         inputs.structure = self.ctx.current_structure
-        inputs.restart_folder = self.ctx.restart_folder
+
+        if self.ctx.restart_folder:
+            inputs.restart_folder = self.ctx.restart_folder
 
         if self.ctx.chgcar:
             inputs.chgcar = self.ctx.chgcar
+
+        if not (inputs.get('restart_folder') or inputs.get('chgcar')):
+            raise RuntimeError('One of the restart_folder or chgcar must be set for non-scf calculations')
 
         running = {}
 
