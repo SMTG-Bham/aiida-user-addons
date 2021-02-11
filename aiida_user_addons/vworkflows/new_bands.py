@@ -1,5 +1,9 @@
 """
 Bands workchain with a more flexible input
+TODO:
+
+- Add option to use alternative pathways obtained using sumo-interface
+- Add options to perform hybrid function band structures using zero-weight kpoints approach.
 """
 from copy import deepcopy
 
