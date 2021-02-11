@@ -13,17 +13,17 @@ from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import NotExistent, InputValidationError
 from aiida.plugins import CalculationFactory
 from aiida.orm import Code, KpointsData, Dict
+from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_vasp.workchains.restart import BaseRestartWorkChain
 from aiida_vasp.utils.aiida_utils import get_data_class, get_data_node
 from aiida_vasp.utils.workchains import compose_exit_code
 from aiida_vasp.utils.workchains import prepare_process_inputs
-try:
-    from aiida_vasp.assistant.parameters import ParametersMassage
-except ImportError:
-    from aiida_vasp.utils.parameters import ParametersMassage
+from aiida_vasp.assistant.parameters import ParametersMassage
 
 from ..common.inputset.vaspsets import get_ldau_keys
+
+from .common import parameters_validator
 
 
 class VaspWorkChain(BaseRestartWorkChain):
@@ -74,11 +74,11 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.input('code', valid_type=Code)
         spec.input('structure', valid_type=(get_data_class('structure'), get_data_class('cif')), required=True)
         spec.input('kpoints', valid_type=get_data_class('array.kpoints'), required=False)
-        spec.input('potential_family', valid_type=get_data_class('str'), required=True)
-        spec.input('potential_mapping', valid_type=get_data_class('dict'), required=True)
-        spec.input('parameters', valid_type=get_data_class('dict'), required=True)
-        spec.input('options', valid_type=get_data_class('dict'), required=True)
-        spec.input('settings', valid_type=get_data_class('dict'), required=False)
+        spec.input('potential_family', valid_type=get_data_class('str'), required=True, serializer=to_aiida_type)
+        spec.input('potential_mapping', valid_type=get_data_class('dict'), required=True, serializer=to_aiida_type)
+        spec.input('parameters', valid_type=get_data_class('dict'), required=True, validator=parameters_validator)
+        spec.input('options', valid_type=get_data_class('dict'), required=True, serializer=to_aiida_type)
+        spec.input('settings', valid_type=get_data_class('dict'), required=False, serializer=to_aiida_type)
         spec.input('wavecar', valid_type=get_data_class('vasp.wavefun'), required=False)
         spec.input('chgcar', valid_type=get_data_class('vasp.chargedensity'), required=False)
         spec.input('restart_folder',
@@ -91,12 +91,14 @@ class VaspWorkChain(BaseRestartWorkChain):
                    valid_type=get_data_class('int'),
                    required=False,
                    default=lambda: get_data_node('int', 5),
+                   serializer=to_aiida_type,
                    help="""
             The maximum number of iterations to perform.
             """)
         spec.input('clean_workdir',
                    valid_type=get_data_class('bool'),
                    required=False,
+                   serializer=to_aiida_type,
                    default=lambda: get_data_node('bool', True),
                    help="""
             If True, clean the work dir upon the completion of a successfull calculation.
@@ -104,6 +106,7 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.input('verbose',
                    valid_type=get_data_class('bool'),
                    required=False,
+                   serializer=to_aiida_type,
                    default=lambda: get_data_node('bool', False),
                    help="""
             If True, enable more detailed output during workchain execution.
@@ -111,15 +114,26 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.input('ldau_mapping',
                    valid_type=get_data_class('dict'),
                    required=False,
+                   serializer=to_aiida_type,
                    help="Mappings, see the doc string of 'get_ldau_keys'")
         spec.input('kpoints_spacing',
                    valid_type=get_data_class('float'),
                    required=False,
+                   serializer=to_aiida_type,
                    help='Spacing for the kpoints in units A^-1 * 2pi')
         spec.input('auto_parallel',
                    valid_type=get_data_class('dict'),
+                   serializer=to_aiida_type,
                    required=False,
                    help='Automatic parallelisation settings, keywords passed to `get_jobscheme` function.')
+        spec.input('dynamics.positions_dof',
+                   valid_type=get_data_class('list'),
+                   serializer=to_aiida_type,
+                   required=False,
+                   help="""
+            Site dependent flag for selective dynamics when performing relaxation
+            """)
+
         spec.outline(
             cls.init_context,
             cls.init_inputs,
@@ -155,17 +169,13 @@ class VaspWorkChain(BaseRestartWorkChain):
         spec.output('born_charges', valid_type=get_data_class('array'), required=False)
         spec.output('hessian', valid_type=get_data_class('array'), required=False)
         spec.output('dynmat', valid_type=get_data_class('array'), required=False)
+        spec.output('site_magnetization', valid_type=get_data_class('dict'), required=False)
         spec.output('parallel_settings', valid_type=get_data_class('dict'), required=False)
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
         spec.exit_code(700, 'ERROR_NO_POTENTIAL_FAMILY_NAME', message='the user did not supply a potential family name')
         spec.exit_code(701, 'ERROR_POTENTIAL_VALUE_ERROR', message='ValueError was returned from get_potcars_from_structure')
         spec.exit_code(702, 'ERROR_POTENTIAL_DO_NOT_EXIST', message='the potential does not exist')
-        spec.exit_code(703,
-                       'ERROR_INVALID_PARAMETER_DETECTED',
-                       message='the parameter massager found invalid tags in the input parameters.')
-        spec.exit_code(704,
-                       'ERROR_MISSING_PARAMETER_DETECTED',
-                       message='the parameter massager did not find expected tags in the input parameters.')
+        spec.exit_code(703, 'ERROR_IN_PARAMETER_MASSAGER', message='the exception: {exception} was thrown while massaging the parameters')
 
     def init_calculation(self):
         """Set the restart folder and set parameters tags for a restart."""
@@ -206,13 +216,31 @@ class VaspWorkChain(BaseRestartWorkChain):
         else:
             raise InputValidationError("Must supply either 'kpoints' or 'kpoints_spacing'")
 
+        # Set settings
+        unsupported_parameters = None
+        if 'settings' in self.inputs:
+            self.ctx.inputs.settings = self.inputs.settings
+            # Also check if the user supplied additional tags that is not in the supported file.
+            try:
+                unsupported_parameters = self.ctx.inputs.settings.unsupported_parameters
+            except AttributeError:
+                pass
+
         # Perform inputs massage to accommodate generalization in higher lying workchains
-        # and set parameters
-        parameters_massager = ParametersMassage(self, self.inputs.parameters)
-        # Check exit codes from the parameter massager and set it if it exists
-        if parameters_massager.exit_code is not None:
-            return parameters_massager.exit_code
-        self.ctx.inputs.parameters = parameters_massager.parameters
+        # and set parameters.
+        try:
+            parameters_massager = ParametersMassage(self.inputs.parameters, unsupported_parameters)
+        except Exception as exception:  # pylint: disable=broad-except
+            return self.exit_codes.ERROR_IN_PARAMETER_MASSAGER.format(exception=exception)  # pylint: disable=no-member
+        try:
+            # Only set if they exists
+            # Set any INCAR tags
+            self.ctx.inputs.parameters = parameters_massager.parameters.incar
+            # Set any dynamics input (currently only for selective dynamics, e.g. custom write to POSCAR)
+            self.ctx.inputs.dynamics = parameters_massager.parameters.dynamics
+            # Here we could set additional override flags, but those are not relevant for this VASP plugin
+        except AttributeError:
+            pass
 
         # Setup LDAU keys
         if 'ldau_mapping' in self.inputs:

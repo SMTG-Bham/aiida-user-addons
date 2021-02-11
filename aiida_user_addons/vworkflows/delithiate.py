@@ -12,6 +12,8 @@ from aiida_user_addons.process.transform import delithiate_by_wyckoff, delithiat
 from aiida_user_addons.process.battery import compute_li_voltage_shortcut
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 
+from .common import OVERRIDE_NAMESPACE
+
 Relax = WorkflowFactory('vaspu.relax')
 
 
@@ -195,25 +197,25 @@ class SimpleDelithiateWorkChain(WorkChain):
             param_dict = inputs.vasp.parameters.get_dict()
             if not deli_magmom_mapping:
                 self.report('WARNING: Empty mapping given for magmom - keeping the original')
-                magmom = param_dict['vasp'].get('magmom')
+                magmom = param_dict[OVERRIDE_NAMESPACE].get('magmom')
                 # Keep the original MAGMOM used for relaxation
                 if magmom:
                     magarray = np.array(magmom)
                     new_array = magarray[mapping]  # Use the mapping to get a new list of MAGMOM
                     new_magmom = new_array.tolist()
-                    param_dict['vasp']['magmom'] = new_magmom
+                    param_dict[OVERRIDE_NAMESPACE]['magmom'] = new_magmom
             else:
                 # Apply the supplied mapping for relaxing delithiated structure
                 magmom = []
                 default = deli_magmom_mapping.get('default', 0.6)  # Default MAGMOM is 0.6
                 for site in frame.sites:
                     magmom.append(deli_magmom_mapping.get(site.kind_name, default))
-                param_dict['vasp']['magmom'] = magmom
+                param_dict[OVERRIDE_NAMESPACE]['magmom'] = magmom
 
             # Setup LDA+U
             ldau_settings = self.inputs.ldau_mapping.get_dict()
             ldau_keys = get_ldau_keys(frame, **ldau_settings)
-            param_dict['vasp'].update(ldau_keys)
+            param_dict[OVERRIDE_NAMESPACE].update(ldau_keys)
 
             inputs.vasp.parameters = orm.Dict(dict=param_dict)
 

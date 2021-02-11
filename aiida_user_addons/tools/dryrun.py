@@ -94,8 +94,15 @@ def dryrun_relax_builder(builder, **kwargs):
     vasp_builder = VaspCalculation.get_builder()
 
     # Setup the builder for the bare calculation
+
+    # Convert into CalcJob inputs
     vasp_builder.code = builder.vasp.code
-    vasp_builder.parameters = Dict(dict=builder.vasp.parameters.get_dict()['vasp'])
+    pdict = builder.vasp.parameters.get_dict()
+    parameters_massager = ParametersMassage(pdict, None)
+
+    vasp_builder.parameters = parameters_massager.parameters.incar
+    vasp_builder.dynamics = parameters_massager.parameters.dynamics
+
     if builder.vasp.kpoints is not None:
         vasp_builder.kpoints = builder.vasp.kpoints
     else:

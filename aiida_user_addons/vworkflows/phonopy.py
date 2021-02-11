@@ -10,6 +10,7 @@ support any code that does force and energy output.
 """
 from aiida.engine import WorkChain, if_, ToContext
 import aiida.orm as orm
+from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida.plugins import WorkflowFactory
 from aiida.common.extendeddicts import AttributeDict
@@ -22,6 +23,8 @@ from aiida_phonopy.common.utils import (
     generate_phonopy_cells,
     get_vasp_force_sets_dict,
 )
+
+from .common import OVERRIDE_NAMESPACE
 
 __version__ = '0.1.0'
 
@@ -86,18 +89,24 @@ class VaspAutoPhononWorkChain(WorkChain):
                                'help': 'Inputs for the DFPT NAC calculation.'
                            })
         # Phonon specific inputs
-        spec.input('remote_phonopy', default=lambda: orm.Bool(False), help='Run phonopy as a remote code.')
-        spec.input('symmetry_tolerance', valid_type=orm.Float, default=lambda: orm.Float(1e-5))
-        spec.input('subtract_residual_forces', valid_type=orm.Bool, default=lambda: orm.Bool(False))
+        spec.input('remote_phonopy', serializer=to_aiida_type, default=lambda: orm.Bool(False), help='Run phonopy as a remote code.')
+        spec.input('symmetry_tolerance', serializer=to_aiida_type, valid_type=orm.Float, default=lambda: orm.Float(1e-5))
+        spec.input('subtract_residual_forces', serializer=to_aiida_type, valid_type=orm.Bool, default=lambda: orm.Bool(False))
         spec.input('structure', valid_type=orm.StructureData, help='Structure of which the phonons should calculated')
         spec.input('phonon_settings',
+                   serializer=to_aiida_type,
                    valid_type=orm.Dict,
                    validator=PhononSettings.validate_dict,
                    help='Settings for the underlying phonopy calculations')
         spec.input('phonon_code', valid_type=orm.Code, help='Code for the phonopy for remote calculations', required=False)
-        spec.input('options', valid_type=orm.Dict, help='Options for the remote phonopy calculation', required=False)
+        spec.input('options',
+                   serializer=to_aiida_type,
+                   valid_type=orm.Dict,
+                   help='Options for the remote phonopy calculation',
+                   required=False)
         spec.input('reuse_supercell_calc',
                    valid_type=orm.Str,
+                   serializer=to_aiida_type,
                    validator=validate_reuse_supercell_calc,
                    required=False,
                    help=('Perform calculation for the perfect supercell and use its CHGCAR to bootstrap displacement calculations.'
@@ -180,7 +189,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             relax_calc_inputs = self.exposed_inputs(self._relax_chain, 'relax')
             # Fetch the magmom from the relaxation calculation (eg. for the starting structure)
             try:
-                magmom = relax_calc_inputs.vasp.parameters['vasp'].get('magmom')
+                magmom = relax_calc_inputs.vasp.parameters[OVERRIDE_NAMESPACE].get('magmom')
             except AttributeError:
                 magmom = None
         else:
@@ -230,7 +239,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         if magmom:
             self.report('Using MAGMOM from the phonopy output')
             param = calc_inputs.parameters.get_dict()
-            param['vasp']['magmom'] = magmom
+            param[OVERRIDE_NAMESPACE]['magmom'] = magmom
             calc_inputs.parameters = orm.Dict(dict=param)
 
         # Ensure either the chgcar is retrieved or the remote workdir is not cleaned
@@ -242,7 +251,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             calc_inputs.clean_workdir = orm.Bool(False)
 
         # Make sure the calculation writes CHGCAR and WAVECAR
-        calc_inputs.parameters = nested_update_dict_node(calc_inputs.parameters, {'vasp': {'lcharg': True, 'lwave': True}})
+        calc_inputs.parameters = nested_update_dict_node(calc_inputs.parameters, {OVERRIDE_NAMESPACE: {'lcharg': True, 'lwave': True}})
 
         calc_inputs.metadata.label = self.ctx.label + ' SUPERCELL'
         calc_inputs.metadata.call_link_label = 'supercell_calc'
@@ -289,7 +298,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         if magmom:
             self.report('Using MAGMOM from the phonopy output')
             param = force_calc_inputs.parameters.get_dict()
-            param['vasp']['magmom'] = magmom
+            param[OVERRIDE_NAMESPACE]['magmom'] = magmom
             force_calc_inputs.parameters = orm.Dict(dict=param)
 
         # Ensure we parser the forces

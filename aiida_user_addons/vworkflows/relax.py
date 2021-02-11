@@ -30,13 +30,18 @@ from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import InputValidationError
 from aiida.engine import WorkChain, append_, while_, if_, ToContext
 from aiida.plugins import WorkflowFactory
+from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_vasp.utils.aiida_utils import get_data_class
 from aiida_vasp.utils.workchains import compose_exit_code
 
 from ..common.opthold import OptionHolder, typed_field
+from .common import OVERRIDE_NAMESPACE
 
-__version__ = '0.3.1'
+__version__ = '0.4.0'
+
+# Change log
+# 0.4.0 update such `vasp` namespace in `parameters` is renamed to `incar`
 
 
 class VaspRelaxWorkChain(WorkChain):
@@ -53,26 +58,30 @@ class VaspRelaxWorkChain(WorkChain):
         spec.input('static_calc_parameters',
                    valid_type=get_data_class('dict'),
                    required=False,
+                   serializer=to_aiida_type,
                    help="""
                    The parameters (INCAR) to be used in the final static calculation.
                    """)
         spec.input('static_calc_settings',
                    valid_type=get_data_class('dict'),
                    required=False,
+                   serializer=to_aiida_type,
                    help="""
                    The full settings Dict to be used in the final static calculation.
                    """)
         spec.input('static_calc_options',
                    valid_type=get_data_class('dict'),
                    required=False,
+                   serializer=to_aiida_type,
                    help="""
                    The full options Dict to be used in the final static calculation.
                    """)
         spec.input('relax_settings',
                    valid_type=get_data_class('dict'),
                    validator=RelaxOptions.validate_dict,
+                   serializer=to_aiida_type,
                    help=RelaxOptions.get_description())
-        spec.input('verbose', required=False, help='Increased verbosity.', valid_type=orm.Bool)
+        spec.input('verbose', required=False, help='Increased verbosity.', valid_type=orm.Bool, serializer=to_aiida_type)
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
         spec.exit_code(300,
                        'ERROR_MISSING_REQUIRED_OUTPUT',
@@ -241,7 +250,7 @@ class VaspRelaxWorkChain(WorkChain):
             inputs.parameters = nested_update_dict_node(
                 inputs.parameters,
                 {
-                    'vasp': {
+                    OVERRIDE_NAMESPACE: {
                         'lhfcalc': False,
                         'isym': 2,  # Standard DFT needs ISYM=2
                     },

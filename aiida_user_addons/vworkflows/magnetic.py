@@ -9,8 +9,11 @@ from aiida.engine import WorkChain, calcfunction, append_
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.links import LinkType
 from aiida.plugins import WorkflowFactory
+from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
+
+from .common import OVERRIDE_NAMESPACE
 
 __version__ = '0.0.1'
 
@@ -34,11 +37,12 @@ class SpinEnumerateWorkChain(WorkChain):
         spec.input('structure', valid_type=orm.StructureData)
         spec.input(
             'ldau_mapping',
+            serializer=to_aiida_type,
             required=False,  # I set it to be mandatory here as in most cases we will need a U
             help='Mapping for LDA+U, see `get_ldau_keys` function for details.',
             valid_type=orm.Dict)
-        spec.input('moment_map', valid_type=orm.Dict, help='Mapping of the mangetic moments')
-        spec.input('enum_options', valid_type=orm.Dict, help='Additional options to the Enumerator')
+        spec.input('moment_map', serializer=to_aiida_type, valid_type=orm.Dict, help='Mapping of the mangetic moments')
+        spec.input('enum_options', serializer=to_aiida_type, valid_type=orm.Dict, help='Additional options to the Enumerator')
 
         spec.outline(
             cls.setup,
@@ -70,14 +74,14 @@ class SpinEnumerateWorkChain(WorkChain):
             inputs = self.exposed_inputs(WorkflowFactory(self._relax_workchain), 'relax')
             inputs.structure = mag_struct
             # Apply the MAGMOM to the input parameters
-            inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {'vasp': {'magmom': magmom}})
-            incar_dict = inputs.vasp.parameters.get_dict()['vasp']
+            inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {OVERRIDE_NAMESPACE: {'magmom': magmom}})
+            incar_dict = inputs.vasp.parameters.get_dict()[OVERRIDE_NAMESPACE]
 
             # Setup LDA+U - we cannot use the original since atoms can be reordered!!
             if 'ldau_mapping' in self.inputs:
                 ldau_settings = self.inputs.ldau_mapping.get_dict()
                 ldau_keys = get_ldau_keys(mag_struct, **ldau_settings)
-                inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {'vasp': ldau_keys})
+                inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {OVERRIDE_NAMESPACE: ldau_keys})
             elif 'laduu' in incar_dict:
                 raise RuntimeError('Using LDA+U but not explicity mapping given. Please set ldu_mapping input.')
 

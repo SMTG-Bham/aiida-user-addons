@@ -8,9 +8,12 @@ import aiida.orm as orm
 from aiida.common.extendeddicts import AttributeDict
 from aiida.engine import WorkChain, calcfunction, if_
 from aiida.plugins import WorkflowFactory
+from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_user_addons.process.transform import magnetic_structure_decorate, magnetic_structure_dedecorate
 from aiida_user_addons.common.magmapping import create_additional_species
+
+from .common import OVERRIDE_NAMESPACE
 
 
 class VaspBandsWorkChain(WorkChain):
@@ -59,6 +62,7 @@ class VaspBandsWorkChain(WorkChain):
         spec.input(
             'dos_kpoints_density',
             help='Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.',
+            serializer=to_aiida_type,
             required=False,
             valid_type=orm.Float,
         )
@@ -96,10 +100,17 @@ class VaspBandsWorkChain(WorkChain):
                            })
         spec.input('clean_children_workdir',
                    valid_type=orm.Str,
+                   serializer=to_aiida_type,
                    help='What part of the called children to clean',
                    required=False,
                    default=lambda: orm.Str('none'))
-        spec.input('only_dos', required=False, help='Flag for running only DOS calculations')
+        spec.input(
+            'only_dos',
+            required=False,
+            help='Flag for running only DOS calculations',
+            valid_type=orm.Bool,
+            serializer=to_aiida_type,
+        )
         spec.outline(
             cls.setup,
             if_(cls.should_do_relax)(
@@ -131,9 +142,9 @@ class VaspBandsWorkChain(WorkChain):
         self.ctx.current_structure = self.inputs.structure
         self.ctx.bands_kpoints = self.inputs.get('bands_kpoints')
         param = self.inputs.scf.parameters.get_dict()
-        if 'magmom' in param['vasp'] and not self.inputs.get('only_dos'):
+        if 'magmom' in param[OVERRIDE_NAMESPACE] and not self.inputs.get('only_dos'):
             self.report('Magnetic system passed for BS')
-            self.ctx.magmom = param['vasp']['magmom']
+            self.ctx.magmom = param[OVERRIDE_NAMESPACE]['magmom']
         else:
             self.ctx.magmom = None
 
@@ -224,15 +235,15 @@ class VaspBandsWorkChain(WorkChain):
 
         # Ensure that writing the CHGCAR file is on
         pdict = inputs.parameters.get_dict()
-        if (pdict['vasp'].get('lcharg') == False) or (pdict['vasp'].get('LCHARG') == False):
-            pdict['vasp']['lcharg'] = True
+        if (pdict[OVERRIDE_NAMESPACE].get('lcharg') == False) or (pdict[OVERRIDE_NAMESPACE].get('LCHARG') == False):
+            pdict[OVERRIDE_NAMESPACE]['lcharg'] = True
             inputs.parameters = orm.Dict(dict=pdict)
             self.report('Correction: setting LCHARG to True')
 
         # Take magmom from the context, in case that the magmom is rearranged in the primitive cell
         magmom = self.ctx.get('magmom')
         if magmom:
-            inputs.parameters = nested_update_dict_node(inputs.parameters, {'vasp': {'magmom': magmom}})
+            inputs.parameters = nested_update_dict_node(inputs.parameters, {OVERRIDE_NAMESPACE: {'magmom': magmom}})
 
         running = self.submit(base_work, **inputs)
         self.report('Running SCF calculation {}'.format(running))
