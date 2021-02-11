@@ -7,10 +7,11 @@
     "classifiers": [
         "Programming Language :: Python"
     ],
-    "version": "0.1.0",
+    "version": "1.0.0",
     "install_requires": [
         "aiida-vasp>=2.0",
-        "aiida-core>=1.1.0",
+        "aiida-phonopy @ git+https://github.com/zhubonan/aiida-phonopy@bz-changes#egg=aiida-phonopy",
+        "aiida-core>=1.5.2",
         "bsym==1.1.1"
     ],
     "entry_points": {
