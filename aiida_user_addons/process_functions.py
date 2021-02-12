@@ -29,13 +29,12 @@ def extend_magnetic_orderings(struct, moment_map):
     for the per-site magnetisations.
     """
     from pymatgen.analysis.magnetism import MagneticStructureEnumerator
-    from toolchest.matgen import get_all_spins
     moment_map = moment_map.get_dict()
     pstruc = struct.get_pymatgen()
     enum = MagneticStructureEnumerator(pstruc, moment_map)
     structs = {}
     for idx, ptemp in enumerate(enum.ordered_structures):
-        magmom = get_all_spins(ptemp)
+        magmom = _get_all_spins(ptemp)
         for site in ptemp.sites:
             # This is abit hacky - I set the specie to be the element
             # This avoids AiiDA added addition Kind to reflect the spins
@@ -44,3 +43,14 @@ def extend_magnetic_orderings(struct, moment_map):
         astruc.set_attribute('MAGMOM', magmom)
         structs[f'out_structure_{idx:03d}'] = astruc
     return structs
+
+
+def _get_all_spins(pstruc):
+    """Get all the spins from pymatgen structure"""
+    out_dict = []
+    for site in pstruc.sites:
+        if isinstance(site.specie, pmg.core.Element):
+            out_dict.append(0.0)
+            continue
+        out_dict.append(site.specie._properties.get('spin', 0.0))
+    return out_dict

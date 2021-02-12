@@ -199,7 +199,7 @@ def res2structure_smart(file):
 @calcfunction
 def res2structure(file):
     """Create StructureData from SingleFile data"""
-    from toolchest.resutils import read_res
+    from aiida_user_addons.tools.resutils import read_res
     from aiida.orm import StructureData
     with file.open(file.filename) as fhandle:
         titls, atoms = read_res(fhandle.readlines())
