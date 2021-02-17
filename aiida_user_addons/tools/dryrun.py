@@ -103,7 +103,8 @@ def dryrun_relax_builder(builder, **kwargs):
     parameters_massager = ParametersMassage(pdict, None)
 
     vasp_builder.parameters = Dict(dict=parameters_massager.parameters.incar)
-    vasp_builder.dynamics = Dict(dict=parameters_massager.parameters.dynamics)
+    if 'dynamics' in parameters_massager.parameters:
+        vasp_builder.dynamics = Dict(dict=parameters_massager.parameters.dynamics)
 
     if builder.vasp.kpoints is not None:
         vasp_builder.kpoints = builder.vasp.kpoints
@@ -129,7 +130,8 @@ def dryrun_vaspu_builder(builder, **kwargs):
     parameters_massager = ParametersMassage(pdict, None)
 
     vasp_builder.parameters = Dict(dict=parameters_massager.parameters.incar)
-    vasp_builder.dynamics = Dict(dict=parameters_massager.parameters.dynamics)
+    if 'dynamics' in parameters_massager.parameters:
+        vasp_builder.dynamics = Dict(dict=parameters_massager.parameters.dynamics)
 
     # Setup the builder for the bare calculation
     vasp_builder.code = builder.code
