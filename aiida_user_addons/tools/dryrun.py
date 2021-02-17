@@ -102,8 +102,8 @@ def dryrun_relax_builder(builder, **kwargs):
     pdict = builder.vasp.parameters.get_dict()
     parameters_massager = ParametersMassage(pdict, None)
 
-    vasp_builder.parameters = parameters_massager.parameters.incar
-    vasp_builder.dynamics = parameters_massager.parameters.dynamics
+    vasp_builder.parameters = Dict(dict=parameters_massager.parameters.incar)
+    vasp_builder.dynamics = Dict(dict=parameters_massager.parameters.dynamics)
 
     if builder.vasp.kpoints is not None:
         vasp_builder.kpoints = builder.vasp.kpoints
@@ -121,15 +121,15 @@ def dryrun_relax_builder(builder, **kwargs):
 
 def dryrun_vaspu_builder(builder, **kwargs):
     """Dry run a vaspu.vasp workchain builder"""
-    from aiida.orm import KpointsData
+    from aiida.orm import KpointsData, Dict
 
     pdict = builder.parameters.get_dict()
     vasp_builder = VaspCalculation.get_builder()
 
     parameters_massager = ParametersMassage(pdict, None)
 
-    vasp_builder.parameters = parameters_massager.parameters.incar
-    vasp_builder.dynamics = parameters_massager.parameters.dynamics
+    vasp_builder.parameters = Dict(dict=parameters_massager.parameters.incar)
+    vasp_builder.dynamics = Dict(dict=parameters_massager.parameters.dynamics)
 
     # Setup the builder for the bare calculation
     vasp_builder.code = builder.code
