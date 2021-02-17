@@ -8,6 +8,9 @@ from aiida.engine.processes.builder import ProcessBuilder
 from aiida.engine import run_get_node
 
 from aiida_vasp.calcs.vasp import VaspCalculation
+from aiida_vasp.assistant.parameters import ParametersMassage
+from aiida_vasp.data.potcar import PotcarData
+
 from aiida_user_addons.cmdline.cmd_vasp_dryrun import vasp_dryrun as _vasp_dryrun
 
 from .optparallel import JobScheme
@@ -89,7 +92,6 @@ def prepare_inputs(inputs):
 
 def dryrun_relax_builder(builder, **kwargs):
     """Dry run a relaxation workchain builder"""
-    from aiida_vasp.data.potcar import PotcarData
     from aiida.orm import KpointsData, Dict
     vasp_builder = VaspCalculation.get_builder()
 
@@ -119,13 +121,18 @@ def dryrun_relax_builder(builder, **kwargs):
 
 def dryrun_vaspu_builder(builder, **kwargs):
     """Dry run a vaspu.vasp workchain builder"""
-    from aiida_vasp.data.potcar import PotcarData
-    from aiida.orm import KpointsData, Dict
+    from aiida.orm import KpointsData
+
+    pdict = builder.parameters.get_dict()
     vasp_builder = VaspCalculation.get_builder()
+
+    parameters_massager = ParametersMassage(pdict, None)
+
+    vasp_builder.parameters = parameters_massager.parameters.incar
+    vasp_builder.dynamics = parameters_massager.parameters.dynamics
 
     # Setup the builder for the bare calculation
     vasp_builder.code = builder.code
-    vasp_builder.parameters = Dict(dict=builder.parameters.get_dict()['vasp'])
     if builder.kpoints is not None:
         vasp_builder.kpoints = builder.kpoints
     else:
