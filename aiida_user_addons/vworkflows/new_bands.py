@@ -15,13 +15,13 @@ from aiida.plugins import WorkflowFactory
 from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_user_addons.process.transform import magnetic_structure_decorate, magnetic_structure_dedecorate
-from aiida_user_addons.common.magmapping import create_additional_species
 
+from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE
 from aiida_vasp.utils.aiida_utils import get_data_class
 
 
-class VaspBandsWorkChain(WorkChain):
+class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
     """
     Workchain for running bands calculations.
 

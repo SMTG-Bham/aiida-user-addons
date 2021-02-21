@@ -13,6 +13,7 @@ from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 
+from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE
 
 __version__ = '0.0.1'
@@ -20,7 +21,7 @@ __version__ = '0.0.1'
 RELAX_WORKCHAIN = 'vaspu.relax'
 
 
-class SpinEnumerateWorkChain(WorkChain):
+class SpinEnumerateWorkChain(WorkChain, WithVaspInputSet):
     """
     This workchain enumerate the spin configuration for a given element, and dispatch them to
     individual RelaxWorkChains

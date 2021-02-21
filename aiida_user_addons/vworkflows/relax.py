@@ -28,6 +28,7 @@ import numpy as np
 import aiida.orm as orm
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import InputValidationError
+from aiida.common.utils import classproperty
 from aiida.engine import WorkChain, append_, while_, if_, ToContext
 from aiida.plugins import WorkflowFactory
 from aiida.orm.nodes.data.base import to_aiida_type
@@ -35,6 +36,7 @@ from aiida.orm.nodes.data.base import to_aiida_type
 from aiida_vasp.utils.aiida_utils import get_data_class
 from aiida_vasp.utils.workchains import compose_exit_code
 
+from .mixins import WithVaspInputSet
 from ..common.opthold import OptionHolder, typed_field
 from .common import OVERRIDE_NAMESPACE
 
@@ -44,7 +46,7 @@ __version__ = '0.4.0'
 # 0.4.0 update such `vasp` namespace in `parameters` is renamed to `incar`
 
 
-class VaspRelaxWorkChain(WorkChain):
+class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
     """Structure relaxation workchain."""
     _verbose = True
     _base_workchain_string = 'vaspu.vasp'
@@ -559,6 +561,11 @@ class VaspRelaxWorkChain(WorkChain):
     def is_verbose(self):
         """Are we in the verbose mode?"""
         return self.ctx.get('verbose', self._verbose)
+
+    @classproperty
+    def relax_option_class(cls):  # pylint: disable=no-self-argument
+        """Class for relax options"""
+        return RelaxOptions
 
 
 def compare_structures(structure_a, structure_b):

@@ -12,12 +12,13 @@ from aiida_user_addons.process.transform import delithiate_by_wyckoff, delithiat
 from aiida_user_addons.process.battery import compute_li_voltage_shortcut
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 
+from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE
 
 Relax = WorkflowFactory('vaspu.relax')
 
 
-class SimpleDelithiateWorkChain(WorkChain):
+class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
     """
     Simple delithiation by removing sites,
     """

@@ -395,32 +395,63 @@ def delithiate_one(structure):
 @calcfunction
 def delithiate_unique_sites(cell, excluded_sites, nsub, atol):
     """
+    Generate delithiated non-equivalent cells using BSYM
+    Args:
+        cell (StructureData): The cell to be delithiate
+        excluded_sites (List): A list of site indices to be excluded
+        nsub (Int): Number of sites to be delithiated
+        atol (Float): Symmetry tolerance for BSYM
+
+    Returns:
+        A dictionary of structures and corresponding site mappings
+    """
+
+    return _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False)
+
+
+def _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False):
+    """
     Make lots of delithiated non-equivalent cells using BSYM
 
     Use BSYM to do the job, vacancies are subsituted with P and
     later removed. Excluded sites are subsituted with S and later
     converted back to Li.
+
+    Args:
+        cell (StructureData): The cell to be delithiate
+        excluded_sites (List): A list of site indices to be excluded
+        nsub (Int): Number of sites to be delithiated
+        atol (Float): Symmetry tolerance for BSYM
+        pmg_only (Bool): Only return a list of pymatgen structures.
+
+    Returns:
+        A dictionary of structures and corresponding site mappings
     """
     from pymatgen import Composition
     from bsym.interface.pymatgen import unique_structure_substitutions
+    exclude_dummy = 'Ar'
+    vacancy_dummy = 'He'
     nsub = nsub.value
     struc = cell.get_pymatgen()
     excluded = excluded_sites.get_list()
 
     for n, site in enumerate(struc.sites):
         if n in excluded:
-            site.species = Composition('Ar')
+            site.species = Composition(exclude_dummy)
 
     # Expand the supercell with S subsituted strucutre
     noli = int(struc.composition['Li'])
-    unique_structure = unique_structure_substitutions(struc, 'Li', {'He': nsub, 'Li': noli - nsub}, verbose=True, atol=float(atol))
+    unique_structure = unique_structure_substitutions(struc, 'Li', {vacancy_dummy: nsub, 'Li': noli - nsub}, verbose=True, atol=float(atol))
     # Convert back to normal structure
-    # Remove He as they are vacancies, Convert Ar back to Li
     for ustruc in unique_structure:
-        p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition('He')]
+        p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition(vacancy_dummy)]
         ustruc.remove_sites(p_indices)
-        # Convert S sites back to O
-        ustruc['Ar'] = 'Li'
+        ustruc[exclude_dummy] = 'Li'
+
+    if pmg_only:
+        return unique_structure
+
+    # Transform into StructureData
     output_dict = {}
     for n, s in enumerate(unique_structure):
         stmp = StructureData(pymatgen=s)
@@ -430,6 +461,7 @@ def delithiate_unique_sites(cell, excluded_sites, nsub, atol):
 
         # Create the mask to map old site to the new sites
         # can be used to redfine per-site properties such as the mangetic moments
+        # Simply search for the close position matches.
         mapping = []
         for i_new, new_site in enumerate(s.sites):
             found = False
