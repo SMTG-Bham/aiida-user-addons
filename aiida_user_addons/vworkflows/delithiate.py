@@ -118,7 +118,7 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
         Check the existence if Li-ref calculations
         """
         inputs = self.exposed_inputs(Relax, 'relax')
-        incar = inputs['parameters']['incar']
+        incar = inputs.vasp.parameters['incar']
 
         gga = incar.get('gga')
         encut = incar.get('encut')
