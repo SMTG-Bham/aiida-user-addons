@@ -12,6 +12,7 @@ from aiida.plugins import WorkflowFactory
 from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
+from aiida_user_addons.common.misc import get_energy_from_misc
 
 from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE
@@ -145,12 +146,13 @@ def compose_magnetic_data(**miscs):
         else:
             total_mag = None
 
+        energy = get_energy_from_misc(misc) / num_fu
         entry = {
             'config_id': ist,
             'relaxation': workchain.uuid,
             'output_structure': workchain.outputs.relax__structure.uuid,
             'input_structure': mag_struct.uuid,
-            'energy': misc['total_energies']['energy_no_entropy'] / num_fu,
+            'energy': energy,
             'origin': orig,
             'total_magnetisation': total_mag / num_fu,
             'magnetisation': magnetisation,

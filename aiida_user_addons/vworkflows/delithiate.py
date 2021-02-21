@@ -11,6 +11,7 @@ from aiida.plugins import WorkflowFactory
 from aiida_user_addons.process.transform import delithiate_by_wyckoff, delithiate_full, delithiate_unique_sites, rattle
 from aiida_user_addons.process.battery import compute_li_voltage_shortcut, check_li_ref_calc
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
+from aiida_user_addons.common.misc import get_energy_from_misc
 
 from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE
@@ -371,10 +372,7 @@ def compose_delithiation_data(**miscs):
         else:
             total_mag = 0.0
 
-        if 'energy_no_entropy' in misc['total_energies']:
-            energy = misc['total_energies']['energy_no_entropy'] / num_fw
-        else:
-            energy = misc['total_energies']['energy_extrapolated'] / num_fw
+        energy = get_energy_from_misc(misc) / num_fu
 
         entry = {
             'relax_id': ist,  # ID of the relaxation launched by the workchain

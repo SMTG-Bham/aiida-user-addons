@@ -5,15 +5,9 @@ from aiida.orm import Float
 from aiida.engine import calcfunction
 from pymatgen.analysis.reaction_calculator import Reaction
 
+from aiida_user_addons.common.misc import get_energy_from_misc
+
 __version__ = '0.0.1'
-
-
-def _get_energy(misc):
-    """Get energy from misc Dict/dictionary"""
-    if 'energy_no_entropy' in misc['total_energies']:
-        return misc['total_energies']['energy_no_entropy']
-    else:
-        return misc['total_energies']['energy_extrapolated']
 
 
 @calcfunction
@@ -25,11 +19,11 @@ def compute_li_voltage(lithiated_structure, lithiated_res, delithiated_structure
     """
 
     lith_comp = lithiated_structure.get_pymatgen().composition
-    lith_eng = _get_energy(lithiated_res)
+    lith_eng = get_energy_from_misc(lithiated_res)
     deli_comp = delithiated_structure.get_pymatgen().composition
-    deli_eng = _get_energy(delithiated_res)
+    deli_eng = get_energy_from_misc(delithiated_res)
     li_comp = li_ref_structure.get_pymatgen().composition
-    li_eng = _get_energy(li_ref_res)
+    li_eng = get_energy_from_misc(li_ref_res)
 
     reaction = Reaction([lith_comp], [li_comp, deli_comp])
     # How many atoms does the Li reference have?
