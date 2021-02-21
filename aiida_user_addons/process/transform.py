@@ -441,7 +441,20 @@ def _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False):
 
     # Expand the supercell with S subsituted strucutre
     noli = int(struc.composition['Li'])
-    unique_structure = unique_structure_substitutions(struc, 'Li', {vacancy_dummy: nsub, 'Li': noli - nsub}, verbose=True, atol=float(atol))
+    li_left = noli - nsub
+    if li_left > 0:
+        unique_structure = unique_structure_substitutions(struc,
+                                                          'Li', {
+                                                              vacancy_dummy: nsub,
+                                                              'Li': noli - nsub
+                                                          },
+                                                          verbose=True,
+                                                          atol=float(atol))
+    elif li_left == 0:
+        unique_structure = unique_structure_substitutions(struc, 'Li', {vacancy_dummy: nsub}, verbose=True, atol=float(atol))
+    else:
+        raise ValueError(f'There are {noli} Li but requested to remove {nsub} of them!!')
+
     # Convert back to normal structure
     for ustruc in unique_structure:
         p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition(vacancy_dummy)]
