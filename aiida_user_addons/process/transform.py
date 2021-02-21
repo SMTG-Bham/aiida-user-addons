@@ -393,7 +393,7 @@ def delithiate_one(structure):
 
 
 @calcfunction
-def delithiate_unique_sites(cell, excluded_sites, nsub, atol):
+def delithiate_unique_sites(cell, excluded_sites, nsub, atol, **kwargs):
     """
     Generate delithiated non-equivalent cells using BSYM
     Args:
@@ -401,15 +401,16 @@ def delithiate_unique_sites(cell, excluded_sites, nsub, atol):
         excluded_sites (List): A list of site indices to be excluded
         nsub (Int): Number of sites to be delithiated
         atol (Float): Symmetry tolerance for BSYM
+        limit (Int, optional): Maximum limit of the structures
 
     Returns:
         A dictionary of structures and corresponding site mappings
     """
 
-    return _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False)
+    return _delithiate_unique_sites(cell, excluded_sites, nsub, atol, limit=kwargs.get('limit'), pmg_only=False)
 
 
-def _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False):
+def _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False, limit=None):
     """
     Make lots of delithiated non-equivalent cells using BSYM
 
@@ -423,6 +424,7 @@ def _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False):
         nsub (Int): Number of sites to be delithiated
         atol (Float): Symmetry tolerance for BSYM
         pmg_only (Bool): Only return a list of pymatgen structures.
+        limit (Int, optional): Maximum limit of the structures. Default to None - no limit.
 
     Returns:
         A dictionary of structures and corresponding site mappings
@@ -460,6 +462,9 @@ def _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False):
         p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition(vacancy_dummy)]
         ustruc.remove_sites(p_indices)
         ustruc[exclude_dummy] = 'Li'
+
+    if limit is not None:
+        unique_structure = unique_structure[:int(limit)]
 
     if pmg_only:
         return unique_structure

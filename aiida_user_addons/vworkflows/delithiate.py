@@ -9,7 +9,7 @@ from aiida.engine import WorkChain, if_, append_, calcfunction
 from aiida.plugins import WorkflowFactory
 
 from aiida_user_addons.process.transform import delithiate_by_wyckoff, delithiate_full, delithiate_unique_sites, rattle
-from aiida_user_addons.process.battery import compute_li_voltage_shortcut
+from aiida_user_addons.process.battery import compute_li_voltage_shortcut, check_li_ref_calc
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 
 from .mixins import WithVaspInputSet
@@ -31,6 +31,11 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
         super().define(spec)
 
         spec.expose_inputs(Relax, 'relax', exclude=('structure',))
+        spec.input('li_ref_group_name',
+                   valid_type=str,
+                   non_db=True,
+                   default='li-metal-refs',
+                   help='Name of the group containing calculations of Li metal references.')
         spec.input('structure', valid_type=orm.StructureData)
         spec.input('strategy', valid_type=orm.Str, help='Delithiation strategy to be used. Choose from: full, unique, wyckoff.')
         spec.input('rattle_amp',
@@ -48,6 +53,7 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
         spec.input('unique_options.excluded_sites', required=False, default=lambda: orm.List(list=[]), help='Excluded site indices.')
         spec.input('unique_options.nsub', required=False, default=lambda: orm.Int(1), help='Number of Li to remove')
         spec.input('unique_options.atol', required=False, default=lambda: orm.Float(1e-5), help='Symmetry tolerance')
+        spec.input('unique_options.limit', required=False, help='Maximum number of structures to attempt')
         spec.input(
             'ldau_mapping',
             required=True,  # I set it to be mandatory here as in most cases we will need a U
@@ -98,6 +104,22 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
             self.report(f'Strategy: {strategy} is not valid, valid ones are: {self._allowed_strategies}')
             return self.exit_codes.ERROR_UNKNOWN_STRATEGY
         self.ctx.strategy = strategy
+
+        # Check the existence of Li-metal reference calculations, do not proceed if there is no reference
+        self.check_li_ref()
+
+    def check_li_ref(self):
+        """
+        Check the existence if Li-ref calculations
+        """
+        inputs = self.exposed_inputs(Relax, 'relax')
+        incar = inputs['parameters']['incar']
+
+        gga = incar.get('gga')
+        encut = incar.get('encut')
+
+        if not check_li_ref_calc(incar.get('encut'), incar.get('gga'), self.inputs.li_ref_group_name):
+            raise RuntimeError(f'Li reference calculations do not exist for GGA:{gga}, encut: {encut}')
 
     def should_run_initial_relax(self):
         """Wether to run the initial relaxation"""
