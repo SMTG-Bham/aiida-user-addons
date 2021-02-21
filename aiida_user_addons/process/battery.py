@@ -119,6 +119,39 @@ def _obtain_li_ref_calc(encut, gga, group_name='li-metal-refs'):
     return matches[0][0]
 
 
+def check_li_ref_calc(encut, gga, group_name='li-metal-refs'):
+    from aiida.orm import QueryBuilder, Group, WorkChainNode, Dict
+    if gga is None:
+        gga = 'pe'
+    q = QueryBuilder()
+    q.append(Group, filters={'label': group_name})
+    q.append(WorkChainNode, with_group=Group, filters={'attributes.exit_status': 0}, project=['*'])
+    q.append(Dict,
+             with_outgoing=WorkChainNode,
+             filters={
+                 'or': [
+                     {
+                         'attributes.vasp.encut': encut,
+                         'attributes.vasp.gga': gga
+                     },
+                     {
+                         'attributes.incar.encut': encut,
+                         'attributes.incar.gga': gga
+                     },
+                 ]
+             },
+             edge_filters={'label': 'parameters'})
+
+    nmatch = q.count()
+    if nmatch > 1:
+        print(f'WARNING: more than one matches found for gga:{gga} encut:{encut}')
+        return True
+    if nmatch == 1:
+        return True
+    if nmatch == 0:
+        return False
+
+
 def list_li_ref_calcs(group_name='li-metal-refs'):
     """Return the reference calculation for Li metal"""
     from aiida.orm import QueryBuilder, Group, WorkChainNode, Dict
