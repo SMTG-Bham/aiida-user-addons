@@ -8,6 +8,14 @@ from pymatgen.analysis.reaction_calculator import Reaction
 __version__ = '0.0.1'
 
 
+def _get_energy(misc):
+    """Get energy from misc Dict/dictionary"""
+    if 'energy_no_entropy' in misc['total_energies']:
+        return misc['total_energies']['energy_no_entropy']
+    else:
+        return misc['total_energies']['energy_extrapolated']
+
+
 @calcfunction
 def compute_li_voltage(lithiated_structure, lithiated_res, delithiated_structure, delithiated_res, li_ref_structure, li_ref_res):
     """
@@ -17,11 +25,11 @@ def compute_li_voltage(lithiated_structure, lithiated_res, delithiated_structure
     """
 
     lith_comp = lithiated_structure.get_pymatgen().composition
-    lith_eng = lithiated_res['total_energies']['energy_no_entropy']
+    lith_eng = _get_energy(lithiated_res)
     deli_comp = delithiated_structure.get_pymatgen().composition
-    deli_eng = delithiated_res['total_energies']['energy_no_entropy']
+    deli_eng = _get_energy(delithiated_res)
     li_comp = li_ref_structure.get_pymatgen().composition
-    li_eng = li_ref_res['total_energies']['energy_no_entropy']
+    li_eng = _get_energy(li_ref_res)
 
     reaction = Reaction([lith_comp], [li_comp, deli_comp])
     # How many atoms does the Li reference have?

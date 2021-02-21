@@ -48,6 +48,10 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
                    default=lambda: orm.Bool(True),
                    required=False,
                    help='Whether to run the initial relaxation.')
+        spec.input('lithiated_calc_output',
+                   valid_type=orm.Dict,
+                   required=False,
+                   help='The output `misc` of the calculation for the original lithiated structure.')
         spec.input('wyckoff_sites', valid_type=orm.List, required=False, help='Wyckoff sites to remove for the wyckoff mode.')
         spec.input_namespace('unique_options', required=False, populate_defaults=False, help='Options for delithiate by unique sites')
         spec.input('unique_options.excluded_sites', required=False, default=lambda: orm.List(list=[]), help='Excluded site indices.')
@@ -296,8 +300,16 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
         """Compute the voltages"""
         relax = self.ctx.initial_relax
         if not relax:
-            self.report('Initial relaxation not performed - skipping voltage computation')
-            return
+            lithiated_misc = self.inptus.get('lithiated_calc_output')
+            if lithiated_misc:
+                # Find the CalcJobNode associated with the output misc
+                q = QueryBuilder()
+                q.append(Node, filters={'id': lithiated_misc.pk})
+                q.append(orm.CalcJobNode, with_outgoing=Node)
+                relax = q.one()[0]  # Use this calcjob node as the lithiated calculation.
+            else:
+                self.report('Initial relaxation not performed - skipping voltage computation')
+                return
 
         voltage_data = []
         for workchain in self.ctx.workchains:
@@ -359,12 +371,17 @@ def compose_delithiation_data(**miscs):
         else:
             total_mag = 0.0
 
+        if 'energy_no_entropy' in misc['total_energies']:
+            energy = misc['total_energies']['energy_no_entropy'] / num_fw
+        else:
+            energy = misc['total_energies']['energy_extrapolated'] / num_fw
+
         entry = {
             'relax_id': ist,  # ID of the relaxation launched by the workchain
             'relaxation': workchain.uuid,
             'output_structure': workchain.outputs.relax__structure.uuid,
             'input_structure': deli_struct.uuid,
-            'energy': misc['total_energies']['energy_no_entropy'] / num_fu,
+            'energy': energy,
             'total_magnetisation': total_mag / num_fu,
             'magnetisation': magnetisation,
             'deli_link_label': deli_link,
