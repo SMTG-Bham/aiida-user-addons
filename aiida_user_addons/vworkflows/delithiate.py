@@ -301,16 +301,16 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
         """Compute the voltages"""
         relax = self.ctx.initial_relax
         if not relax:
-            lithiated_misc = self.inptus.get('lithiated_calc_output')
+            lithiated_misc = self.inputs.get('lithiated_calc_output')
             if lithiated_misc:
                 # Find the CalcJobNode associated with the output misc
-                q = QueryBuilder()
-                q.append(Node, filters={'id': lithiated_misc.pk})
-                q.append(orm.CalcJobNode, with_outgoing=Node)
+                q = orm.QueryBuilder()
+                q.append(orm.Node, filters={'id': lithiated_misc.pk})
+                q.append(orm.CalcJobNode, with_outgoing=orm.Node)
                 relax = q.one()[0]  # Use this calcjob node as the lithiated calculation.
             else:
                 self.report('Initial relaxation not performed - skipping voltage computation')
-                return
+                return None
 
         voltage_data = []
         for workchain in self.ctx.workchains:
@@ -329,7 +329,7 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
 
         # No data is found
         if not voltage_data:
-            return
+            return None
 
         voltage_dict = transpose_dict(voltage_data)
         return orm.Dict(dict=voltage_dict)
