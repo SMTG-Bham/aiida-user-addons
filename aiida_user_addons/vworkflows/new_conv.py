@@ -24,6 +24,23 @@ from aiida_user_addons.common.opthold import OptionHolder, typed_field
 class VaspConvergenceWorkChain(WorkChain):
     """
     A workchain to perform convergence tests.
+
+    The inputs are essentially the same as for ``VaspWorChain`` but instead of launching
+    a single calculation it launches many calculations with different kpoint spacing
+    and the cut off energy.
+
+    A ``conv_setting`` input controls the range of cut off energies and kpoint spacings.
+    The avaliable options are:
+      - cutoff_start
+      - cutoff_stop
+      - cutoff_step
+      - kspacing_start
+      - kspacing_stop
+      - kspacing_step
+      - cutoff_kconv : cut-off energy for the kpoints convergence tests.
+      - kspcaing_cutconv : the kpoint spacing to be used for cut-off energy convergence tests.
+
+    The the output data are collected and stored in two ``Dict`` output nodes.
     """
 
     _sub_workchain_string = 'vaspu.vasp'
