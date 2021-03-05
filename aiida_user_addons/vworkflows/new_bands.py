@@ -397,13 +397,16 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
             inputs.update(dos_input)
             inputs.parameters = orm.Dict(dict=parameters)
 
-            # Check if add_dos
-            settings = inputs.get('settings')
-            essential = {'parser_settings': {'add_dos': True}}
-            if settings is None:
-                inputs.settings = orm.Dict(dict=essential)
-            else:
-                inputs.settings = nested_update_dict_node(settings, essential)
+            if 'dos' not in self.inputs:
+                # kindly add `add_dos` if the `dos` input namespace is not
+                # explicitly defined.
+                settings = inputs.get('settings')
+                essential = {'parser_settings': {'add_dos': True}}
+
+                if settings is None:
+                    inputs.settings = orm.Dict(dict=essential)
+                else:
+                    inputs.settings = nested_update_dict_node(settings, essential)
 
             # Set the label
             inputs.metadata.label = self.inputs.metadata.label + ' DOS'
