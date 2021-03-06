@@ -201,6 +201,22 @@ class VaspConvergenceWorkChain(WorkChain):
     def option_class(cls):
         return ConvOptions
 
+    @staticmethod
+    def get_conv_data(conv_work, plot=False, **plot_kwargs):
+        """
+        Convenient method for extracting convergence data
+
+        Args:
+        conv_work (orm.WorkChainNode): Convergence workflow node
+
+        Returns:
+        A tuple of cut-off convergence and k-point convergence result dataframe
+        """
+        cdf, kdf = get_conv_data(conv_work)
+        if plot:
+            plot_conv_data(cdf, kdf, **plot_kwargs)
+        return cdf, kdf
+
 
 class ConvOptions(OptionHolder):
     _allowed_options = ('cutoff_start', 'cutoff_stop', 'cutoff_step', 'kspacing_start', 'kspacing_stop', 'kspacing_step', 'cutoff_kconv',
@@ -234,3 +250,43 @@ def nested_update_dict_node(dict_node, update_dict):
         return dict_node
     else:
         return orm.Dict(dict=pydict)
+
+
+def get_conv_data(conv_work):
+    """
+    Convenient method for extracting convergence data
+
+    Args:
+      conv_work (orm.WorkChainNode): Convergence workflow node
+
+    Returns:
+      A tuple of cut-off convergence and k-point convergence result data frame
+    """
+    import pandas as pd
+    cutdf = pd.DataFrame(conv_work.outputs.cutoff_conv_data.get_dict())
+    kdf = pd.DataFrame(conv_work.outputs.kpoints_conv_data.get_dict())
+    cutdf['energy_per_atom'] = cutdf['energy'] / len(conv_work.inputs.structure.sites)
+    kdf['energy_per_atom'] = kdf['energy'] / len(conv_work.inputs.structure.sites)
+    kdf['dE_per_atom'] = kdf['energy_per_atom'] - kdf['energy_per_atom'].iloc[-1]
+    cutdf['dE_per_atom'] = cutdf['energy_per_atom'] - cutdf['energy_per_atom'].iloc[-1]
+    return cutdf, kdf
+
+
+def plot_conv_data(cdf, kdf, **kwargs):
+    """
+    Make a plot for the convergence data.
+    """
+    import matplotlib.pyplot as plt
+    # Create a subplot
+    fig, axs = plt.subplots(2, 1, **kwargs)
+    axs[0].plot(cdf.cutoff_energy, cdf.dE_per_atom, '-x')
+    axs[1].plot(kdf.kpoints_spacing, kdf.dE_per_atom, '-x')
+    axs[0].set_ylabel('dE (eV / atom)')
+    axs[1].set_ylabel('dE (eV / atom)')
+    axs[0].set_xlabel('Cut-off energy (eV)')
+    axs[1].set_xlabel(r'K-point spacing ($\AA_{-1}$)')
+
+    # Set the ticks to show both spacing the actual mesh
+    axs[1].set_xticks(kdf.kpoints_spacing)
+    axs[1].set_xticklabels([f'{row.kpoints_spacing:.3f}\n{row.mesh}' for _, row in kdf.iterrows()], rotation=45)
+    return fig
