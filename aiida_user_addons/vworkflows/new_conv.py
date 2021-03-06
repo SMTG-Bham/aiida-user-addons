@@ -100,7 +100,12 @@ class VaspConvergenceWorkChain(WorkChain):
             new_param = nested_update_dict_node(inputs.parameters, {'incar': {'encut': cut}})
             inputs.parameters = new_param
             inputs.kpoints_spacing = kspacing_for_cutoffconv
-            inputs.metadata.label += f' CUTCONV {cut:.2f}'
+
+            if 'label' in inputs.metadata:
+                inputs.metadata.label += f' CUTCONV {cut:.2f}'
+            else:
+                inputs.metadata.label = f'CUTCONV {cut:.2f}'
+
             running = self.submit(self._sub_workchain, **inputs)
             self.report(f'Submitted {running} with cut off energy {cut:.1f} eV.')
             self.to_context(cutoff_conv_workchains=append_(running))
