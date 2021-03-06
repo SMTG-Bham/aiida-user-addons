@@ -135,6 +135,10 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
         inputs = self.exposed_inputs(Relax, 'relax')
         inputs.structure = self.inputs.structure
         inputs.metadata.call_link_label = 'initial_relax'
+
+        if not inputs.metadata.get('label'):
+            inputs.metadata.label = inputs.structure.get_formula('count') + ' RELAX'
+
         running = self.submit(Relax, **inputs)
         self.to_context(initial_relax=running)
         self.report(f'Submitted initial relaxation workchain {running}')
