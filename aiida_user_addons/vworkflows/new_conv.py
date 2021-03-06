@@ -274,19 +274,42 @@ def get_conv_data(conv_work):
 
 def plot_conv_data(cdf, kdf, **kwargs):
     """
-    Make a plot for the convergence data.
+    Make two combined plots for the convergence test results.
     """
     import matplotlib.pyplot as plt
     # Create a subplot
-    fig, axs = plt.subplots(2, 1, **kwargs)
+    figs = []
+    fig, axs = plt.subplots(3, 1, sharex=True, **kwargs)
+    figs.append(fig)
     axs[0].plot(cdf.cutoff_energy, cdf.dE_per_atom, '-x')
-    axs[1].plot(kdf.kpoints_spacing, kdf.dE_per_atom, '-x')
-    axs[0].set_ylabel('dE (eV / atom)')
-    axs[1].set_ylabel('dE (eV / atom)')
-    axs[0].set_xlabel('Cut-off energy (eV)')
-    axs[1].set_xlabel(r'K-point spacing ($\AA_{-1}$)')
+    i = 0
+    if 'maximum_force' in cdf.columns:
+        i += 1
+        axs[i].plot(cdf.cutoff_energy, cdf.maximum_force, '-x')
+        axs[i].set_ylabel(r'$F_{max}$ (eV$\AA^{-1}$)')
+    if 'maximum_stress' in cdf.columns:
+        i += 1
+        axs[i].plot(cdf.cutoff_energy, cdf.maximum_stress, '-x')
+        axs[i].set_ylabel(r'$S_{max}$ (kBar)')
+    axs[i].set_xlabel('Cut-off energy (eV)')
+    fig.tight_layout()
 
-    # Set the ticks to show both spacing the actual mesh
-    axs[1].set_xticks(kdf.kpoints_spacing)
-    axs[1].set_xticklabels([f'{row.kpoints_spacing:.3f}\n{row.mesh}' for _, row in kdf.iterrows()], rotation=45)
-    return fig
+    fig, axs = plt.subplots(3, 1, sharex=True, **kwargs)
+    figs.append(fig)
+    axs[0].plot(kdf.kpoints_spacing, kdf.dE_per_atom, '-x')
+    axs[0].set_ylabel('dE (eV / atom)')
+    i = 0
+    if 'maximum_force' in kdf.columns:
+        i += 1
+        axs[i].plot(kdf.kpoints_spacing, kdf.maximum_force, '-x')
+        axs[i].set_ylabel(r'$F_{max}$ (eV$\AA^{-1}$)')
+    if 'maximum_stress' in kdf.columns:
+        i += 1
+        axs[i].plot(kdf.kpoints_spacing, kdf.maximum_stress, '-x')
+        axs[i].set_ylabel(r'$S_{max}$ (kBar)')
+    axs[i].set_xticks(kdf.kpoints_spacing)
+    axs[i].set_xticklabels([f'{row.kpoints_spacing:.3f}\n{row.mesh}' for _, row in kdf.iterrows()], rotation=45)
+    axs[i].set_xlabel('K-pointing spacing (mesh)')
+    fig.tight_layout()
+
+    return figs
