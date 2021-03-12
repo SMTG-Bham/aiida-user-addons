@@ -496,3 +496,14 @@ def _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False, l
         output_dict[f'mapping_{n:04d}'] = map_array
 
     return output_dict
+
+
+@calcfunction
+def niggli_reduce(structure):
+    """Peroform niggli reduction"""
+    from ase.build import niggli_reduce as niggli_reduce_
+    atoms = structure.get_ase()
+    niggli_reduce_(atoms)
+    new_structure = StructureData(ase=atoms)
+    new_structure.label = structure.label + ' NIGGLI'
+    return new_structure
