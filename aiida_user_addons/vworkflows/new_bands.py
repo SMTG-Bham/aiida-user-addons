@@ -6,11 +6,13 @@ TODO:
 - Add options to perform hybrid function band structures using zero-weight kpoints approach.
 """
 from copy import deepcopy
+from typing import List
 
 import numpy as np
 import aiida.orm as orm
 from aiida.common.extendeddicts import AttributeDict
-from aiida.engine import WorkChain, calcfunction, if_
+from aiida.common.links import LinkType
+from aiida.engine import WorkChain, calcfunction, if_, append_
 from aiida.plugins import WorkflowFactory
 from aiida.orm.nodes.data.base import to_aiida_type
 
@@ -58,8 +60,9 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         relax_work = WorkflowFactory(cls._relax_wk_string)
         base_work = WorkflowFactory(cls._base_wk_string)
 
+        spec.input('kpoints_per_split', valid_type=orm.Int, help='Number of kpoints per split.', required=True)
         spec.input('structure', help='The input structure', valid_type=orm.StructureData)
-        spec.input('bands_kpoints',
+        spec.input('bs_kpoints',
                    help='Explicit kpoints for the bands. Will not generate kpoints if supplied.',
                    valid_type=orm.KpointsData,
                    required=False)
@@ -170,7 +173,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
     def setup(self):
         """Setup the calculation"""
         self.ctx.current_structure = self.inputs.structure
-        self.ctx.bands_kpoints = self.inputs.get('bands_kpoints')
+        self.ctx.bs_kpoints = self.inputs.get('bs_kpoints')
         param = self.inputs.scf.parameters.get_dict()
         if 'magmom' in param[OVERRIDE_NAMESPACE] and not self.inputs.get('only_dos'):
             self.report('Magnetic system passed for BS')
@@ -215,7 +218,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         Seekpath should only run if no explicit bands is provided or we are just
         running for DOS, in which case the original structure is used.
         """
-        return 'bands_kpoints' not in self.inputs and (not self.inputs.get('only_dos', False))
+        return 'bs_kpoints' not in self.inputs and (not self.inputs.get('only_dos', False))
 
     def run_seekpath(self):
         """
@@ -243,7 +246,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
 
         if not np.allclose(self.ctx.current_structure.cell, current_structure_backup.cell):
             self.report('The primitive structure is not the same as the input structure - using the former for all calculations from now.')
-        self.ctx.bands_kpoints = seekpath_results['explicit_kpoints']
+        self.ctx.bs_kpoints = seekpath_results['explicit_kpoints']
         self.out('primitive_structure', self.ctx.current_structure)
         self.out('seekpath_parameters', seekpath_results['parameters'])
 
@@ -352,7 +355,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
                 inputs.settings = nested_update_dict_node(settings, essential)
 
             # Swap with the default kpoints generated
-            inputs.kpoints = self.ctx.bands_kpoints
+            inputs.kpoints = self.ctx.bs_kpoints
 
             # Tag the calculation
             inputs.metadata.label = self.inputs.metadata.label + ' BS'
@@ -520,3 +523,252 @@ def compose_labelled_bands(bands, kpoints):
     new_bands = deepcopy(bands)
     new_bands.set_kpointsdata(kpoints)
     return new_bands
+
+
+class VaspHybridBandsWorkChain(VaspBandsWorkChain):
+    """
+    Bands workchain for hybrid calculations
+
+    This workchain compute the bandstructure by adding band path segments as zero-weighted
+    kpoints for self-consistent calculations. This is mainly for hybrid calculations, but can
+    also be used for GGA calculations, although it would be not as efficient as the non-SCF
+    method implemented in ``VaspBandsWorkChain``.
+
+    TODO:
+     - Ensure the bands is extracted for sub workchains
+     - Warn if the calculation is not actually a hybrid one
+    """
+
+    @classmethod
+    def define(cls, spec):
+        """Initialise the WorkChain class"""
+        super().define(spec)
+        relax_work = WorkflowFactory(cls._relax_wk_string)
+        base_work = WorkflowFactory(cls._base_wk_string)
+
+        spec.input('structure', help='The input structure', valid_type=orm.StructureData)
+        spec.input('bs_kpoints',
+                   help='Explicit kpoints for the bands. Will not generate kpoints if supplied.',
+                   valid_type=orm.KpointsData,
+                   required=False)
+        spec.input('bands_kpoints_distance',
+                   help='Spacing for band distances for automatic kpoints generation.',
+                   valid_type=orm.Float,
+                   required=False)
+        spec.input(
+            'dos_kpoints_density',
+            help='Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.',
+            serializer=to_aiida_type,
+            required=False,
+            valid_type=orm.Float,
+        )
+        spec.expose_inputs(relax_work,
+                           namespace='relax',
+                           exclude=('structure',),
+                           namespace_options={
+                               'required': False,
+                               'populate_defaults': False,
+                               'help': 'Inputs for Relaxation workchain, if needed'
+                           })
+        spec.expose_inputs(base_work,
+                           namespace='scf',
+                           exclude=('structure',),
+                           namespace_options={
+                               'required': True,
+                               'populate_defaults': True,
+                               'help': 'Inputs for SCF workchain, mandatory'
+                           })
+        spec.input('clean_children_workdir',
+                   valid_type=orm.Str,
+                   serializer=to_aiida_type,
+                   help='What part of the called children to clean',
+                   required=False,
+                   default=lambda: orm.Str('none'))
+        spec.outline(
+            cls.setup,
+            if_(cls.should_do_relax)(
+                cls.run_relax,
+                cls.verify_relax,
+            ),
+            if_(cls.should_run_seekpath)(cls.run_seekpath),
+            cls.make_splitted_kpoints,  # Split the kpoints
+            cls.run_scf_multi,  # Launch split calculation
+            cls.inspect_and_combine_bands,  # Combined the band structure
+        )
+
+        spec.output('primitive_structure', required=False, help='Primitive structure used for band structure calculations')
+        spec.output('band_structure', required=False, help='Computed band structure with labels')
+        spec.output('seekpath_parameters', help='Parameters used by seekpath', required=False)
+
+        spec.exit_code(501, 'ERROR_SUB_PROC_RELAX_FAILED', message='Relaxation workchain failed')
+        spec.exit_code(502, 'ERROR_SUB_PROC_SCF_FAILED', message='SCF workchain failed')
+        spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
+        spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
+
+    def make_splitted_kpoints(self):
+        """Split the kpoints"""
+        full_kpoints = self.ctx.bs_kpoints
+        kpoints_for_calc = split_kpoints(self.inputs.scf.kpoints, full_kpoints, self.inputs.kpoints_per_split)
+        self.ctx.kpoints_for_calc = kpoints_for_calc
+
+    def run_scf_multi(self):
+        """
+        Launch multiple SCF calculations with zero-weighted kpoints for segments of the band structure
+        """
+
+        workflow_class = WorkflowFactory(self._base_wk_string)
+        for key, value in self.ctx.kpoints_for_calc.items():
+            idx = int(key.split('_')[-1])
+
+            inputs = self.exposed_inputs(workflow_class, 'scf')
+            # Swap the kpoints the the one with zero-weight parts
+            inputs.kpoints = value
+            inputs.metadata.label = self.inputs.metadata.label + f' SPLIT {idx}'
+            inputs.metadata.call_link_label = f'bandstructure_split_{idx:03d}'
+            inputs.structure = self.ctx.current_structure
+            running = self.submit(workflow_class, **inputs)
+            self.report('launching {}<{}> for split #{}'.format(workflow_class.__name__, running.pk, idx))
+            self.to_context(workchains=append_(running))
+
+    def inspect_and_combine_bands(self):
+        """
+        Inspect that all calculations have finished OK
+        """
+        workchains = self.ctx.workchains
+
+        return_codes = [work.exit_status for work in workchains]
+        if any(return_codes):
+            self.report('At least one calculation did not have zero return code!')
+
+        # Extract the bands information
+        self.report(f'Extracting output bandstructure from {len(self.ctx.workchains)} workchains.')
+        kwargs = {}
+        for work in workchains:
+            link_label = work.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
+            link_idx = int(link_label.split('_')[-1])
+            kwargs[f'band_{link_idx:03d}'] = work.outputs.bands
+            kwargs[f'kpoint_{link_idx:03d}'] = work.inputs.kpoints
+
+        combined_bands = combine_bands_data(self.ctx.bs_kpoints, **kwargs)
+        self.out('band_structure', combined_bands)
+
+
+@calcfunction
+def split_kpoints(scf_kpoints, band_kpoints, kpn_per_split):
+    """
+    Split the kpoints into multiple one and combined with SCF kpoints
+
+    The kpoints for band structure calculation has zero weights
+    """
+    return _split_kpoints(scf_kpoints, band_kpoints, kpn_per_split)
+
+
+def _split_kpoints(scf_kpoints: orm.KpointsData, band_kpoints: orm.KpointsData, kpn_per_split: orm.Int):
+    """
+    Split the kpoints into multiple one and combined with SCF kpoints
+
+    The kpoints for band structure calculation has zero weights
+    """
+    scf_kpoints_array, scf_weights_array = scf_kpoints.get_kpoints(also_weights=True)
+    band_kpn = band_kpoints.get_kpoints()
+    nband_kpts = band_kpn.shape[0]
+    nscf_kpts = scf_kpoints_array.shape[0]
+
+    # Split the kpoints
+    kpn_per_split = int(kpn_per_split)
+    kpt_splits = [band_kpn[i:i + kpn_per_split] for i in range(0, nband_kpts, kpn_per_split)]
+
+    splitted_kpoints = {}
+    for isplit, skpts in enumerate(kpt_splits):
+        kpt = orm.KpointsData()
+        kpt_array = np.concatenate([scf_kpoints_array, skpts], axis=0)
+        weights_array = np.zeros(kpt_array.shape[0])
+        # Set the weights for SCF kpoints
+        weights_array[:nscf_kpts] = scf_weights_array
+        # Set kpoints and the weights
+        kpt.set_kpoints(kpt_array, weights=weights_array)
+        kpt.label = f'SPLIT {isplit:03d}'
+        kpt.description = 'Splitted kpoints'
+        splitted_kpoints[f'bs_kpoints_{isplit:03d}'] = kpt
+
+    return splitted_kpoints
+
+
+@calcfunction
+def combine_bands_data(bs_kpoints, **kwargs):
+    """
+    Combine splitted bands and kpoints data
+
+    The inputs should be supplied as keyword arguments like `band_001`, `kpoint_001` for the splitted
+    kpoints and correspdonging bands data from each calculation.
+    The `bs_kpoints` is the originally generated band structure path.
+
+    Returns a `BandsData` by combining the zero-weighted bands from each calculation.
+    """
+    kpoints_list = [[node, int(key.split('_')[1])] for key, node in kwargs.items() if 'kpoint' in key]
+    kpoints_list.sort(key=lambda x: x[1])
+    kpoints_list = [item[0] for item in kpoints_list]
+
+    bands_list = [[node, int(key.split('_')[1])] for key, node in kwargs.items() if 'band' in key]
+    bands_list.sort(key=lambda x: x[1])
+    bands_list = [item[0] for item in bands_list]
+
+    return _combine_bands_data(bs_kpoints, kpoints_list, bands_list)
+
+
+def _combine_bands_data(bs_kpoints: orm.KpointsData, kpoints_list: List[orm.KpointsData], bands_list: List[orm.BandsData]):
+    """
+    Combine bands from splitted kpoints into a single bands node.
+
+    The list of kpoints and bands must be sorted in the right order.
+    """
+    bands_array_combine = []
+    occu_array_combine = []
+    kpoints_combine = []
+
+    for skpts, sbands in zip(kpoints_list, bands_list):
+        kpt_array, weights_array = skpts.get_kpoints(also_weights=True)
+        zero_weight_mask = weights_array == 0.
+        kpoints_combine.append(kpt_array[zero_weight_mask, :])
+
+        bands_array = sbands.get_bands()
+        if 'occupations' in sbands.get_arraynames():
+            occ_array = sbands.get_array('occupations')
+        else:
+            occ_array = None
+
+        # Bands array can have three or two dimensions, we have to handle it separately
+        if bands_array.ndim == 3:
+            bands_array_combine.append(bands_array[:, zero_weight_mask, :])
+            if occ_array is not None:
+                occu_array_combine.append(occ_array[:, zero_weight_mask, :])
+        else:
+            bands_array_combine.append(bands_array[zero_weight_mask, :])
+            if occ_array is not None:
+                occu_array_combine.append(occ_array[zero_weight_mask, :])
+
+    # Concatenate arrays
+    if bands_array.ndim == 3:
+        band_array_full = np.concatenate(bands_array_combine, axis=1)
+        if occu_array_combine:
+            occu_array_full = np.concatenate(occu_array_combine, axis=1)
+        else:
+            occu_array_full = None
+    else:
+        band_array_full = np.concatenate(bands_array_combine, axis=0)
+        if occu_array_combine:
+            occu_array_full = np.concatenate(occu_array_combine, axis=0)
+        else:
+            occu_array_full = None
+
+    # Sanity check all valid kpoints should combine into the original path
+    all_kpoints = np.concatenate(kpoints_combine, axis=0)
+    if not np.allclose(all_kpoints, bs_kpoints.get_kpoints()):
+        raise ValueError('The k-path segements do not much the original path when combined!')
+
+    # Compose the node
+    band_data = orm.BandsData()
+    band_data.set_kpointsdata(bs_kpoints)
+    band_data.set_bands(band_array_full, occupations=occu_array_full)
+
+    return band_data
