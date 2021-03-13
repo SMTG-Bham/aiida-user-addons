@@ -7,6 +7,8 @@ TODO:
 """
 from copy import deepcopy
 from typing import List
+from tempfile import mkdtemp
+import shutil
 
 import numpy as np
 import aiida.orm as orm
@@ -21,6 +23,7 @@ from aiida_user_addons.process.transform import magnetic_structure_decorate, mag
 from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE
 from aiida_vasp.utils.aiida_utils import get_data_class
+from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser
 
 
 class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
@@ -772,3 +775,45 @@ def _combine_bands_data(bs_kpoints: orm.KpointsData, kpoints_list: List[orm.Kpoi
     band_data.set_bands(band_array_full, occupations=occu_array_full)
 
     return band_data
+
+
+def extract_kpoints_from_calc(calc):
+    """
+    Extract computed kpoints from a existing calculation
+    """
+    retrieved = calc.outputs.retrieved
+    return extract_kpoints_from_retrieved(retrieved)
+
+
+@calcfunction
+def extract_kpoints_from_retrieved(retrieved):
+    """
+    Extract explicity kpoints from a finished calculation
+    """
+    return _extract_kpoints_from_retrieved(retrieved)
+
+
+def _extract_kpoints_from_retrieved(retrieved):
+    """
+    Extract explicity kpoints from a finished calculation
+    """
+    tmpdir = mkdtemp()
+    with retrieved.open('vasprun.xml', mode='r') as fsrc:
+        with open(tmpdir + 'vasprun.xml', mode='w') as fdst:
+            shutil.copyfileobj(fsrc, fdst)
+
+    parser = VasprunParser(file_path=tmpdir + 'vasprun.xml')
+    vkpoints = parser.kpoints
+    if vkpoints['mode'] != 'explicit':
+        raise ValueError('Only explicity kpoints is supported!')
+
+    kpoints_array = np.stack([kpt.get_point() for kpt in vkpoints['points']], axis=0)
+    weights_array = np.array([kpt.get_weight() for kpt in vkpoints['points']])
+
+    kpoints_data = orm.KpointsData()
+    kpoints_data.set_kpoints(kpoints=kpoints_array, weights=weights_array)
+
+    # Remove the directory tree
+    shutil.rmtree(tmpdir)
+
+    return kpoints_data
