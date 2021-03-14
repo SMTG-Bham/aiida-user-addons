@@ -96,12 +96,17 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             'ERROR_RELAX_NOT_CONVERGED',
             message='Ionic relaxation was not converged after the maximum number of iterations has been spent',
         )
+        spec.exit_code(601,
+                       'ERROR_FINAL_SCF_HAS_RESIDUAL_FORCE',
+                       message=('The final singlepoint calculation has increased residual forces. ',
+                                'This may be caused by electronic solver converging to a different solution. '
+                                'Care should be taken to investigate the results.'))
         spec.outline(
             cls.initialize,
             if_(cls.perform_relaxation)(
                 while_(cls.run_next_relax)(
                     cls.run_relax,
-                    cls.verify_next_workchain,
+                    cls.verify_last_relax,
                     cls.analyze_convergence,
                 ),
                 cls.store_relaxed,
@@ -329,6 +334,33 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
 
         return self.ctx.exit_code
 
+    def verify_last_relax(self):
+        """Verify and inherit exit status from the last relaxation"""
+
+        try:
+            workchain = self.ctx.workchains[-1]
+        except IndexError:
+            self.report('There is no {} in the called workchain list.'.format(self._base_workchain.__name__))
+            return self.exit_codes.ERROR_NO_CALLED_WORKCHAIN  # pylint: disable=no-member
+
+        # Inherit exit status from last workchain (supposed to be
+        # successfull)
+        next_workchain_exit_status = workchain.exit_status
+        next_workchain_exit_message = workchain.exit_message
+        if not next_workchain_exit_status:
+            self.ctx.exit_code = self.exit_codes.NO_ERROR  # pylint: disable=no-member
+        elif 'misc' in workchain.outputs and 'structure' in workchain.outputs and 'maximum_force' in workchain.outputs.misc.get_dict():
+            self.ctx.exit_code = self.exit_codes.NO_ERROR  # pylint: disable=no-member
+            self.report('The called {}<{}> returned a non-zero exit status. '
+                        'Continue the workflow as "misc" and "structure" outputs are present.'.format(
+                            workchain.__class__.__name__, workchain.pk))
+        else:
+            self.ctx.exit_code = compose_exit_code(next_workchain_exit_status, next_workchain_exit_message)
+            self.report('The called {}<{}> returned a non-zero exit status. '
+                        'The exit status {} is inherited'.format(workchain.__class__.__name__, workchain.pk, self.ctx.exit_code))
+
+        return self.ctx.exit_code
+
     def analyze_convergence(self):
         """
         Analyze the convergence of the relaxation.
@@ -488,10 +520,21 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
         """
         Attach the remaining output results.
         This can either be the final static calculation or the last relaxation if the
-        former is not needed
+        former is not needed.
+
+        As a final check - check if the `maximum_force` is lower than the predefined value.
         """
         workchain = self.ctx.workchains[-1]
         self.out_many(self.exposed_outputs(workchain, self._base_workchain))
+
+        # Try to get the smearing type, there is no point to perform check if the tetrahedral smearing is used.
+        if not detect_tetrahedral_method(workchain.inputs.parameters.get_dict()):
+            max_force_threshold = self.ctx.relax_settings.get('force_cutoff', 0.03)
+            actual_max_force = workchain.outputs.misc['maximum_force']
+            if actual_max_force > max_force_threshold * 1.5:
+                return self.exit_codes.ERROR_FINAL_SCF_HAS_RESIDUAL_FORCE  # pylint: disable=no-member
+        else:
+            self.report('Unable to presure final check for maximum force, as the tetrahedral method is used for integration.')
 
     def finalize(self):
         """
@@ -711,3 +754,15 @@ def get_step_structure(traj, step):
         # Automatic species generation
         structure.append_atom(symbols=_s, position=_p)
     return structure
+
+
+def detect_tetrahedral_method(input_dict: dict) -> bool:
+    """
+    Check if the tetrahedral method is used for BZ integration.
+    """
+    incar = input_dict.get('incar', {})
+    if incar.get('ismear', 1) == -5:
+        return True
+    if input_dict.get('smearing', {}).get('tetra') and not incar.get('ismear'):
+        return True
+    return False
