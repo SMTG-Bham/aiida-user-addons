@@ -360,3 +360,58 @@ class VaspWorkChain(BaseRestartWorkChain):
                         'Please inspect messages and act.')
 
         return super(VaspWorkChain, self).on_except(exc_info)
+
+    def verify_calculation(self):
+        """
+        Analyse the results of the last calculation.
+
+        In particular, check whether it finished successfully or if not troubleshoot the cause and handle the errors,
+        or abort if unrecoverable error was found.
+        Note that this workchain only check system level issues and does not handle errors or warnings from the
+        calculation itself. That is handled in its parent.
+        """
+        try:
+            calculation = self.ctx.calculations[-1]
+        except IndexError:
+            self.report = 'The first iteration finished without returning a {}'.format(self._calculation.__name__)  # pylint: disable=not-callable
+            return self.exit_codes.ERROR_ITERATION_RETURNED_NO_CALCULATION  # pylint: disable=no-member
+
+        # Check if the calculation already has an exit status, if so, inherit that
+        if calculation.exit_status:
+            exit_code = compose_exit_code(calculation.exit_status, calculation.exit_message)
+            self.report('The called {}<{}> returned a non-zero exit status. '  # pylint: disable=not-callable
+                        'The exit status {} is inherited'.format(calculation.__class__.__name__, calculation.pk, exit_code))
+            # Attach all quantities if possible - different from the original behaviour
+            for key in calculation.outputs:
+                if key in self.spec().outputs:
+                    self.out(key, calculation.outputs['key'])
+            return exit_code
+
+        # Set default exit status to an unknown failure
+        self.ctx.exit_code = self.exit_codes.ERROR_UNKNOWN  # pylint: disable=no-member
+
+        # Done: successful completion of last calculation
+        if calculation.is_finished_ok:
+            self._handle_succesfull(calculation)
+
+        # Abort: exceeded maximum number of retries
+        elif self.ctx.iteration > self.inputs.max_iterations.value:
+            self._handle_max_iterations(calculation)
+
+        # Abort: unexpected state of last calculation
+        elif calculation.process_state not in self._expected_calculation_states:
+            self._handle_unexpected(calculation)
+
+        # Abort: killed
+        elif calculation.is_killed:
+            self._handle_killed(calculation)
+
+        # Abort: excepted
+        elif calculation.is_excepted:
+            self._handle_excepted(calculation)
+
+        # Retry or abort: calculation finished or failed (but is not ok)
+        elif calculation.is_finished:
+            self._handle_other(calculation)
+
+        return self.ctx.exit_code
