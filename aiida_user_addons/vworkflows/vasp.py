@@ -384,7 +384,7 @@ class VaspWorkChain(BaseRestartWorkChain):
             # Attach all quantities if possible - different from the original behaviour
             for key in calculation.outputs:
                 if key in self.spec().outputs:
-                    self.out(key, calculation.outputs['key'])
+                    self.out(key, calculation.outputs[key])
             return exit_code
 
         # Set default exit status to an unknown failure
