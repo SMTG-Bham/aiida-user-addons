@@ -538,8 +538,8 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
     method implemented in ``VaspBandsWorkChain``.
 
     TODO:
-     - Ensure the bands is extracted for sub workchains
      - Warn if the calculation is not actually a hybrid one
+     - Automatic Kpoints from dryruns
     """
 
     @classmethod

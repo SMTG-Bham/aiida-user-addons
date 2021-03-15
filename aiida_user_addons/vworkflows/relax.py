@@ -98,7 +98,7 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
         )
         spec.exit_code(601,
                        'ERROR_FINAL_SCF_HAS_RESIDUAL_FORCE',
-                       message=('The final singlepoint calculation has increased residual forces. ',
+                       message=('The final singlepoint calculation has increased residual forces. '
                                 'This may be caused by electronic solver converging to a different solution. '
                                 'Care should be taken to investigate the results.'))
         spec.outline(
