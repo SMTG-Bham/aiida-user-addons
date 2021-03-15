@@ -9,6 +9,7 @@ from copy import deepcopy
 from typing import List
 from tempfile import mkdtemp
 import shutil
+from gzip import GzipFile
 
 import numpy as np
 import aiida.orm as orm
@@ -798,9 +799,17 @@ def _extract_kpoints_from_retrieved(retrieved):
     Extract explicity kpoints from a finished calculation
     """
     tmpdir = mkdtemp()
-    with retrieved.open('vasprun.xml', mode='r') as fsrc:
-        with open(tmpdir + 'vasprun.xml', mode='w') as fdst:
-            shutil.copyfileobj(fsrc, fdst)
+    if 'vasprun.xml' in retrieved.list_object_names():
+        with retrieved.open('vasprun.xml', mode='r') as fsrc:
+            with open(tmpdir + 'vasprun.xml', mode='w') as fdst:
+                shutil.copyfileobj(fsrc, fdst)
+    elif 'vasprun.xml.gz' in retrieved.list_object_names():
+        with retrieved.open('vasprun.xml', mode='rb') as fsrc:
+            with GzipFile(fileobj=fsrc, mode='rb') as gobj:
+                with open(tmpdir + 'vasprun.xml', mode='wb') as fdst:
+                    shutil.copyfileobj(gobj, fdst)
+    else:
+        raise RuntimeError('No valid vasprun.xml file to use!!')
 
     parser = VasprunParser(file_path=tmpdir + 'vasprun.xml')
     vkpoints = parser.kpoints
