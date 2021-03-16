@@ -538,6 +538,13 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
     also be used for GGA calculations, although it would be not as efficient as the non-SCF
     method implemented in ``VaspBandsWorkChain``.
 
+    In contrast to ``VaspBandsWorkChain`` this workflow requires and explicitly defined kpoints
+    set for the ``scf.kpoints`` port. This can be obtained by parsing the ``IBZKPT`` file from
+    and existing calculation or dryrun. Or by parsing the ``vasprun.xml`` file.
+
+    If a relaxation workchain is run as part of the process, the ``kpoints`` output returned can
+    be used for this purpose automatically.
+
     TODO:
      - Warn if the calculation is not actually a hybrid one
      - Automatic Kpoints from dryruns
@@ -608,11 +615,27 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
         spec.exit_code(502, 'ERROR_SUB_PROC_SCF_FAILED', message='SCF workchain failed')
         spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
         spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
+        spec.exit_code(505, 'ERROR_NO_VALID_SCF_KPOINTS_INPUT', message='Cannot found valid inputs for SCF kpoints')
 
     def make_splitted_kpoints(self):
         """Split the kpoints"""
         full_kpoints = self.ctx.bs_kpoints
-        kpoints_for_calc = split_kpoints(self.inputs.scf.kpoints, full_kpoints, self.inputs.kpoints_per_split)
+        if 'kpoints' in self.inputs.scf:
+            scf_kpoints = self.inputs.scf.kpoints
+        # Relaxation workchain has kpoints output
+        elif 'workchain_relax' in self.ctx and 'kpoints' in self.ctx['workchain_relax'].outputs:
+            scf_kpoints = self.ctx.workchain_relax.outputs.kpoints
+            self.report('Using output from <{}> for SCF kpoints.'.format(self.ctx.workchain_relax))
+        # Parse from relaxation output
+        elif 'workchain_relax' in self.ctx:
+            # Try getting the kpoints from the retrieved folder
+            scf_kpoints = extract_kpoints_from_calc(self.ctx.workchain_relax)
+            self.report('Extracted SCF kpoints from retrieved vasprun.xml of <{}>.'.format(self.ctx.workchain_relax))
+        else:
+            self.report('No valid SCF kpoints is avaliable to use. Please define scf.kpoints explicitly!')
+            return self.exit_codes.ERROR_NO_VALID_SCF_KPOINTS_INPUT  # pylint: disable=no-member
+
+        kpoints_for_calc = split_kpoints(scf_kpoints, full_kpoints, self.inputs.kpoints_per_split)
         self.ctx.kpoints_for_calc = kpoints_for_calc
 
     def run_scf_multi(self):
