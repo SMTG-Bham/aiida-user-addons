@@ -698,6 +698,28 @@ def _split_kpoints(scf_kpoints: orm.KpointsData, band_kpoints: orm.KpointsData, 
     return splitted_kpoints
 
 
+def dryrun_split_kpoints(structure: orm.StructureData,
+                         scf_kpoints: orm.KpointsData,
+                         kpn_per_split: orm.Int,
+                         kpoints_args=None,
+                         verbose=True):
+    """
+    Perform a "dryrun" for splitting the kpoints
+    """
+    from aiida.tools import get_explicit_kpoints_path
+
+    if kpoints_args is None:
+        kpoints_args = {}
+    seekpath_results = get_explicit_kpoints_path(structure, **kpoints_args)
+    explicit_kpoints = seekpath_results['explicit_kpoints']
+    splitted = _split_kpoints(scf_kpoints, explicit_kpoints, kpn_per_split)
+    if verbose:
+        nseg = len(splitted)
+        nkpts = [kpn.get_kpoints().shape[0] for kpn in splitted.values()]
+        print(f'Splitted in to {nseg} segements with number of kpoints: {nkpts}')
+    return seekpath_results, splitted
+
+
 @calcfunction
 def combine_bands_data(bs_kpoints, **kwargs):
     """
@@ -804,7 +826,7 @@ def _extract_kpoints_from_retrieved(retrieved):
             with open(tmpdir + 'vasprun.xml', mode='w') as fdst:
                 shutil.copyfileobj(fsrc, fdst)
     elif 'vasprun.xml.gz' in retrieved.list_object_names():
-        with retrieved.open('vasprun.xml', mode='rb') as fsrc:
+        with retrieved.open('vasprun.xml.gz', mode='rb') as fsrc:
             with GzipFile(fileobj=fsrc, mode='rb') as gobj:
                 with open(tmpdir + 'vasprun.xml', mode='wb') as fdst:
                     shutil.copyfileobj(gobj, fdst)
