@@ -159,6 +159,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         spec.exit_code(502, 'ERROR_SUB_PROC_SCF_FAILED', message='SCF workchain failed')
         spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
         spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
+        spec.exit_code(601, 'ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE', message='The input structure is not the primitive one!')
 
     def select_chgcar_from_inputs(self):
         """Setup CHGCAR from inputs"""
@@ -249,6 +250,11 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
             self.ctx.current_structure = seekpath_results['primitive_structure']
 
         if not np.allclose(self.ctx.current_structure.cell, current_structure_backup.cell):
+            if self.inputs.scf.get('kpoints'):
+                self.report(
+                    'The primitive structure is not the same as the input structure but explicty kpoints are supplied - aborting the workchain.'
+                )
+                return self.exit_codes.ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE  # pylint: disable=no-member
             self.report('The primitive structure is not the same as the input structure - using the former for all calculations from now.')
         self.ctx.bs_kpoints = seekpath_results['explicit_kpoints']
         self.out('primitive_structure', self.ctx.current_structure)
@@ -616,6 +622,7 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
         spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
         spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
         spec.exit_code(505, 'ERROR_NO_VALID_SCF_KPOINTS_INPUT', message='Cannot found valid inputs for SCF kpoints')
+        spec.exit_code(601, 'ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE', message='The input structure is not the primitive one!')
 
     def make_splitted_kpoints(self):
         """Split the kpoints"""
