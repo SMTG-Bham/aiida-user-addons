@@ -77,7 +77,7 @@ potcar_mapping:
   Co: Co
   Cr: Cr_pv
   Cs: Cs_sv
-  Cu: Cu_pv
+  Cu: Cu
   Dy: Dy_3
   Er: Er_3
   Eu: Eu

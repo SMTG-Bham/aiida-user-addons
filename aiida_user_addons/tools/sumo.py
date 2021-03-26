@@ -33,7 +33,7 @@ def get_sumo_dos_plotter(scf_node, **kwargs):
     return dp
 
 
-def get_pmg_bandstructure(bands_node, structure=None, efermi=None):
+def get_pmg_bandstructure(bands_node, structure=None, efermi=None, **kwargs):
     """
     Return a pymatgen `BandStructureSymmLine` object from BandsData
 
@@ -103,11 +103,16 @@ def get_pmg_bandstructure(bands_node, structure=None, efermi=None):
     else:
         efermi = efermi_raw
 
-    bands_structure = BandStructureSymmLine(kpoints, bands_dict, lattice.reciprocal_lattice, efermi=efermi, labels_dict=labels_dict)
+    bands_structure = BandStructureSymmLine(kpoints,
+                                            bands_dict,
+                                            lattice.reciprocal_lattice,
+                                            efermi=efermi,
+                                            labels_dict=labels_dict,
+                                            **kwargs)
     return bands_structure
 
 
-def get_sumo_bands_plotter(bands, efermi=None):
+def get_sumo_bands_plotter(bands, efermi=None, structure=None, **kwargs):
     """
     Return a sumo `SBSPlotter` object
 
@@ -120,7 +125,7 @@ def get_sumo_bands_plotter(bands, efermi=None):
     Returns:
         A `SBSPlotter` object
     """
-    bands_structure = get_pmg_bandstructure(bands, efermi)
+    bands_structure = get_pmg_bandstructure(bands, efermi=efermi, **kwargs)
     return SBSPlotter(bands_structure)
 
 
