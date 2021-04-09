@@ -382,13 +382,23 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             self.ctx.current_restart_folder = workchain.outputs.remote_folder
             return self.exit_codes.NO_ERROR  # pylint: disable=no-member
 
+        # Because the workchain may have been through multiple restarts of the underlying VASP calculation
+        # we have to query and find the exact input structure of the calculation that generated the output
+        # structure and use that for comparison
+        query = orm.QueryBuilder()
+        query.append(orm.StructureData, filters={'id': workchain.outputs.structure.id}, tag='workchain-out')
+        query.append(orm.CalcJobNode, with_outgoing='workchain-out', tag='calcjob')
+        query.append(orm.StructureData, with_outgoing='calcjob')
+        input_structure = query.one()[0]
+
         self.ctx.previous_structure = self.ctx.current_structure
+        self.ctx.last_calc_input_structure = input_structure
         self.ctx.current_structure = workchain.outputs.structure
 
         conv_mode = self.ctx.relax_settings.convergence_mode
         # Assign the two structure used for comparison
         if conv_mode == 'inout':
-            compare_from = self.ctx.previous_structure
+            compare_from = self.ctx.last_calc_input_structure
             compare_to = self.ctx.current_structure
         elif conv_mode == 'last':
             traj = workchain.outputs.trajectory
@@ -397,7 +407,7 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
                 compare_to = get_step_structure(workchain.outputs.trajectory, -1)  # take take second last structure
             else:
                 self.report('Warning - no enough number of steps to compare - using input/output structures instead.')
-                compare_from = self.ctx.previous_structure
+                compare_from = self.ctx.last_calc_input_structure
                 compare_to = self.ctx.current_structure
         else:
             raise RuntimeError('Convergence mode {} is not a valid option'.format(conv_mode))
