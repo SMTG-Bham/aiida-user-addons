@@ -3,13 +3,12 @@ Test the option settings
 """
 import pytest
 
-from aiida_user_addons.vworkflows.relax import RelaxOptions
-from aiida_user_addons.vworkflows.phonopy import PhononSettings
 from aiida.common.exceptions import InputValidationError
 
 
 def test_validation_relax():
     """Test validation"""
+    from aiida_user_addons.vworkflows.relax import RelaxOptions
     options = {
         'algo': 'cg',
         'convergence_absolute': False,
@@ -45,12 +44,14 @@ def test_validation_relax():
 
 def test_relax():
     """Test relax options"""
+    from aiida_user_addons.vworkflows.relax import RelaxOptions
     opts = RelaxOptions()
     assert opts.algo == 'cg'
 
 
 def test_phonon():
     """Test phonon options"""
+    from aiida_user_addons.vworkflows.phonon_wc import PhononSettings
     opts = PhononSettings(mesh=10)
     assert opts.magmom is None
     with pytest.raises(InputValidationError):

@@ -15,7 +15,7 @@ from aiida.orm.nodes.data.base import to_aiida_type
 from aiida.plugins import WorkflowFactory
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import InputValidationError
-from ..common.opthold import OptionHolder, typed_field, required_field
+from aiida_user_addons.common.opthold import OptionHolder, typed_field, required_field
 from aiida_phonopy.common.utils import (
     get_force_constants,
     get_nac_params,
@@ -24,7 +24,7 @@ from aiida_phonopy.common.utils import (
     get_vasp_force_sets_dict,
 )
 
-from .common import OVERRIDE_NAMESPACE
+from aiida_user_addons.vworkflows.common import OVERRIDE_NAMESPACE
 
 __version__ = '0.1.0'
 

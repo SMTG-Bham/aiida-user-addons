@@ -158,7 +158,10 @@ class VaspWorkChain(VanillaVaspWorkChain):
 
     def init_inputs(self):
         """Make sure all the required inputs are there and valid, create input dictionary for calculation."""
-        super().init_inputs()
+
+        output = super().init_inputs()
+        if output is not None and output.status != 0:
+            return output
 
         # Set the kpoints (kpoints)
         if 'kpoints' in self.inputs:
