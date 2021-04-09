@@ -125,6 +125,8 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
 
     def initialize(self):
         """Initialize."""
+        # Check the input parameters
+        self._check_input_parameters()
 
         # Initialise the contexts
         self.ctx.exit_code = self.exit_codes.ERROR_UNKNOWN  # pylint: disable=no-member
@@ -180,6 +182,19 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             if clean_tmp and clean_tmp.value:
                 self.report('Disable clean_workdir for downstream workflows since `reuse` is requested.')
                 self.ctx.relax_input_additions['clean_workdir'] = orm.Bool(False)
+
+        # Check the input parameters
+        self._check_input_parameters()
+
+    def _check_input_parameters(self):
+        """Validate the input parameters and detect problems before running the workchain"""
+        exposed = self.exposed_inputs(self._base_workchain, 'vasp')
+        incar = exposed.parameters['incar']
+        exp_key = ['ibrion', 'nsw']
+        for key in exp_key:
+            if key in incar:
+                self.report('{} explicitly set to {} - this overrides the relax_settings input - proceed with caution.'.format(
+                    key, incar[key]))
 
     def _init_relax_input_additions(self):
         """
@@ -307,6 +322,15 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
 
         # Update the input with whatever stored in the relax_input_additions attribute dict
         inputs.update(self.ctx.static_input_additions)
+
+        # Make sure NSW is not here for the static calculation
+        incar = inputs.parameters['incar']
+        if 'nsw' in incar:
+            incar.pop('nsw')
+            new_param = inputs.parameters.get_dict()
+            new_param['incar'] = incar
+            inputs.parameters = orm.Dict(dict=new_param)
+            self.report('Removed explicitly defined NSW value for the static calculation')
 
         running = self.submit(self._base_workchain, **inputs)
         self.report('launching {}<{}> iterations #{}'.format(self._base_workchain.__name__, running.pk, self.ctx.iteration))
