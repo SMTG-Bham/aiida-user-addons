@@ -1,0 +1,55 @@
+name: aiida-user-addons
+
+on: [push, pull_request]
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:10
+        ports:
+          - 5432:5432
+      rabbitmq:
+        image: rabbitmq:latest
+        ports:
+          - 5672:5672
+    strategy:
+      matrix:
+        python: ['3.7', '3.8', '3.9']
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Cache python dependencies
+        id: cache-pip
+        uses: actions/cache@v1
+        with:
+            path: ~/.cache/pip
+            key: pip-${{ matrix.python }}-tests-${{ hashFiles('**/setup.json') }}
+            restore-keys:
+                pip-${{ matrix.python }}-tests-
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install system dependencies
+        run: |
+          sudo apt update
+          sudo apt install postgresql-10
+          sudo .ci/enable_ssh_localhost.sh
+      - name: Upgrade pip
+        run: |
+          pip install --upgrade pip
+          pip --version
+      - name: Install wheel
+        run: pip install wheel
+      - name: Install AiiDA
+        run: pip install aiida-core==1.6.1
+      - name: Install package
+        run: pip install -e .[testing]
+      - name: Record python dependencies
+        run: pip freeze
+#      - name: Run pytest
+#        run: pytest
