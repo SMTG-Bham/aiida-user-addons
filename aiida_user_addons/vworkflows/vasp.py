@@ -159,9 +159,106 @@ class VaspWorkChain(VanillaVaspWorkChain):
     def init_inputs(self):
         """Make sure all the required inputs are there and valid, create input dictionary for calculation."""
 
-        output = super().init_inputs()
-        if output is not None and output.status != 0:
-            return output
+        #### START OF THE COPY FROM VASPWorkChain ####
+        #  - the only change is that the section about kpoints is deleted
+        self.ctx.inputs = AttributeDict()
+        self.ctx.inputs.parameters = self._init_parameters()
+        # Set the code
+        self.ctx.inputs.code = self.inputs.code
+
+        # Set the structure (poscar)
+        self.ctx.inputs.structure = self.inputs.structure
+
+        # Set the kpoints (kpoints) - No longer needed, using kpoints/kpoints spacing as from below
+        # self.ctx.inputs.kpoints = self.inputs.kpoints
+
+        # Set settings
+        unsupported_parameters = None
+        skip_parameters_validation = False
+        if self.inputs.get('settings'):
+            self.ctx.inputs.settings = self.inputs.settings
+            # Also check if the user supplied additional tags that is not in the supported file.
+            settings_dict = self.ctx.inputs.settings.get_dict()
+            unsupported_parameters = settings_dict.get('unsupported_parameters', unsupported_parameters)
+            skip_parameters_validation = settings_dict.get('skip_parameters_validation', skip_parameters_validation)
+
+        # Perform inputs massage to accommodate generalization in higher lying workchains
+        # and set parameters.
+        try:
+            parameters_massager = ParametersMassage(self.ctx.inputs.parameters,
+                                                    unsupported_parameters,
+                                                    skip_parameters_validation=skip_parameters_validation)
+        except Exception as exception:  # pylint: disable=broad-except
+            return self.exit_codes.ERROR_IN_PARAMETER_MASSAGER.format(exception=exception)  # pylint: disable=no-member
+        try:
+            # Only set if they exists
+            # Set any INCAR tags
+            self.ctx.inputs.parameters = parameters_massager.parameters.incar
+            # Set any dynamics input (currently only for selective dynamics, e.g. custom write to POSCAR)
+            self.ctx.inputs.dynamics = parameters_massager.parameters.dynamics
+            # Here we could set additional override flags, but those are not relevant for this VASP plugin
+        except AttributeError:
+            pass
+
+        # Set options
+        # Options is very special, not storable and should be
+        # wrapped in the metadata dictionary, which is also not storable
+        # and should contain an entry for options
+        if 'options' in self.inputs:
+            options = {}
+            options.update(self.inputs.options)
+            self.ctx.inputs.metadata = {'options': options}
+            # Override the parser name if it is supplied by the user.
+            parser_name = self.ctx.inputs.metadata['options'].get('parser_name')
+            if parser_name:
+                self.ctx.inputs.metadata['options']['parser_name'] = parser_name
+            # Set MPI to True, unless the user specifies otherwise
+            withmpi = self.ctx.inputs.metadata['options'].get('withmpi', True)
+            self.ctx.inputs.metadata['options']['withmpi'] = withmpi
+
+        # Utilise default input/output selections
+        self.ctx.inputs.metadata['options']['input_filename'] = 'INCAR'
+        self.ctx.inputs.metadata['options']['output_filename'] = 'OUTCAR'
+
+        # Make sure we also bring along any label and description set on the WorkChain to the CalcJob, it if does
+        # not exists, set to empty string.
+        if 'metadata' in self.inputs:
+            label = self.inputs.metadata.get('label', '')
+            description = self.inputs.metadata.get('description', '')
+            if 'metadata' not in self.ctx.inputs:
+                self.ctx.inputs.metadata = {}
+            self.ctx.inputs.metadata['label'] = label
+            self.ctx.inputs.metadata['description'] = description
+
+        # Verify and set potentials (potcar)
+        if not self.inputs.potential_family.value:
+            self.report('An empty string for the potential family name was detected.')  # pylint: disable=not-callable
+            return self.exit_codes.ERROR_NO_POTENTIAL_FAMILY_NAME  # pylint: disable=no-member
+        try:
+            self.ctx.inputs.potential = get_data_class('vasp.potcar').get_potcars_from_structure(
+                structure=self.inputs.structure,
+                family_name=self.inputs.potential_family.value,
+                mapping=self.inputs.potential_mapping.get_dict())
+        except ValueError as err:
+            return compose_exit_code(self.exit_codes.ERROR_POTENTIAL_VALUE_ERROR.status, str(err))  # pylint: disable=no-member
+        except NotExistent as err:
+            return compose_exit_code(self.exit_codes.ERROR_POTENTIAL_DO_NOT_EXIST.status, str(err))  # pylint: disable=no-member
+
+        # Store verbose parameter in ctx - otherwise it will not work after deserialization
+        try:
+            self.ctx.verbose = self.inputs.verbose.value
+        except AttributeError:
+            self.ctx.verbose = self._verbose
+
+        # Set the charge density (chgcar)
+        if 'chgcar' in self.inputs:
+            self.ctx.inputs.charge_density = self.inputs.chgcar
+
+        # Set the wave functions (wavecar)
+        if 'wavecar' in self.inputs:
+            self.ctx.inputs.wavefunctions = self.inputs.wavecar
+
+        ##### END OF THE COPY from VaspWorkChain   #####
 
         # Set the kpoints (kpoints)
         if 'kpoints' in self.inputs:
