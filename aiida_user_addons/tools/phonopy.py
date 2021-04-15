@@ -4,11 +4,22 @@ Tool for working with Phonopy calculations
 
 from pathlib import Path
 from warnings import warn
+import math
+from itertools import product
+
+import numpy as np
+
+from pymatgen.core import Structure
+
+from aiida.orm import StructureData, Dict
+from aiida.engine import calcfunction
+from ase import Atoms
+
 from aiida_vasp.parsers.file_parsers.poscar import PoscarParser
 from aiida.common.exceptions import NotExistent
 from aiida_phonopy.common.utils import get_phonopy_instance
 
-from .vasp import export_vasp_calc
+from aiida_user_addons.tools.vasp import export_vasp_calc
 
 
 def export_phonon_work(work, dst, include_potcar=False):
@@ -97,3 +108,105 @@ def get_phonon_obj(work, nac='auto'):
         phonon.produce_force_constants()
         warn('Cannot locate force constants - producing force constants from force_sets.')
     return phonon
+
+
+def mode_mapping_gamma_from_work_node(work, qstart, qfinsh, qsample, band, dryrun=True):
+    """
+    Generate mode mapping using a work node
+    """
+    force_set = work.outputs.force_sets
+    if nac == 'auto':
+        if 'nac_params' in work.outputs:
+            params = {'nac_params': work.outputs.nac_params}
+    elif nac:
+        params = {'nac_params': nac}
+    else:
+        params = {}
+
+    if not isinstance(band, Node):
+        band = Int(band)
+    if not isinstance(qstart, Node):
+        qstart = Float(qstart)
+    if not isinstance(qfinish, Node):
+        qfinish = Float(qfinish)
+    if not isinstance(qsample, Node):
+        qsample = Int(qsample)
+
+    if 'relaxed_structure' in work.outputs:
+        args = [
+            work.outputs.relaxed_structure, work.outputs.phonon_setting_info, force_set, work.outputs.nac_params, qstart, qfinish, qsample,
+            band
+        ]
+    else:
+        # No relaxation - use the input structure directly
+        results = [
+            work.inputs.structure, work.outputs.phonon_setting_info, force_set, work.outputs.nac_params, qstart, qfinish, qsample, band
+        ]
+    if dryrun:
+        kwargs = {'store_provenance': False}
+    else:
+        kwargs = {}
+
+    return mode_mapping_gamma(*args, **kwargs)
+
+
+@calcfunction
+def mode_mapping_gamma(structure, phonon_settings, force_set, nac_param, qstart, qfinish, qsamples, band):
+    """Generate pushed structures at gamma point"""
+    phonon = get_phonopy_instance(
+        structure,
+        phonon_settings,
+        {'nac_params': nac_param},
+    )
+    displacements = phonon_settings['displacement_dataset']
+    phonon.dataset = displacements
+    phonon.set_forces(force_set.get_array('force_sets'))
+    phonon.produce_force_constants()
+
+    frames = {}
+    qscale = math.sqrt(len(phonon.unitcell.get_scaled_positions()))
+    qpoints = []
+    for i, q in enumerate(np.linspace(qstart.value, qfinish.value, qsamples.value)):
+        phonon.set_modulations((1, 1, 1), [[[0, 0, 0], band.value, q * qscale, 0.0]])
+        cell = phonon.get_modulated_supercells()[0]
+        atoms = Atoms(positions=cell.positions, cell=cell.cell, numbers=cell.numbers, pbc=True)
+        struct = StructureData(ase=atoms)
+        struct.label = structure.label + f' q_{i:03d}'
+        frames[f'q_{i:03d}'] = struct
+        qpoints.append(q)
+    frames['info'] = Dict(dict={'Q_list': qpoints, 'band': band.value, 'qscale': qscale})
+    return frames
+
+
+@calcfunction
+def mode_mapping_gamma_2d(structure, phonon_settings, force_set, nac_param, settings):
+    """
+    Generate pushed structures at gamma point
+
+    :param: settings - a dictionary with "qlist1", "qlist2" and "band1", "band2"
+    """
+    phonon = get_phonopy_instance(
+        structure,
+        phonon_settings,
+        {'nac_params': nac_param},
+    )
+    displacements = phonon_settings['displacement_dataset']
+    phonon.dataset = displacements
+    phonon.set_forces(force_set.get_array('force_sets'))
+    phonon.produce_force_constants()
+
+    frames = {}
+    qscale = math.sqrt(len(phonon.unitcell.get_scaled_positions()))
+    qpoints = []
+    qlist1 = settings['qlist1']
+    qlist2 = settings['qlist2']
+    band1, band2 = settings['band1'], settings['band2']
+    for i, (q1, q2) in enumerate(product(qlist1, qlist2)):
+        phonon.set_modulations((1, 1, 1), [[[0, 0, 0], band1, q1 * qscale, 0.0], [[0, 0, 0], band2, q2 * qscale, 0.0]])
+        phonon.write_modulations()
+        struct = StructureData(pymatgen=Structure.from_file('MPOSCAR'))
+        struct.label = structure.label + f' disp_{i:03d}'
+        frames[f'disp_{i:03d}'] = struct
+        qpoints.append([q1, q2])
+    frames['info'] = Dict(dict={'Q_list': qpoints, 'band1': band1, 'band2': band2, 'qscale': qscale})
+    return frames
