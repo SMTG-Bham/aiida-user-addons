@@ -134,7 +134,7 @@ def mode_mapping_gamma_from_work_node(work, qstart, qfinish, qsample, band, dryr
         # No relaxation - use the input structure directly
         args = [work.inputs.structure, work.outputs.phonon_setting_info, force_set, work.outputs.nac_params, qstart, qfinish, qsample, band]
     if dryrun:
-        kwargs = {'store_provenance': False}
+        kwargs = {'metadata': {'store_provenance': False}}
     else:
         kwargs = {}
 
