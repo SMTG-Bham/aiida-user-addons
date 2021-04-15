@@ -251,7 +251,8 @@ class VaspAutoPhononWorkChain(WorkChain):
             calc_inputs.clean_workdir = orm.Bool(False)
 
         # Make sure the calculation writes CHGCAR and WAVECAR
-        calc_inputs.parameters = nested_update_dict_node(calc_inputs.parameters, {OVERRIDE_NAMESPACE: {'lcharg': True, 'lwave': True}})
+        # Turn off WAVECAR - otherwise it may take too much disk space
+        calc_inputs.parameters = nested_update_dict_node(calc_inputs.parameters, {OVERRIDE_NAMESPACE: {'lcharg': True, 'lwave': False}})
 
         calc_inputs.metadata.label = self.ctx.label + ' SUPERCELL'
         calc_inputs.metadata.call_link_label = 'supercell_calc'
