@@ -116,14 +116,6 @@ def mode_mapping_gamma_from_work_node(work, qstart, qfinsh, qsample, band, dryru
     """
     from aiida.orm import Node, Int, Float
     force_set = work.outputs.force_sets
-    if nac == 'auto':
-        if 'nac_params' in work.outputs:
-            params = {'nac_params': work.outputs.nac_params}
-    elif nac:
-        params = {'nac_params': nac}
-    else:
-        params = {}
-
     if not isinstance(band, Node):
         band = Int(band)
     if not isinstance(qstart, Node):
@@ -140,9 +132,7 @@ def mode_mapping_gamma_from_work_node(work, qstart, qfinsh, qsample, band, dryru
         ]
     else:
         # No relaxation - use the input structure directly
-        results = [
-            work.inputs.structure, work.outputs.phonon_setting_info, force_set, work.outputs.nac_params, qstart, qfinish, qsample, band
-        ]
+        args = [work.inputs.structure, work.outputs.phonon_setting_info, force_set, work.outputs.nac_params, qstart, qfinish, qsample, band]
     if dryrun:
         kwargs = {'store_provenance': False}
     else:
