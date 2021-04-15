@@ -110,7 +110,7 @@ def get_phonon_obj(work, nac='auto'):
     return phonon
 
 
-def mode_mapping_gamma_from_work_node(work, qstart, qfinsh, qsample, band, dryrun=True):
+def mode_mapping_gamma_from_work_node(work, qstart, qfinish, qsample, band, dryrun=True):
     """
     Generate mode mapping using a work node
     """
