@@ -114,6 +114,7 @@ def mode_mapping_gamma_from_work_node(work, qstart, qfinsh, qsample, band, dryru
     """
     Generate mode mapping using a work node
     """
+    from aiida.orm import Node, Int, Float
     force_set = work.outputs.force_sets
     if nac == 'auto':
         if 'nac_params' in work.outputs:
