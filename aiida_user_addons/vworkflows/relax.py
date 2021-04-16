@@ -565,7 +565,11 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
         if not detect_tetrahedral_method(workchain.inputs.parameters.get_dict()):
             max_force_threshold = self.ctx.relax_settings.get('force_cutoff', 0.03)
             actual_max_force = workchain.outputs.misc['maximum_force']
-            if actual_max_force > max_force_threshold * 1.5:
+            if actual_max_force > max(max_force_threshold * 1.5, max_force_threshold + 0.001):
+                if self.is_verbose():
+                    self.report(
+                        f'The force of the final SCF is {actual_max_force} eV/A, which is significantly higher than the tolerance {max_force_threshold} eV/A.'
+                    )
                 return self.exit_codes.ERROR_FINAL_SCF_HAS_RESIDUAL_FORCE  # pylint: disable=no-member
         else:
             self.report('Unable to presure final check for maximum force, as the tetrahedral method is used for integration.')
