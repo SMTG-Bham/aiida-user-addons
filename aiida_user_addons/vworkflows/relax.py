@@ -195,6 +195,10 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             if key in incar:
                 self.report('{} explicitly set to {} - this overrides the relax_settings input - proceed with caution.'.format(
                     key, incar[key]))
+        isif = incar.get('isif')
+        if isif == 3 and not all([self.ctx.relax_settings.get(key) for key in ['positions', 'volume', 'shape']]):
+            raise InputValidationError(
+                'ISIF = 3 is set explicity for INCAR, which is consistent with the mode of relaxation supplied to the workchain.')
 
     def _init_relax_input_additions(self):
         """
