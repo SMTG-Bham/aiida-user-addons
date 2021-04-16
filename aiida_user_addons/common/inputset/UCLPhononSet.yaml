@@ -17,7 +17,6 @@ global:
   nelmin: 8
   gga: ps
   lasph: true
-  isif: 3
   addgrid: true
 
 per_atom:

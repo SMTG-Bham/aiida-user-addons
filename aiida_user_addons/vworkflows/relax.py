@@ -190,7 +190,7 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
         """Validate the input parameters and detect problems before running the workchain"""
         exposed = self.exposed_inputs(self._base_workchain, 'vasp')
         incar = exposed.parameters['incar']
-        exp_key = ['ibrion', 'nsw']
+        exp_key = ['ibrion', 'nsw', 'isif']
         for key in exp_key:
             if key in incar:
                 self.report('{} explicitly set to {} - this overrides the relax_settings input - proceed with caution.'.format(
