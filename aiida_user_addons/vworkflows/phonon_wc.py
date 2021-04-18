@@ -447,7 +447,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         return bool(node)
 
 
-def collect_vasp_forces_and_energies(ctx, ctx_supercells, prefix='force_calc'):
+def collect_vasp_forces_and_energies(ctx, ctx_supercells, prefix='force_calc', obj=None):
     """
     Collect forces and energies from VASP calculations.
     This is essentially for pre-process before dispatching to the calcfunction for creating
@@ -467,6 +467,16 @@ def collect_vasp_forces_and_energies(ctx, ctx_supercells, prefix='force_calc'):
             calc_dict = calc
         else:
             calc_dict = calc.outputs
+        if 'forces' not in calc_dict:
+            msg = 'Force not found in the VaspWorkChain - trying to recover using the last called VaspCalculation - procedd with caution.'
+            if obj:
+                obj.report(msg)
+            else:
+                print(msg)
+            calc_node = calc.called[0]
+            if 'forces' in calc_node.outputs:
+                calc_dict = calc_node.outputs
+
         if ('forces' in calc_dict and 'final' in calc_dict['forces'].get_arraynames()):
             forces_dict['forces_{}'.format(num)] = calc_dict['forces']
         else:

@@ -12,6 +12,7 @@ import numpy as np
 from pymatgen.core import Structure
 
 from aiida.orm import StructureData, Dict
+import aiida.orm as orm
 from aiida.engine import calcfunction
 from ase import Atoms
 
@@ -38,7 +39,11 @@ def export_phonon_work(work, dst, include_potcar=False):
     for triple in work.get_outgoing(link_label_filter='force_calc%').all():
         fc_calc = triple.node
         fc_folder = (dst / triple.link_label)
-        export_vasp_calc(fc_calc, fc_folder, decompress=True, include_potcar=include_potcar)
+        try:
+            export_vasp_calc(fc_calc, fc_folder, decompress=True, include_potcar=include_potcar)
+        except Exception as error:
+            print(f'Cannot export the {fc_calc} - exporting its last calculation instead. The error was {error.args}')
+            export_vasp_calc(fc_calc.called[0], fc_folder, decompres=True, include_potcar=include_potcar)
 
     nac_calc = work.get_outgoing(link_label_filter='nac_calc').first().node
     if nac_calc:
@@ -56,16 +61,19 @@ def export_phonon_work(work, dst, include_potcar=False):
     poscar_parser = PoscarParser(data=disp_structure, precision=10)
     poscar_parser.write(str(dst / 'POSCAR'))
 
-    # Write processed phonon data
-    pobj = get_phonon_obj(work, nac='auto')
+    # Write processed phonon data if avaliable
+    try:
+        pobj = get_phonon_obj(work, nac='auto')
+    except Exception as error:
+        print(f'Cannot obtained the computed phonon data - manual re-computation will be needed. The error was {error.args}')
+    else:
+        # phonopy_disp.yaml
+        pobj.save(dst / 'phonopy_disp.yaml')
+        pobj.save(dst / 'phonopy_params.yaml')
 
-    # phonopy_disp.yaml
-    pobj.save(dst / 'phonopy_disp.yaml')
-    pobj.save(dst / 'phonopy_params.yaml')
-
-    # FORCE_SETS and FORCE_CONSTANTS
-    write_FORCE_SETS(pobj.dataset, dst / 'FORCE_SETS')
-    write_FORCE_CONSTANTS(pobj.get_force_constants(), dst / 'FORCE_CONSTANTS')
+        # FORCE_SETS and FORCE_CONSTANTS
+        write_FORCE_SETS(pobj.dataset, dst / 'FORCE_SETS')
+        write_FORCE_CONSTANTS(pobj.get_force_constants(), dst / 'FORCE_CONSTANTS')
 
     # Export BORN FILE
     if nac_calc:
@@ -159,6 +167,53 @@ def mode_mapping_gamma(structure, phonon_settings, force_set, nac_param, qstart,
     qpoints = []
     for i, q in enumerate(np.linspace(qstart.value, qfinish.value, qsamples.value)):
         phonon.set_modulations((1, 1, 1), [[[0, 0, 0], band.value, q * qscale, 0.0]])
+        cell = phonon.get_modulated_supercells()[0]
+        atoms = Atoms(positions=cell.positions, cell=cell.cell, numbers=cell.numbers, pbc=True)
+        struct = StructureData(ase=atoms)
+        struct.label = structure.label + f' q_{i:03d}'
+        frames[f'q_{i:03d}'] = struct
+        qpoints.append(q)
+    frames['info'] = Dict(dict={'Q_list': qpoints, 'band': band.value, 'qscale': qscale})
+    return frames
+
+
+@calcfunction
+def mode_mapping_1d(structure: orm.StructureData, phonon_settings: orm.Dict, force_set: orm.ArrayData, nac_param: orm.Dict,
+                    qstart: orm.Float, qfinish: orm.Float, qsamples: orm.Int, band: orm.Int, q_point: orm.List, supercell: orm.List):
+    """
+    Generate pushed structures at any qpoint
+
+    Args:
+        structure: the input structure
+        phonon_settings: the settings of the phonopy
+        force_set: computed force_set for phonopy
+        nac_param: NAC parameters used for Phonopy
+        qstart: The start push amplitude
+        qfinish: The finish push amplitude
+        qsample: Number of samples for push
+        band: Id of the band at q_point to be pushed
+        q_point: The qpoint at which the mode should be pushed
+        sueprcell: The supercell expansion for which the mode map to be calculated.
+
+    Returns:
+        A dictionary of pushed frames and mode mapping information.
+
+    """
+    phonon = get_phonopy_instance(
+        structure,
+        phonon_settings,
+        {'nac_params': nac_param},
+    )
+    displacements = phonon_settings['displacement_dataset']
+    phonon.dataset = displacements
+    phonon.set_forces(force_set.get_array('force_sets'))
+    phonon.produce_force_constants()
+
+    frames = {}
+    qscale = math.sqrt(len(phonon.unitcell.get_scaled_positions()))
+    qpoints = []
+    for i, q in enumerate(np.linspace(qstart.value, qfinish.value, qsamples.value)):
+        phonon.set_modulations(supercell.get_list(), [[q_point.get_list(), band.value, q * qscale, 0.0]])
         cell = phonon.get_modulated_supercells()[0]
         atoms = Atoms(positions=cell.positions, cell=cell.cell, numbers=cell.numbers, pbc=True)
         struct = StructureData(ase=atoms)
