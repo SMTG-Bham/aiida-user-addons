@@ -75,9 +75,9 @@ def export_phonon_work(work, dst, include_potcar=False):
         write_FORCE_SETS(pobj.dataset, dst / 'FORCE_SETS')
         write_FORCE_CONSTANTS(pobj.get_force_constants(), dst / 'FORCE_CONSTANTS')
 
-    # Export BORN FILE
-    if nac_calc:
-        write_BORN(pobj.primitive, pobj.nac_params['born'], pobj.nac_params['dielectric'], dst / 'BORN')
+        # Export BORN FILE
+        if nac_calc:
+            write_BORN(pobj.primitive, pobj.nac_params['born'], pobj.nac_params['dielectric'], dst / 'BORN')
 
 
 def get_phonon_obj(work, nac='auto'):
