@@ -5,11 +5,13 @@ Use sumo to plot the AiiDA BandsData
 import warnings
 
 from pymatgen.electronic_structure.bandstructure import BandStructureSymmLine, Spin
+from pymatgen.phonon.bandstructure import PhononBandStructureSymmLine
 from pymatgen import Lattice
 
 from sumo.plotting.bs_plotter import SBSPlotter
 from sumo.electronic_structure.dos import load_dos
 from sumo.plotting import dos_plotter
+from sumo.plotting.phonon_bs_plotter import SPhononBSPlotter
 
 from aiida.orm import BandsData
 
@@ -138,7 +140,7 @@ def find_vbm(bands, occupations, tol=1e-4):
     return bands[occupations > tol].max()
 
 
-def make_latex_labels(labels):
+def make_latex_labels(labels: list) -> list:
     """Convert labels to laxtex style"""
     label_mapping = {
         'GAMMA': r'\Gamma',
@@ -153,3 +155,28 @@ def make_latex_labels(labels):
                 break
         out_labels.append(f'{label}')
     return out_labels
+
+
+def get_pymatgen_phonon_bands(band_structure: orm.BandsData, input_structure: orm.StructureData,
+                              has_nac=False) -> PhononBandStructureSymmLine:
+    """
+    Obtain a pymatgen phonon bandstructure plotter
+    """
+    qpoints = band_structure.get_kpoints()
+    freq = np.transpose(band_structure.get_bands())  # Pymatgen uses (3 * natoms, number qpoints) for frequency
+    structure = input_structure.get_pymatgen()
+    lattice = structure.lattice.reciprocal_lattice
+    idx, labels = zip(*band_structure.labels)
+    labels = make_latex_labels(labels)
+    labels_dict = {qpoints[idx]: label for idx, label in zip(idx, labels)}
+    pbs = PhononBandStructureSymmLine(qpoints, freq, lattice, labels_dict=labels_dict, structure=structure, has_nac=has_nac)
+    return pbs
+
+
+def get_sumo_phonon_plotter(band_structure: orm.BandsData, input_structure: orm.StructureData, has_nac=False,
+                            imag_tol=-5e-2) -> SPhononBSPlotter:
+    """
+    Obtain a sumo phonon plotter object
+    """
+    bs = get_pymatgen_phonon_bands(band_structure, input_structure, has_nac)
+    return SPhononBSPlotter(bs, imag_tol)
