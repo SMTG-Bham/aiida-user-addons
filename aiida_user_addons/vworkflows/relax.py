@@ -125,8 +125,6 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
 
     def initialize(self):
         """Initialize."""
-        # Check the input parameters
-        self._check_input_parameters()
 
         # Initialise the contexts
         self.ctx.exit_code = self.exit_codes.ERROR_UNKNOWN  # pylint: disable=no-member
@@ -136,6 +134,9 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
         self.ctx.workchains = []
         self.ctx.inputs = AttributeDict()  # This may not be necessary anymore
         self.ctx.relax_settings = AttributeDict(self.inputs.relax_settings.get_dict())  # relax_settings controls the logic of the workchain
+
+        # Check potential issues in the the input parameters
+        self._check_input_parameters()
 
         # Storage space for the inputs
         self.ctx.relax_input_additions = self._init_relax_input_additions()
