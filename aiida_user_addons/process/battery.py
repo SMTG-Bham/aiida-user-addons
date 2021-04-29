@@ -106,10 +106,16 @@ def _obtain_li_ref_calc(encut, gga, group_name='li-metal-refs'):
     qdb.append(Dict,
                with_outgoing=WorkChainNode,
                filters={
-                   'attributes.vasp.encut': encut,
-                   'attributes.vasp.gga': {
-                       'ilike': gga
-                   },
+                   'or': [
+                       {
+                           'attributes.vasp.encut': encut,
+                           'attributes.vasp.gga': gga
+                       },
+                       {
+                           'attributes.incar.encut': encut,
+                           'attributes.incar.gga': gga
+                       },
+                   ]
                },
                edge_filters={'label': 'parameters'})
 
