@@ -64,12 +64,30 @@ def vasp_dryrun(input_dir, vasp_exe='vasp_std', timeout=10, work_dir=None, keep=
         # Once we are out side the loop, kill VASP process
         process.kill()
     result = parse_outcar(outcar)
+    ibzkpt = parse_ibzkpt(work_dir / 'IBZKPT')
+    result['kpoints_and_weights_ibzkpt'] = ibzkpt
 
     if not keep:
         shutil.rmtree(tmpdir)
 
     return result
 
+def parse_ibzkpt(ibzkpt_path):
+    """
+    Parsing the IBZKPT file
+    """
+    from parsevasp.kpoints import Kpoints
+    kpoints = Kpoints(file_path=str(ibzkpt_path))
+    tmp = kpoints.get_dict()['points']
+    kpoints_and_weights = [elem[0].tolist() + [elem[1]] for elem in tmp] 
+    total_weight = sum(tmp[3] for tmp in kpoints_and_weights)
+
+    # Normalise the kpoint weights
+    normalised = []
+    for entry in kpoints_and_weights:
+        normalised.append(entry[:3] + [entry[3] / total_weight])
+
+    return normalised
 
 def parse_outcar(outcar_path):
     """
