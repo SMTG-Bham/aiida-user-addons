@@ -227,7 +227,7 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             # Override INCARs for the final relaxation
             if 'static_calc_parameters' in self.inputs:
                 self.ctx.static_input_additions.parameters = nested_update_dict_node(self.inputs.vasp.parameters,
-                                                                                     self.inputs.static_parameters.get_dict())
+                                                                                     self.inputs.static_calc_parameters.get_dict())
             if self.is_verbose():
                 self.report('performing a final calculation using the relaxed structure.')
 
