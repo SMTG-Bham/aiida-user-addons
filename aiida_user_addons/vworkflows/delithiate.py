@@ -324,7 +324,7 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
             try:
                 voltage = compute_li_voltage_shortcut(relax,
                                                       workchain,
-                                                      li_ref_group_name=self.inputs.li_ref_group_name.value,
+                                                      li_ref_group_name=self.inputs.li_ref_group_name,
                                                       store_provenance=False)
             except RuntimeError:
                 self.report('Cannot compute voltage - possibly the Li reference is not available')
