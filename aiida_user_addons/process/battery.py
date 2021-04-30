@@ -34,7 +34,7 @@ def compute_li_voltage(lithiated_structure, lithiated_res, delithiated_structure
     return Float(eng)
 
 
-def compute_li_voltage_shortcut(lithiated, delithiated, li_ref=None, store_provenance=True):
+def compute_li_voltage_shortcut(lithiated, delithiated, li_ref=None, li_ref_group_name='li-metal-refs', store_provenance=True):
     """
     Compute voltage from three calculations.
 
@@ -44,7 +44,7 @@ def compute_li_voltage_shortcut(lithiated, delithiated, li_ref=None, store_prove
         indict = get_input_parameters_dict(lithiated.outputs.misc)
         encut = _get_incar_tag('encut', indict)
         gga = _get_incar_tag('gga', indict)
-        li_ref = _obtain_li_ref_calc(encut, gga)
+        li_ref = _obtain_li_ref_calc(encut, gga, group_name=li_ref_group_name)
 
     # Check if the calculations are comparable
     if not _is_comparable(lithiated, delithiated):
