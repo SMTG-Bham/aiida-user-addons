@@ -3,6 +3,7 @@ Use sumo to plot the AiiDA BandsData
 """
 
 import warnings
+import numpy as np
 
 from pymatgen.electronic_structure.bandstructure import BandStructureSymmLine, Spin
 from pymatgen.phonon.bandstructure import PhononBandStructureSymmLine
@@ -13,7 +14,7 @@ from sumo.electronic_structure.dos import load_dos
 from sumo.plotting import dos_plotter
 from sumo.plotting.phonon_bs_plotter import SPhononBSPlotter
 
-from aiida.orm import BandsData
+from aiida.orm import BandsData, StructureData
 
 from aiida_user_addons.tools.vasp import pmg_vasprun
 
@@ -157,8 +158,7 @@ def make_latex_labels(labels: list) -> list:
     return out_labels
 
 
-def get_pymatgen_phonon_bands(band_structure: orm.BandsData, input_structure: orm.StructureData,
-                              has_nac=False) -> PhononBandStructureSymmLine:
+def get_pymatgen_phonon_bands(band_structure: BandsData, input_structure: StructureData, has_nac=False) -> PhononBandStructureSymmLine:
     """
     Obtain a pymatgen phonon bandstructure plotter
     """
@@ -168,13 +168,12 @@ def get_pymatgen_phonon_bands(band_structure: orm.BandsData, input_structure: or
     lattice = structure.lattice.reciprocal_lattice
     idx, labels = zip(*band_structure.labels)
     labels = make_latex_labels(labels)
-    labels_dict = {qpoints[idx]: label for idx, label in zip(idx, labels)}
+    labels_dict = {label: qpoints[idx] for idx, label in zip(idx, labels)}
     pbs = PhononBandStructureSymmLine(qpoints, freq, lattice, labels_dict=labels_dict, structure=structure, has_nac=has_nac)
     return pbs
 
 
-def get_sumo_phonon_plotter(band_structure: orm.BandsData, input_structure: orm.StructureData, has_nac=False,
-                            imag_tol=-5e-2) -> SPhononBSPlotter:
+def get_sumo_phonon_plotter(band_structure: BandsData, input_structure: StructureData, has_nac=False, imag_tol=-5e-2) -> SPhononBSPlotter:
     """
     Obtain a sumo phonon plotter object
     """
