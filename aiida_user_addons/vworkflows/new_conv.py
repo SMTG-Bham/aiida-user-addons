@@ -132,7 +132,10 @@ class VaspConvergenceWorkChain(WorkChain):
             output = workchain.outputs.misc.get_dict()
             data = {}
             data['maximum_force'] = output.get('maximum_force')
-            data['magnetization'] = output.get('magnetization', [None])[0]
+            # Extract the magnetization
+            magnetization = output.get('magnetization')
+            if magnetization:
+                data['magnetization'] = magnetization[0]
             data['maximum_stress'] = output.get('maximum_stress', None)
             data['energy'] = list(output['total_energies'].values())[0]
             return data
