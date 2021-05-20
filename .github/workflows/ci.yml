@@ -43,7 +43,7 @@ jobs:
       - name: Install AiiDA
         run: pip install 'aiida-core>=1.6.1,<2'
       - name: Install aiida-vasp
-        run: pip install -e git+https://github.com/zhubonan/aiida-vasp@bz-changes#egg=aiida-vasp[testing]
+        run: pip install -e git+https://github.com/zhubonan/aiida-vasp@bz-changes#egg=aiida-vasp[tests]
       - name: Install package
         run: |
           pip install -e .
