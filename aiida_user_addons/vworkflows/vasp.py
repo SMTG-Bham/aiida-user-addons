@@ -15,7 +15,7 @@ from aiida.common.utils import classproperty
 from aiida.plugins import CalculationFactory
 from aiida.orm import Code, KpointsData, Dict
 from aiida.orm.nodes.data.base import to_aiida_type
-from aiida.engine.processes.workchains.restart import BaseRestartWorkChain
+from aiida.engine.processes.workchains.restart import BaseRestartWorkChain, process_handler
 
 from aiida_vasp.workchains.vasp import VaspWorkChain as VanillaVaspWorkChain
 
@@ -23,6 +23,7 @@ from aiida_vasp.utils.aiida_utils import get_data_class, get_data_node
 from aiida_vasp.utils.workchains import compose_exit_code
 from aiida_vasp.utils.workchains import prepare_process_inputs
 from aiida_vasp.assistant.parameters import ParametersMassage
+from aiida_vasp.calcs.vasp import VaspCalculation
 
 from aiida_user_addons.common.inputset.vaspsets import VASPInputSet
 from ..common.inputset.vaspsets import get_ldau_keys
@@ -311,3 +312,19 @@ class VaspWorkChain(VanillaVaspWorkChain):
         self.report(f'Found optimum KPAR={scheme.kpar}, NCORE={scheme.ncore}')  # pylint: disable=not-callable
         self.ctx.inputs.parameters.update(parallel_opts)
         self.out('parallel_settings', Dict(dict={'ncore': scheme.ncore, 'kpar': scheme.kpar}).store())
+
+    # In this workchain variant we default to ignore the NELM breaches in the middle of the calculation
+    @process_handler(priority=850,
+                     exit_codes=[
+                         VaspCalculation.exit_codes.ERROR_ELECTRONIC_NOT_CONVERGED,
+                         VaspCalculation.exit_codes.ERROR_IONIC_NOT_CONVERGED,
+                         VaspCalculation.exit_codes.ERROR_DID_NOT_FINISH,
+                     ],
+                     enabled=True)
+    def ignore_nelm_breach_relax(self, node):
+        """
+        Not a actual handler but works as a switch to bypass checks for NELM breaches in the middle of an ionic relaxation.
+        """
+        _ = node
+        self.ctx.ignore_transient_nelm_breach = True
+
