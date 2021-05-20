@@ -1,0 +1,5 @@
+ALGO = normal
+EDIFF = 1e-07
+IBRION = 2
+ISIF = 3
+NELM = 200

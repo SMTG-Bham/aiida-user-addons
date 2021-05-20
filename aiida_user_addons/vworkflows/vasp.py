@@ -15,8 +15,10 @@ from aiida.common.utils import classproperty
 from aiida.plugins import CalculationFactory
 from aiida.orm import Code, KpointsData, Dict
 from aiida.orm.nodes.data.base import to_aiida_type
+from aiida.engine.processes.workchains.restart import BaseRestartWorkChain
 
-from aiida_vasp.workchains.restart import BaseRestartWorkChain
+from aiida_vasp.workchains.vasp import VaspWorkChain as VanillaVaspWorkChain
+
 from aiida_vasp.utils.aiida_utils import get_data_class, get_data_node
 from aiida_vasp.utils.workchains import compose_exit_code
 from aiida_vasp.utils.workchains import prepare_process_inputs
@@ -27,8 +29,11 @@ from ..common.inputset.vaspsets import get_ldau_keys
 
 from .common import parameters_validator
 
+assert issubclass(VanillaVaspWorkChain,
+                  BaseRestartWorkChain), 'vasp.vasp workchain is not a subclass of BaseRestartWorkChain from aiida-core'
 
-class VaspWorkChain(BaseRestartWorkChain):
+
+class VaspWorkChain(VanillaVaspWorkChain):
     """
     The VASP workchain.
 
@@ -135,103 +140,54 @@ class VaspWorkChain(BaseRestartWorkChain):
                    help="""
             Site dependent flag for selective dynamics when performing relaxation
             """)
-
         spec.outline(
-            cls.init_context,
+            cls.setup,
             cls.init_inputs,
             if_(cls.run_auto_parallel)(
-                cls.init_calculation,
+                cls.prepare_inputs,
                 cls.perform_autoparallel
             ),
-            while_(cls.run_calculations)(
-                cls.init_calculation,
-                cls.run_calculation,
-                cls.verify_calculation
+            while_(cls.should_run_process)(
+                cls.prepare_inputs,
+                cls.run_process,
+                cls.inspect_process,
             ),
             cls.results,
-            cls.finalize
         )  # yapf: disable
-
-        spec.output('misc', valid_type=get_data_class('dict'))
-        spec.output('remote_folder', valid_type=get_data_class('remote'))
-        spec.output('retrieved', valid_type=get_data_class('folder'))
-        spec.output('structure', valid_type=get_data_class('structure'), required=False)
-        spec.output('kpoints', valid_type=get_data_class('array.kpoints'), required=False)
-        spec.output('trajectory', valid_type=get_data_class('array.trajectory'), required=False)
-        spec.output('chgcar', valid_type=get_data_class('vasp.chargedensity'), required=False)
-        spec.output('wavecar', valid_type=get_data_class('vasp.wavefun'), required=False)
-        spec.output('bands', valid_type=get_data_class('array.bands'), required=False)
-        spec.output('forces', valid_type=get_data_class('array'), required=False)
-        spec.output('stress', valid_type=get_data_class('array'), required=False)
-        spec.output('dos', valid_type=get_data_class('array'), required=False)
-        spec.output('occupancies', valid_type=get_data_class('array'), required=False)
-        spec.output('energies', valid_type=get_data_class('array'), required=False)
-        spec.output('projectors', valid_type=get_data_class('array'), required=False)
-        spec.output('dielectrics', valid_type=get_data_class('array'), required=False)
-        spec.output('born_charges', valid_type=get_data_class('array'), required=False)
-        spec.output('hessian', valid_type=get_data_class('array'), required=False)
-        spec.output('dynmat', valid_type=get_data_class('array'), required=False)
-        spec.output('site_magnetization', valid_type=get_data_class('dict'), required=False)
         spec.output('parallel_settings', valid_type=get_data_class('dict'), required=False)
-        spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
-        spec.exit_code(700, 'ERROR_NO_POTENTIAL_FAMILY_NAME', message='the user did not supply a potential family name')
-        spec.exit_code(701, 'ERROR_POTENTIAL_VALUE_ERROR', message='ValueError was returned from get_potcars_from_structure')
-        spec.exit_code(702, 'ERROR_POTENTIAL_DO_NOT_EXIST', message='the potential does not exist')
-        spec.exit_code(703, 'ERROR_IN_PARAMETER_MASSAGER', message='the exception: {exception} was thrown while massaging the parameters')
-
-    def init_calculation(self):
-        """Set the restart folder and set parameters tags for a restart."""
-        # Check first if the calling workchain wants a restart in the same folder
-        if 'restart_folder' in self.inputs:
-            self.ctx.inputs.restart_folder = self.inputs.restart_folder
-
-        # Then check if we the restart workchain wants a restart
-        if isinstance(self.ctx.restart_calc, self._calculation):
-            self.ctx.inputs.restart_folder = self.ctx.restart_calc.outputs.remote_folder
-            old_parameters = AttributeDict(self.ctx.inputs.parameters.get_dict())
-            parameters = old_parameters.copy()
-            if 'istart' in parameters:
-                parameters.istart = 1
-            if 'icharg' in parameters:
-                parameters.icharg = 1
-            if parameters != old_parameters:
-                self.ctx.inputs.parameters = get_data_node('dict', dict=parameters)
 
     def init_inputs(self):
         """Make sure all the required inputs are there and valid, create input dictionary for calculation."""
-        self.ctx.inputs = AttributeDict()
 
+        #### START OF THE COPY FROM VASPWorkChain ####
+        #  - the only change is that the section about kpoints is deleted
+        self.ctx.inputs = AttributeDict()
+        self.ctx.inputs.parameters = self._init_parameters()
         # Set the code
         self.ctx.inputs.code = self.inputs.code
 
         # Set the structure (poscar)
         self.ctx.inputs.structure = self.inputs.structure
 
-        # Set the kpoints (kpoints)
-        if 'kpoints' in self.inputs:
-            self.ctx.inputs.kpoints = self.inputs.kpoints
-        elif 'kpoints_spacing' in self.inputs:
-            kpoints = KpointsData()
-            kpoints.set_cell_from_structure(self.ctx.inputs.structure)
-            kpoints.set_kpoints_mesh_from_density(self.inputs.kpoints_spacing.value * np.pi * 2)
-            self.ctx.inputs.kpoints = kpoints
-        else:
-            raise InputValidationError("Must supply either 'kpoints' or 'kpoints_spacing'")
+        # Set the kpoints (kpoints) - No longer needed, using kpoints/kpoints spacing as from below
+        # self.ctx.inputs.kpoints = self.inputs.kpoints
 
         # Set settings
         unsupported_parameters = None
-        if 'settings' in self.inputs:
+        skip_parameters_validation = False
+        if self.inputs.get('settings'):
             self.ctx.inputs.settings = self.inputs.settings
             # Also check if the user supplied additional tags that is not in the supported file.
-            try:
-                unsupported_parameters = self.ctx.inputs.settings.unsupported_parameters
-            except AttributeError:
-                pass
+            settings_dict = self.ctx.inputs.settings.get_dict()
+            unsupported_parameters = settings_dict.get('unsupported_parameters', unsupported_parameters)
+            skip_parameters_validation = settings_dict.get('skip_parameters_validation', skip_parameters_validation)
 
         # Perform inputs massage to accommodate generalization in higher lying workchains
         # and set parameters.
         try:
-            parameters_massager = ParametersMassage(self.inputs.parameters, unsupported_parameters)
+            parameters_massager = ParametersMassage(self.ctx.inputs.parameters,
+                                                    unsupported_parameters,
+                                                    skip_parameters_validation=skip_parameters_validation)
         except Exception as exception:  # pylint: disable=broad-except
             return self.exit_codes.ERROR_IN_PARAMETER_MASSAGER.format(exception=exception)  # pylint: disable=no-member
         try:
@@ -244,17 +200,6 @@ class VaspWorkChain(BaseRestartWorkChain):
         except AttributeError:
             pass
 
-        # Setup LDAU keys
-        if 'ldau_mapping' in self.inputs:
-            ldau_settings = self.inputs.ldau_mapping.get_dict()
-            ldau_keys = get_ldau_keys(self.ctx.inputs.structure, **ldau_settings)
-            # Directly update the raw inputs passed to VaspCalculation
-            self.ctx.inputs.parameters.update(ldau_keys)
-
-        # Set settings
-        if 'settings' in self.inputs:
-            self.ctx.inputs.settings = self.inputs.settings
-
         # Set options
         # Options is very special, not storable and should be
         # wrapped in the metadata dictionary, which is also not storable
@@ -262,27 +207,32 @@ class VaspWorkChain(BaseRestartWorkChain):
         if 'options' in self.inputs:
             options = {}
             options.update(self.inputs.options)
-            self.ctx.inputs.metadata = {}
-            self.ctx.inputs.metadata['options'] = options
+            self.ctx.inputs.metadata = {'options': options}
             # Override the parser name if it is supplied by the user.
             parser_name = self.ctx.inputs.metadata['options'].get('parser_name')
             if parser_name:
                 self.ctx.inputs.metadata['options']['parser_name'] = parser_name
-            # Also make sure we specify the entry point for the
             # Set MPI to True, unless the user specifies otherwise
             withmpi = self.ctx.inputs.metadata['options'].get('withmpi', True)
             self.ctx.inputs.metadata['options']['withmpi'] = withmpi
+
         # Utilise default input/output selections
         self.ctx.inputs.metadata['options']['input_filename'] = 'INCAR'
         self.ctx.inputs.metadata['options']['output_filename'] = 'OUTCAR'
 
-        # Set the CalcJobNode to have the same label as the WorkChain
-        self.ctx.inputs.metadata['label'] = self.inputs.metadata.get('label', '')
+        # Make sure we also bring along any label and description set on the WorkChain to the CalcJob, it if does
+        # not exists, set to empty string.
+        if 'metadata' in self.inputs:
+            label = self.inputs.metadata.get('label', '')
+            description = self.inputs.metadata.get('description', '')
+            if 'metadata' not in self.ctx.inputs:
+                self.ctx.inputs.metadata = {}
+            self.ctx.inputs.metadata['label'] = label
+            self.ctx.inputs.metadata['description'] = description
 
         # Verify and set potentials (potcar)
         if not self.inputs.potential_family.value:
-            self.report(  # pylint: disable=not-callable
-                'An empty string for the potential family name was detected.')
+            self.report('An empty string for the potential family name was detected.')  # pylint: disable=not-callable
             return self.exit_codes.ERROR_NO_POTENTIAL_FAMILY_NAME  # pylint: disable=no-member
         try:
             self.ctx.inputs.potential = get_data_class('vasp.potcar').get_potcars_from_structure(
@@ -294,10 +244,12 @@ class VaspWorkChain(BaseRestartWorkChain):
         except NotExistent as err:
             return compose_exit_code(self.exit_codes.ERROR_POTENTIAL_DO_NOT_EXIST.status, str(err))  # pylint: disable=no-member
 
+        # Store verbose parameter in ctx - otherwise it will not work after deserialization
         try:
-            self._verbose = self.inputs.verbose.value
+            self.ctx.verbose = self.inputs.verbose.value
         except AttributeError:
-            pass
+            self.ctx.verbose = self._verbose
+
         # Set the charge density (chgcar)
         if 'chgcar' in self.inputs:
             self.ctx.inputs.charge_density = self.inputs.chgcar
@@ -306,11 +258,29 @@ class VaspWorkChain(BaseRestartWorkChain):
         if 'wavecar' in self.inputs:
             self.ctx.inputs.wavefunctions = self.inputs.wavecar
 
-        return self.exit_codes.NO_ERROR  # pylint: disable=no-member
+        ##### END OF THE COPY from VaspWorkChain   #####
+
+        # Set the kpoints (kpoints)
+        if 'kpoints' in self.inputs:
+            self.ctx.inputs.kpoints = self.inputs.kpoints
+        elif 'kpoints_spacing' in self.inputs:
+            kpoints = KpointsData()
+            kpoints.set_cell_from_structure(self.ctx.inputs.structure)
+            kpoints.set_kpoints_mesh_from_density(self.inputs.kpoints_spacing.value * np.pi * 2)
+            self.ctx.inputs.kpoints = kpoints
+        else:
+            raise InputValidationError("Must supply either 'kpoints' or 'kpoints_spacing'")
+
+        # Setup LDAU keys
+        if 'ldau_mapping' in self.inputs:
+            ldau_settings = self.inputs.ldau_mapping.get_dict()
+            ldau_keys = get_ldau_keys(self.ctx.inputs.structure, **ldau_settings)
+            # Directly update the raw inputs passed to VaspCalculation
+            self.ctx.inputs.parameters.update(ldau_keys)
 
     def run_auto_parallel(self):
         """Wether we should run auto-parallelisation test"""
-        return 'auto_parallel' in self.inputs
+        return 'auto_parallel' in self.inputs and self.inputs.auto_parallel.value is True
 
     def perform_autoparallel(self):
         """Dry run and obtain the best parallelisation settings"""
@@ -341,77 +311,3 @@ class VaspWorkChain(BaseRestartWorkChain):
         self.report(f'Found optimum KPAR={scheme.kpar}, NCORE={scheme.ncore}')  # pylint: disable=not-callable
         self.ctx.inputs.parameters.update(parallel_opts)
         self.out('parallel_settings', Dict(dict={'ncore': scheme.ncore, 'kpar': scheme.kpar}).store())
-
-    @override
-    def on_except(self, exc_info):
-        """Handle excepted state."""
-        try:
-            last_calc = self.ctx.calculations[-1] if self.ctx.calculations else None
-            if last_calc is not None:
-                self.report(  # pylint: disable=not-callable
-                    'Last calculation: {calc}'.format(calc=repr(last_calc)))
-                sched_err = last_calc.outputs.retrieved.get_file_content('_scheduler-stderr.txt')
-                sched_out = last_calc.outputs.retrieved.get_file_content('_scheduler-stdout.txt')
-                self.report('Scheduler output:\n{}'.format(sched_out or ''))  # pylint: disable=not-callable
-                self.report('Scheduler stderr:\n{}'.format(sched_err or ''))  # pylint: disable=not-callable
-        except AttributeError:
-            self.report('No calculation was found in the context. '  # pylint: disable=not-callable
-                        'Something really awefull happened. '
-                        'Please inspect messages and act.')
-
-        return super(VaspWorkChain, self).on_except(exc_info)
-
-    def verify_calculation(self):
-        """
-        Analyse the results of the last calculation.
-
-        In particular, check whether it finished successfully or if not troubleshoot the cause and handle the errors,
-        or abort if unrecoverable error was found.
-        Note that this workchain only check system level issues and does not handle errors or warnings from the
-        calculation itself. That is handled in its parent.
-        """
-        try:
-            calculation = self.ctx.calculations[-1]
-        except IndexError:
-            self.report = 'The first iteration finished without returning a {}'.format(self._calculation.__name__)  # pylint: disable=not-callable
-            return self.exit_codes.ERROR_ITERATION_RETURNED_NO_CALCULATION  # pylint: disable=no-member
-
-        # Check if the calculation already has an exit status, if so, inherit that
-        if calculation.exit_status:
-            exit_code = compose_exit_code(calculation.exit_status, calculation.exit_message)
-            self.report('The called {}<{}> returned a non-zero exit status. '  # pylint: disable=not-callable
-                        'The exit status {} is inherited'.format(calculation.__class__.__name__, calculation.pk, exit_code))
-            # Attach all quantities if possible - different from the original behaviour
-            for key in calculation.outputs:
-                if key in self.spec().outputs:
-                    self.out(key, calculation.outputs[key])
-            return exit_code
-
-        # Set default exit status to an unknown failure
-        self.ctx.exit_code = self.exit_codes.ERROR_UNKNOWN  # pylint: disable=no-member
-
-        # Done: successful completion of last calculation
-        if calculation.is_finished_ok:
-            self._handle_succesfull(calculation)
-
-        # Abort: exceeded maximum number of retries
-        elif self.ctx.iteration > self.inputs.max_iterations.value:
-            self._handle_max_iterations(calculation)
-
-        # Abort: unexpected state of last calculation
-        elif calculation.process_state not in self._expected_calculation_states:
-            self._handle_unexpected(calculation)
-
-        # Abort: killed
-        elif calculation.is_killed:
-            self._handle_killed(calculation)
-
-        # Abort: excepted
-        elif calculation.is_excepted:
-            self._handle_excepted(calculation)
-
-        # Retry or abort: calculation finished or failed (but is not ok)
-        elif calculation.is_finished:
-            self._handle_other(calculation)
-
-        return self.ctx.exit_code

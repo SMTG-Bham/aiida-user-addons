@@ -25,6 +25,7 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
     """
 
     _allowed_strategies = ['full', 'unique', 'wyckoff']
+    ALLOWED_OK_EXIT_CODES = [601]
 
     @classmethod
     def define(cls, spec):
@@ -264,11 +265,14 @@ class SimpleDelithiateWorkChain(WorkChain, WithVaspInputSet):
         nfail = 0
         for workchain in self.ctx.workchains:
             link_name = workchain.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
-            if not workchain.is_finished_ok:
+            if not workchain.is_finished_ok and workchain.exit_status not in self.ALLOWED_OK_EXIT_CODES:
                 self.report('Relaxation {} ({}) did not finished ok - not attaching the results'.format(workchain, link_name))
                 nfail += 1
             else:
                 miscs[link_name] = workchain.outputs.misc
+                if workchain.exit_status in self.ALLOWED_OK_EXIT_CODES:
+                    self.report('Relaxation {} ({}) finished with exit code: {}, but treated as if it was OK'.format(
+                        workchain, link_name, workchain.exit_status))
 
         if not miscs:
             self.report('None of the work has finished ok - serious problem must occurred')

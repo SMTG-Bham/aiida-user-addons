@@ -58,7 +58,7 @@ def test_empty_field():
 
     with pytest.raises(InputValidationError):
         DummyOptions4.validate_dict(dict(a=2, b=2))
-    DummyOptions2.validate_dict(dict(a=2, b=2))
+    DummyOptions2.validate_dict(dict(a=2, b=2, c=3.0, d=4))
 
 
 @pytest.fixture

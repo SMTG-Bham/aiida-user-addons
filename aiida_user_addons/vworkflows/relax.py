@@ -135,6 +135,9 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
         self.ctx.inputs = AttributeDict()  # This may not be necessary anymore
         self.ctx.relax_settings = AttributeDict(self.inputs.relax_settings.get_dict())  # relax_settings controls the logic of the workchain
 
+        # Check potential issues in the the input parameters
+        self._check_input_parameters()
+
         # Storage space for the inputs
         self.ctx.relax_input_additions = self._init_relax_input_additions()
         self.ctx.static_input_additions = AttributeDict()
@@ -180,6 +183,23 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             if clean_tmp and clean_tmp.value:
                 self.report('Disable clean_workdir for downstream workflows since `reuse` is requested.')
                 self.ctx.relax_input_additions['clean_workdir'] = orm.Bool(False)
+
+        # Check the input parameters
+        self._check_input_parameters()
+
+    def _check_input_parameters(self):
+        """Validate the input parameters and detect problems before running the workchain"""
+        exposed = self.exposed_inputs(self._base_workchain, 'vasp')
+        incar = exposed.parameters['incar']
+        exp_key = ['ibrion', 'nsw', 'isif']
+        for key in exp_key:
+            if key in incar:
+                self.report('{} explicitly set to {} - this overrides the relax_settings input - proceed with caution.'.format(
+                    key, incar[key]))
+        isif = incar.get('isif')
+        if isif == 3 and not all([self.ctx.relax_settings.get(key) for key in ['positions', 'volume', 'shape']]):
+            raise InputValidationError(
+                'ISIF = 3 is set explicity for INCAR, which is consistent with the mode of relaxation supplied to the workchain.')
 
     def _init_relax_input_additions(self):
         """
@@ -308,6 +328,15 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
         # Update the input with whatever stored in the relax_input_additions attribute dict
         inputs.update(self.ctx.static_input_additions)
 
+        # Make sure NSW is not here for the static calculation
+        incar = inputs.parameters['incar']
+        if 'nsw' in incar:
+            incar.pop('nsw')
+            new_param = inputs.parameters.get_dict()
+            new_param['incar'] = incar
+            inputs.parameters = orm.Dict(dict=new_param)
+            self.report('Removed explicitly defined NSW value for the static calculation')
+
         running = self.submit(self._base_workchain, **inputs)
         self.report('launching {}<{}> iterations #{}'.format(self._base_workchain.__name__, running.pk, self.ctx.iteration))
         return ToContext(workchains=append_(running))
@@ -382,13 +411,23 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             self.ctx.current_restart_folder = workchain.outputs.remote_folder
             return self.exit_codes.NO_ERROR  # pylint: disable=no-member
 
+        # Because the workchain may have been through multiple restarts of the underlying VASP calculation
+        # we have to query and find the exact input structure of the calculation that generated the output
+        # structure and use that for comparison
+        query = orm.QueryBuilder()
+        query.append(orm.StructureData, filters={'id': workchain.outputs.structure.id}, tag='workchain-out')
+        query.append(orm.CalcJobNode, with_outgoing='workchain-out', tag='calcjob')
+        query.append(orm.StructureData, with_outgoing='calcjob')
+        input_structure = query.one()[0]
+
         self.ctx.previous_structure = self.ctx.current_structure
+        self.ctx.last_calc_input_structure = input_structure
         self.ctx.current_structure = workchain.outputs.structure
 
         conv_mode = self.ctx.relax_settings.convergence_mode
         # Assign the two structure used for comparison
         if conv_mode == 'inout':
-            compare_from = self.ctx.previous_structure
+            compare_from = self.ctx.last_calc_input_structure
             compare_to = self.ctx.current_structure
         elif conv_mode == 'last':
             traj = workchain.outputs.trajectory
@@ -397,7 +436,7 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
                 compare_to = get_step_structure(workchain.outputs.trajectory, -1)  # take take second last structure
             else:
                 self.report('Warning - no enough number of steps to compare - using input/output structures instead.')
-                compare_from = self.ctx.previous_structure
+                compare_from = self.ctx.last_calc_input_structure
                 compare_to = self.ctx.current_structure
         else:
             raise RuntimeError('Convergence mode {} is not a valid option'.format(conv_mode))
@@ -531,7 +570,11 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
         if not detect_tetrahedral_method(workchain.inputs.parameters.get_dict()):
             max_force_threshold = self.ctx.relax_settings.get('force_cutoff', 0.03)
             actual_max_force = workchain.outputs.misc['maximum_force']
-            if actual_max_force > max_force_threshold * 1.5:
+            if actual_max_force > max(max_force_threshold * 1.5, max_force_threshold + 0.001):
+                if self.is_verbose():
+                    self.report(
+                        f'The force of the final SCF is {actual_max_force} eV/A, which is significantly higher than the tolerance {max_force_threshold} eV/A.'
+                    )
                 return self.exit_codes.ERROR_FINAL_SCF_HAS_RESIDUAL_FORCE  # pylint: disable=no-member
         else:
             self.report('Unable to presure final check for maximum force, as the tetrahedral method is used for integration.')

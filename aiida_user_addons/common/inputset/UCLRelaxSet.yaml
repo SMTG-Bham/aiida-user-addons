@@ -18,7 +18,6 @@ global:
   lvhar: true
   lorbit: 11
   nedos: 2000
-  isif: 3
   gga: ps
 
 per_atom:
