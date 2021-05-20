@@ -3,7 +3,8 @@ Bands workchain with a more flexible input
 TODO:
 
 - Add option to use alternative pathways obtained using sumo-interface
-- Add options to perform hybrid function band structures using zero-weight kpoints approach.
+- Improve the hybrid workchain by performing local dryrun to extract the full kpoints
+    - If running SOC, the ISYM should be turned to 0 or -1.
 """
 from copy import deepcopy
 from typing import List
