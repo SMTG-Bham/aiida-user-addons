@@ -1,0 +1,55 @@
+# Default input files
+# Note that this is just for a shortcut, the actual input should be check before launching
+# Thanks for AiiDA's provenance preservation it is OK to change this file...
+
+global:
+  task: geometryoptimisation
+  cut_off_energy: 700
+  smearing_width: 0.05
+  spin_polarised: true
+  opt_strategy: speed
+  write_otfg: False
+  write_bib: False
+  write_cst_esp: False
+  xc_functional: pbesol
+  max_scf_cycles: 100
+  geom_max_iter: 60
+  num_backup_iter: 10
+  symmetry_generate: True
+  snap_to_symmetry: True
+  calculate_stress: True
+
+
+# More maybe added later
+hubbardu_mapping:
+  Fe: [d, 4.0]
+  Mn: [d, 4.0]
+
+spin_mapping:
+  Ce: 5
+  Co: 5
+  Cr: 5
+  Dy: 5
+  Eu: 10
+  Fe: 5
+  Gd: 7
+  Ho: 4
+  La: 0.6
+  Lu: 0.6
+  Mn: 5
+  Mo: 5
+  Nd: 3
+  Ni: 5
+  Pm: 4
+  Pr: 2
+  Sm: 5
+  Tb: 6
+  Tm: 2
+  V: 5
+  W: 5
+  Yb: 1
+  default: 0.6
+
+# Essentially copied from MPRelaxSet
+otfg_library:
+  default: C19

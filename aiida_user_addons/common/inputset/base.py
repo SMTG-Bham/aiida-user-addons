@@ -66,7 +66,7 @@ class InputSet:
 
         if overrides is None:
             overrides = {}
-        self.overides = overrides
+        self.overrides = overrides
 
         self._presets = None
         self._load_data()
@@ -80,7 +80,7 @@ class InputSet:
 
         # Set-per atom properties
         natoms = self.natoms
-        for key, value in self._presets['per_atom'].items():
+        for key, value in self._presets.get('per_atom', {}).items():
             out_dict[key] = value * natoms
 
         self.apply_overrides(out_dict)
@@ -118,9 +118,10 @@ class InputSet:
 
     def apply_overrides(self, out_dict):
         """Apply overrides stored in self.overrides to the dictionary passed"""
-        for name, value in self.overides.items():
+        for name, value in self.overrides.items():
             # Keys ends with '_mapping' are treated differently here
-            if '_mapping' in name:
+            # Those valuse should have been applied already implemented in the `get_input_dict` method.
+            if '_mapping' in name or '_list' in name:
                 continue
             # Delete the key
             if value is None:

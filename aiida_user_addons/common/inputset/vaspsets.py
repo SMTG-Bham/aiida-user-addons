@@ -19,13 +19,13 @@ class VASPInputSet(InputSet):
         spin = False
         mapping = deepcopy(self._presets['magmom_mapping'])
         # Update with overrides
-        mapping.update(self.overides.get('magmom_mapping', {}))
+        mapping.update(self.overrides.get('magmom_mapping', {}))
         default = mapping['default']
         for symbol in mapping:
             if symbol in self.elements:
                 spin = True
                 break
-        if 'magmom_mapping' in self.overides or 'magmom' in self.overides:
+        if 'magmom_mapping' in self.overrides or 'magmom' in self.overrides:
             spin = True
 
         # Setup magnetic moments
@@ -43,10 +43,10 @@ class VASPInputSet(InputSet):
 
         # Setup LDAU parameters
         ldauumap = deepcopy(self._presets['ldauu_mapping'])
-        ldauumap.update(self.overides.get('ldauu_mapping', {}))
+        ldauumap.update(self.overrides.get('ldauu_mapping', {}))
 
         ldaujmap = deepcopy(self._presets['ldauj_mapping'])
-        ldaujmap.update(self.overides.get('ldauj_mapping', {}))
+        ldaujmap.update(self.overrides.get('ldauj_mapping', {}))
 
         ldaukeys = get_ldau_keys(self.structure, ldauumap, utype=2, jmapping=ldaujmap)
         out_dict.update(ldaukeys)
@@ -64,7 +64,7 @@ class VASPInputSet(InputSet):
 
         pmap = deepcopy(self._presets['potcar_mapping'])
         # Update the mapping from override, if any
-        pmap.update(self.overides.get('potcar_mapping', {}))
+        pmap.update(self.overrides.get('potcar_mapping', {}))
 
         out_dict = {key: pmap[key] for key in elms}
         return out_dict
