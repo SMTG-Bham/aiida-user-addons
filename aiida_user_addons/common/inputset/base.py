@@ -2,9 +2,11 @@
 Module for preparing standardised input for calculations
 """
 
-import yaml
+from math import pi
 from pathlib import Path
 from copy import deepcopy
+
+import yaml
 from ase import Atoms
 
 FELEMS = [
@@ -41,6 +43,11 @@ FELEMS = [
 ]
 
 
+def get_library_path():
+    """Get the path where the YAML files are stored within this package"""
+    return Path(__file__).parent
+
+
 class InputSet:
     """
     Base class representing an inputs set.
@@ -49,9 +56,9 @@ class InputSet:
     for high-throughput calculations.
     """
     # path from which the set yaml files are read
-    _load_paths = (Path(__file__).parent, Path('~/.inputsets').expanduser())
+    _load_paths = (get_library_path(), Path('~/.inputsets').expanduser())
 
-    def __init__(self, set_name, structure, overrides=None):
+    def __init__(self, set_name, structure, overrides=None, verbose=True):
         """
         Initialise an InputSet
 
@@ -70,6 +77,7 @@ class InputSet:
 
         self._presets = None
         self._load_data()
+        self.verbose = verbose
 
     def get_input_dict(self, raw_python=True):
         """
@@ -98,6 +106,9 @@ class InputSet:
                 break
         if set_path is None:
             raise RuntimeError(f'Cannot find input set definition for {self.set_name}')
+
+        if self.verbose:
+            print(f'Using input set file at: {set_path}')
 
         with open(set_path) as fhd:
             self._presets = yaml.load(fhd, Loader=yaml.FullLoader)
@@ -140,7 +151,6 @@ class InputSet:
           An KpointsData object with the desired density
         """
         from aiida.orm import KpointsData
-        from math import pi
         kpoints = KpointsData()
         kpoints.set_cell(self.structure.cell)
         kpoints.set_kpoints_mesh_from_density(density * 2 * pi)
