@@ -18,6 +18,8 @@ global:
   symmetry_generate: True
   snap_to_symmetry: True
   calculate_stress: True
+  elec_energy_tol: 1.0e-6
+  geom_force_tol : 0.03
 
 
 # More maybe added later
