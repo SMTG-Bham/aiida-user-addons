@@ -76,8 +76,8 @@ class InputSet:
         self.overrides = overrides
 
         self._presets = None
-        self._load_data()
         self.verbose = verbose
+        self._load_data()
 
     def get_input_dict(self, raw_python=True):
         """
