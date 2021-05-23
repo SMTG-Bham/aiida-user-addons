@@ -331,7 +331,7 @@ class CastepAutoPhononWorkChain(WorkChain):
             self.out(key, self.ctx[key])
 
         if self.is_nac():
-
+            raise NotImplemented('Inclusion of NAC is not implemented yet')
             self.report('Create nac data')
             calc = self.ctx.born_and_epsilon_calc
             # NOTE: this is VASP specific outputs -- but I can implement the same for CASTEP plugin
@@ -420,9 +420,7 @@ class CastepAutoPhononWorkChain(WorkChain):
         which is typically not compatible with FD phonons which
         mostly uses the USPs.
 
-        But how does VASP do DFPT with U?
-
-        TODO: allow this to be true
+        TODO: allow this to be true - need to implement parser for born effective charges and dielectric constants
         """
         #return bool(self.inputs.get('nac'))
         return False
