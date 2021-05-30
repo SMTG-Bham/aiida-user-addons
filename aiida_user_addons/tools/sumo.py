@@ -190,17 +190,17 @@ def get_sumo_phonon_plotter(band_structure: BandsData, input_structure: Structur
 ####### Routines for CASTEP  ########
 
 
-def read_dos(calculation_node,
-             bin_width=0.01,
-             gaussian=None,
-             padding=None,
-             emin=None,
-             emax=None,
-             efermi_to_vbm=True,
-             lm_orbitals=None,
-             elements=None,
-             atoms=None,
-             total_only=False):
+def read_dos_castep(calculation_node,
+                    bin_width=0.01,
+                    gaussian=None,
+                    padding=None,
+                    emin=None,
+                    emax=None,
+                    efermi_to_vbm=True,
+                    lm_orbitals=None,
+                    elements=None,
+                    atoms=None,
+                    total_only=False):
     """Convert DOS data from CASTEP .bands file to Pymatgen/Sumo format
 
     The data is binned into a regular series using np.histogram
