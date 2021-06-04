@@ -65,7 +65,6 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         relax_work = WorkflowFactory(cls._relax_wk_string)
         base_work = WorkflowFactory(cls._base_wk_string)
 
-        spec.input('kpoints_per_split', valid_type=orm.Int, help='Number of kpoints per split.', required=True)
         spec.input('structure', help='The input structure', valid_type=orm.StructureData)
         spec.input('bs_kpoints',
                    help='Explicit kpoints for the bands. Will not generate kpoints if supplied.',
@@ -535,13 +534,14 @@ def compose_labelled_bands(bands, kpoints):
     new_bands.set_kpointsdata(kpoints)
     return new_bands
 
+
 @calcfunction
 def get_primitive_strucrture_and_scf_kpoints(structure):
     """
     This function dryruns a VASP calculation using the primitive structure obtained by performing seekpath analyses
 
     The input StructureData should be returned by an VaspRelaxWorkChain which will be used for dryun using local
-    VASP and getting the explicity kpoints for SCF calculation. 
+    VASP and getting the explicity kpoints for SCF calculation.
     """
     # Locate the relaxation work
     from aiida_user_addons.tools.dryrun import dryrun_relax_builder
@@ -557,9 +557,10 @@ def get_primitive_strucrture_and_scf_kpoints(structure):
 
     # Dryrun and construct the SCF kpoints
     kpoint_weights = np.array(dryrun_relax_builder(builder)['kpoints_and_weights'])
-    scf_kpoints = KpointsData()
+    scf_kpoints = orm.KpointsData()
     scf_kpoints.set_kpoints(kpoint_weights[:, :3], weights=kpoint_weights[:, -1])
     return {'primitive': primitive, 'scf_kpoints': scf_kpoints}
+
 
 class VaspHybridBandsWorkChain(VaspBandsWorkChain):
     """
@@ -589,6 +590,7 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
         relax_work = WorkflowFactory(cls._relax_wk_string)
         base_work = WorkflowFactory(cls._base_wk_string)
 
+        spec.input('kpoints_per_split', valid_type=orm.Int, help='Number of kpoints per split.', required=True)
         spec.input('structure', help='The input structure', valid_type=orm.StructureData)
         spec.input('bs_kpoints',
                    help='Explicit kpoints for the bands. Will not generate kpoints if supplied.',

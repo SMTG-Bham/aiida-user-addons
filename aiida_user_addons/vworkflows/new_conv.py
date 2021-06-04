@@ -228,7 +228,7 @@ class ConvOptions(OptionHolder):
     cutoff_start = typed_field('cutoff_start', (float,), 'The starting cut-off energy', 300)
     cutoff_stop = typed_field('cutoff_stop', (float,), 'The Final cut-off energy', 700)
     cutoff_step = typed_field('cutoff_step', (float,), 'Step size of the cut-off energy', 50)
-    kspacing_start = typed_field('kspacing_start', (float,), 'The starting kspacing', 0.05)
+    kspacing_start = typed_field('kspacing_start', (float,), 'The starting kspacing', 0.07)
     kspacing_stop = typed_field('kspacing_stop', (float,), 'The final kspacing', 0.02)
     kspacing_step = typed_field('kspacing_step', (float,), 'Step size of the cut-off energy', 0.01)
     cutoff_kconv = typed_field('cutoff_kconv', (float,), 'The cut-off energy used for kpoints convergence tests', 450)
