@@ -2,16 +2,21 @@
 Module for VASP related stuff
 """
 import gzip
+import shutil
+import os
+import tempfile
+from pathlib import Path
 from functools import wraps
 from itertools import zip_longest
 
-import tempfile
 import numpy as np
-from pathlib import Path
 
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase import Atoms
 from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
+
+from aiida.repository import FileType
+from sqlalchemy.sql.elements import outparam
 
 
 def with_node(f):
@@ -69,26 +74,6 @@ def export_vasp_calc(node, folder, decompress=False, include_potcar=True):
     folder.mkdir(exist_ok=True)
 
     # Inputs
-    def save_node_objects(node):
-        for ifile in node.list_objects():
-            name, otype = ifile
-            if otype.name == 'DIRECTORY':
-                continue
-            with node.open(name, 'rb') as fout:
-                if name.endswith('.gz') and decompress:
-                    out_name = name[:-3]
-                    out_decompress = True
-                else:
-                    out_decompress = False
-                    out_name = name
-                with (folder / out_name).open('wb') as fin:
-                    # Automaticall decompress gzipped files
-                    if out_decompress:
-                        gobj = gzip.GzipFile(fileobj=fout, mode='rb')
-                        fin.write(gobj.read())
-                    else:
-                        fin.write(fout.read())
-
     retrieved = node.get_outgoing(link_label_filter='retrieved').one().node
     if isinstance(node, CalcJobNode):
         calcjob = node
@@ -101,8 +86,9 @@ def export_vasp_calc(node, folder, decompress=False, include_potcar=True):
     info_file = folder / ('aiida_info')
     info_content = f'Label: {calcjob.label}\nDescription: {calcjob.description}\nUUID: {calcjob.uuid}\n'
     info_file.write_text(info_content)
-    save_node_objects(retrieved)
-    save_node_objects(calcjob)
+    # export the retrieved outputs  and the input files
+    save_all_repository_objects(retrieved, folder, decompress)
+    save_all_repository_objects(calcjob, folder, decompress)
     if include_potcar:
         export_pseudos(calcjob, folder)
 
@@ -331,3 +317,49 @@ def traj_to_atoms(node):
             else:
                 eng = None
             return _traj_node_to_atoms(traj, eng)
+
+
+def copy_from_aiida(name: str, node, dst: Path, decompress=False):
+    """
+    Copy objects from aiida repository.
+
+    :param name: The full name (including the parent path) of the object.
+    :param node: Node object for which the files in the repo to be copied.
+    :param dst: Path of the destination folder.
+
+    This is a recursive function so directory copying also works.
+    """
+    obj = node.get_object(name)
+
+    # If it is a directory, copy the contents one by one
+    if obj.file_type == FileType.DIRECTORY:
+        for sub_obj in node.list_objects(name):
+            copy_from_aiida(os.path.join(name, sub_obj.name), node, dst)
+    else:
+        # It is a file
+        with node.open(name, mode='rb') as fsource:
+            # Make parent directory if needed
+            frepo_path = dst / name
+            Path(frepo_path.parent).mkdir(exist_ok=True, parents=True)
+            # Write the file
+            if name.endswith('.gz') and decompress:
+                out_path = str(frepo_path)[:-3]
+                out_decompress = True
+            else:
+                out_decompress = False
+                out_path = str(frepo_path)
+
+            if not out_decompress:
+                with open(out_path, 'wb') as fdst:
+                    shutil.copyfileobj(fsource, fdst)
+            else:
+                gobj = gzip.GzipFile(fileobj=fsource, mode='rb')
+                with open(out_path, 'wb') as fdst:
+                    shutil.copyfileobj(gobj, fdst)
+
+
+def save_all_repository_objects(node, folder: Path, decompress=False):
+    """Copy all objects of a node saved in the repository to the disc"""
+    for ifile in node.list_objects():
+        name, _ = ifile
+        copy_from_aiida(name, node, folder, decompress)
