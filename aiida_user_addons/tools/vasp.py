@@ -161,6 +161,19 @@ def export_relax(work, dst, include_potcar=False, decompress=False):
     poscar_parser = PoscarParser(data=input_structure, precision=10)
     poscar_parser.write(str(dst / 'POSCAR'))
 
+    # Write POSCAR file for the input
+    try:
+        out_structure = work.inputs.outputs.relax__structure
+    except AttributeError:
+        out_structure = work.inputs.outputs.relax.structure
+    poscar_parser = PoscarParser(data=out_structure, precision=10)
+    poscar_parser.write(str(dst / 'POSCAR_RELAXED'))
+
+    # Write the info
+    info_file = dst / ('aiida_info')
+    info_content = f'Label: {work.label}\nDescription: {work.description}\nUUID: {work.uuid}\n'
+    info_file.write_text(info_content)
+
 
 def get_kpn_density(node, kgrid):
     """
