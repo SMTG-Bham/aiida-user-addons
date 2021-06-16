@@ -36,6 +36,10 @@ def export_phonon_work(work, dst, include_potcar=False):
     dst = Path(dst)
     dst.mkdir(exist_ok=True)
 
+    info_file = dst / 'aiida_info'
+    info_content = f'Label: {work.label}\nDescription: {work.description}\nUUID: {work.uuid}\n'
+    info_file.write_text(info_content)
+
     for triple in work.get_outgoing(link_label_filter='force_calc%').all():
         fc_calc = triple.node
         fc_folder = (dst / triple.link_label)
