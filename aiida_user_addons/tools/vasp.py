@@ -175,6 +175,56 @@ def export_relax(work, dst, include_potcar=False, decompress=False):
     info_file.write_text(info_content)
 
 
+def export_neb(workchain, dst):
+    """Export the neb calculation"""
+    from aiida_user_addons.tools.vasp import export_vasp_calc
+    from aiida import orm
+    energies = {key: value['energy_without_entropy'] for key, value in workchain.outputs.neb_misc['neb_data'].items()}
+
+    # Query for the energy computed for the end structures
+    q = orm.QueryBuilder()
+    q.append(orm.Node, filters={'id': workchain.inputs.initial_structure.id}, tag='root')
+    q.append(orm.CalcFunctionNode, with_outgoing='root', project=['attributes.function_name'])
+    q.append(
+        orm.StructureData,
+        with_outgoing=orm.CalcFunctionNode,
+        tag='relaxed',
+        project=['label'],
+        #edge_filters={'label': 'init_structure'},
+        edge_project=['label'])
+    q.append(orm.WorkflowFactory('vaspu.relax'), with_outgoing='relaxed', project=['label', 'uuid'], tag='relaxation')
+    q.append(orm.Dict,
+             with_incoming='relaxation',
+             edge_filters={'label': 'misc'},
+             project=['attributes.total_energies.energy_extrapolated'])
+    q.append(orm.CalcJobNode, with_outgoing=orm.Dict, project=['*'])
+    q.distinct()
+
+    # First export the original calculation
+    export_vasp_calc(workchain, dst, decompress=True, include_potcar=False)
+    ends = {}
+    end_id = '{:02d}'.format(len(energies) + 1)
+    for _, _, _, relax_uuid, eng, calcjob, label in q.all():
+        if label.startswith('init'):
+            if '00' in ends:
+                print('Duplicated calculation: {relax_uuid} -> {eng} vs existing {existing}'.format(relax_uuid=relax_uuid,
+                                                                                                    eng=eng,
+                                                                                                    existing=ends['00']))
+            else:
+                ends['00'] = calcjob
+
+        elif label.startswith('final'):
+            if end_id in ends:
+                print('Duplicated calculation: {relax_uuid} -> {eng} vs existing {existing}'.format(relax_uuid=relax_uuid,
+                                                                                                    eng=eng,
+                                                                                                    existing=ends[end_id]))
+            else:
+                ends[end_id] = calcjob
+    # Export the end point calculation
+    for key, value in ends.items():
+        export_vasp_calc(value, Path(dst) / key, decompress=True, include_potcar=False)
+
+
 def get_kpn_density(node, kgrid):
     """
     Get tbe kpoint density in 1/AA for a given StructureData node

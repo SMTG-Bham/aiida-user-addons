@@ -20,30 +20,41 @@ import yaml
 @click.option('--timeout', help='Timeout in seconds to terminate VASP', default=10, show_default=True)
 @click.option('--work-dir', help='Working directory for running', show_default=True)
 @click.option('--keep', help='Wether to the dryrun files', is_flag=True, show_default=True)
-def cmd_vasp_dryrun(input_dir, vasp_exe, timeout, work_dir, keep):
+@click.option('--force', help='Force the run even if the working directory exists.', is_flag=True, show_default=True)
+def cmd_vasp_dryrun(input_dir, vasp_exe, timeout, work_dir, keep, force):
     """
     A simple tool to dryrun a VASP calculation. The calculation will be run for
     up to <timeout> seconds. The underlying VASP process will be terminated once it enters
     the main loop, which is signalled by the appearance of a `INWAV` keyword in the OUTCAR.
     """
-    result = vasp_dryrun(input_dir=input_dir, vasp_exe=vasp_exe, timeout=timeout, work_dir=work_dir, keep=keep)
+    result = vasp_dryrun(input_dir=input_dir, vasp_exe=vasp_exe, timeout=timeout, work_dir=work_dir, keep=keep, force=force)
     with open(Path(input_dir) / 'dryrun.yaml', 'w') as fhandle:
         yaml.dump(result, fhandle, Dumper=yaml.SafeDumper)
 
 
-def vasp_dryrun(input_dir, vasp_exe='vasp_std', timeout=10, work_dir=None, keep=False):
+def vasp_dryrun(input_dir, vasp_exe='vasp_std', timeout=10, work_dir=None, keep=False, force=False):
     """
     Perform a "dryrun" for a VASP calculation - get the number of kpoints, bands and
     estimated memory usage.
     """
+    input_dir = Path(input_dir)
     if not work_dir:
         tmpdir = tempfile.mkdtemp()  # tmpdir is the one to remove when finished
         work_dir = Path(tmpdir) / 'vasp_dryrun'
     else:
-        work_dir = Path(work_dir) / 'vasp_dyrun'
+        work_dir = Path(work_dir)
+        if work_dir.resolve() == input_dir.resolve():
+            raise ValueError('The working directory cannot be the input directory!')
+        if work_dir.exists():
+            if not force:
+                raise FileExistsError(f'Working directory {work_dir} exists already! Please remove it first.')
+            else:
+                shutil.rmtree(work_dir)
         tmpdir = str(work_dir)
-    input_dir = Path(input_dir)
     shutil.copytree(str(input_dir), str(work_dir))
+
+    # Add the DRYRUNCAR for triggering the dryrun interface
+    (Path(work_dir) / 'DRYRUNCAR').write_text('LDRYRUN = .TRUE.\n')
 
     process = sb.Popen(vasp_exe, cwd=str(work_dir))
     launch_start = time.time()
@@ -54,9 +65,12 @@ def vasp_dryrun(input_dir, vasp_exe='vasp_std', timeout=10, work_dir=None, keep=
         while (time.time() - launch_start < timeout) and not dryrun_finish:
             with open(outcar, 'r') as fhandle:
                 for line in fhandle:
-                    if 'INWAV' in line:
+                    if 'INWAV' in line or 'Terminating' in line:
                         dryrun_finish = True
                         break
+            # Stop if VASP is terminated or crashed
+            if process.poll() is not None:
+                break
             time.sleep(0.2)
     except Exception as error:
         raise error
@@ -72,6 +86,7 @@ def vasp_dryrun(input_dir, vasp_exe='vasp_std', timeout=10, work_dir=None, keep=
 
     return result
 
+
 def parse_ibzkpt(ibzkpt_path):
     """
     Parsing the IBZKPT file
@@ -79,7 +94,7 @@ def parse_ibzkpt(ibzkpt_path):
     from parsevasp.kpoints import Kpoints
     kpoints = Kpoints(file_path=str(ibzkpt_path))
     tmp = kpoints.get_dict()['points']
-    kpoints_and_weights = [elem[0].tolist() + [elem[1]] for elem in tmp] 
+    kpoints_and_weights = [elem[0].tolist() + [elem[1]] for elem in tmp]
     total_weight = sum(tmp[3] for tmp in kpoints_and_weights)
 
     # Normalise the kpoint weights
@@ -88,6 +103,7 @@ def parse_ibzkpt(ibzkpt_path):
         normalised.append(entry[:3] + [entry[3] / total_weight])
 
     return normalised
+
 
 def parse_outcar(outcar_path):
     """
