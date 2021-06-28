@@ -125,11 +125,8 @@ def pmg_vasprun(node, parse_xml=True, parse_potcar_file=False, parse_outcar=True
     else:
         outcar = None
 
-    # Clean up
-    files = list(tmpf.glob('*'))
-    for fobject in files:
-        fobject.unlink()
-    tmpf.rmdir()
+    # Clean up the temporary directory
+    shutil.rmtree(tmpf)
 
     return vrun, outcar
 
