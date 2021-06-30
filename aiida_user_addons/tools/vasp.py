@@ -160,11 +160,16 @@ def export_relax(work, dst, include_potcar=False, decompress=False):
 
     # Write POSCAR file for the input
     try:
-        out_structure = work.inputs.outputs.relax__structure
+        out_structure = work.outputs.relax__structure
     except AttributeError:
-        out_structure = work.inputs.outputs.relax.structure
-    poscar_parser = PoscarParser(data=out_structure, precision=10)
-    poscar_parser.write(str(dst / 'POSCAR_RELAXED'))
+        try:
+            out_structure = work.inputs.outputs.relax.structure
+        except AttributeError:
+            print('Cannot find the output structure - skipping.')
+            out_structure = None
+    if out_structure:
+        poscar_parser = PoscarParser(data=out_structure, precision=10)
+        poscar_parser.write(str(dst / 'POSCAR_RELAXED'))
 
     # Write the info
     info_file = dst / ('aiida_info')
