@@ -314,17 +314,10 @@ class VaspWorkChain(VanillaVaspWorkChain):
         self.out('parallel_settings', Dict(dict={'ncore': scheme.ncore, 'kpar': scheme.kpar}).store())
 
     # In this workchain variant we default to ignore the NELM breaches in the middle of the calculation
-    @process_handler(priority=850,
-                     exit_codes=[
-                         VaspCalculation.exit_codes.ERROR_ELECTRONIC_NOT_CONVERGED,
-                         VaspCalculation.exit_codes.ERROR_IONIC_NOT_CONVERGED,
-                         VaspCalculation.exit_codes.ERROR_DID_NOT_FINISH,
-                     ],
-                     enabled=True)
+    @process_handler(priority=850, enabled=True)
     def ignore_nelm_breach_relax(self, node):
         """
         Not a actual handler but works as a switch to bypass checks for NELM breaches in the middle of an ionic relaxation.
         """
         _ = node
         self.ctx.ignore_transient_nelm_breach = True
-
