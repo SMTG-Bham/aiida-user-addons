@@ -111,7 +111,7 @@ def pmg_vasprun(node, parse_xml=True, parse_potcar_file=False, parse_outcar=True
 
     def gz_if_necessary(fname):
         if not fname.is_file():
-            fname = str(fname + '.gz')
+            fname = str(fname) + '.gz'
         else:
             fname = str(fname)
         return fname
