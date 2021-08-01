@@ -727,6 +727,19 @@ class RelaxOptionsNew(OptionContainer):
     hybrid_calc_bootstrap = BoolOption('Wether to bootstrap hybrid calculation by perfroming standard DFT first', None)
     hybrid_calc_bootstrap_wallclock = IntOption('Wallclock limit in second for the bootstrap calculation', None)
 
+    @classmethod
+    def validate_dict(cls, input_dict, port=None):
+        """Check mutually exclusive fields"""
+        super().validate_dict(input_dict, port)
+        if isinstance(input_dict, orm.Dict):
+            input_dict = input_dict.get_dict()
+        force_cut = input_dict.get('force_cutoff')
+        energy_cut = input_dict.get('energy_cutoff')
+        if force_cut is None and energy_cut is None:
+            raise InputValidationError("Either 'force_cutoff' or 'energy_cutoff' should be supplied")
+        if (force_cut is not None) and (energy_cut is not None):
+            raise InputValidationError("Cannot set both 'force_cutoff' and 'energy_cutoff'")
+
 
 class RelaxOptions(OptionHolder):
     """
