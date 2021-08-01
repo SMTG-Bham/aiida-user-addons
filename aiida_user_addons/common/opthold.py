@@ -4,12 +4,11 @@ Module containing the OptionHolder class
 from typing import Tuple, List
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import InputValidationError
-from attr import setters
 
 
-class Option:
+class Option(property):
     """
-    Base class for descriptors to be used as pre-defined fields for `OptioinContainer`.
+    Base class for descriptors to be used as pre-defined fields for `OptionContainer`.
 
     The point of using these seemingly complex descriptors is to allow the target `OptionContainer`
     class to support pre-defined properties acting as the fields to be set with the following
@@ -21,6 +20,9 @@ class Option:
     * Enforcement of a field being required, e.g. no default value is avaliable.
     * Automatic type convertion where necessary
 
+    Note that the inheritance from 'property' is need for IPython introspect to work, but the usage
+    is rather differently than the actual 'property' (as decorators/factories).
+    However, the instantiated objects both sever as descriptors in a similar way.
     """
 
     def __init__(self, docstring, default_value=None, required=False):
@@ -36,7 +38,8 @@ class Option:
 
     def __get__(self, obj, owner=None):
         """Get the stored value"""
-        _ = owner
+        if obj is None:
+            return self
         if self.required and self.name not in obj._opt_data:
             raise ValueError(f'Field {self.name} has not been set yet!')
 
@@ -72,7 +75,28 @@ class TypedOption(Option):
             obj._opt_data[self.name] = self.target_type(value)
 
     def __get__(self, obj, owner=None):
-        return self.target_type(super().__get__(obj, owner))
+        if obj is None:
+            return self
+
+        raw_value = super().__get__(obj, owner)
+        if raw_value is not None:
+            return self.target_type(raw_value)
+        else:
+            return None
+
+
+class ChoiceOption(Option):
+    """Option that only allow certain values"""
+
+    def __init__(self, docstring, choices, default_value=None, required=False):
+        super().__init__(docstring, default_value, required)
+        self.choices = choices
+
+    def __set__(self, obj, value):
+        """Setter that sets the field"""
+        if value not in self.choices:
+            raise ValueError(f'{value} is not a valid choice, choose from: {self.choices}.')
+        obj._opt_data[self.name] = value
 
 
 class BoolOption(TypedOption):
@@ -88,6 +112,14 @@ class FloatOption(TypedOption):
 class IntOption(TypedOption):
     """Class for an option that accepts integer values"""
     target_type = int
+
+
+class StringOption(TypedOption):
+    """Class for an option that accepts only string values"""
+
+    def __init__(self, docstring, default_value=None, required=False, enforce_type=True):
+        """Instantiate an object, note that we enforce_type by default here."""
+        super().__init__(docstring, default_value=default_value, required=required, enforce_type=enforce_type)
 
 
 class OptionContainer:
@@ -155,7 +187,13 @@ class OptionContainer:
         if check_invalids and invalid_attrs:
             raise ValueError(f'The following attributes are not valid options: {invalid_attrs}')
 
-        return AttributeDict({key: getattr(self, key) for key in self.valid_options})
+        outdict = {}
+        for key in self.valid_options:
+            value = getattr(self, key)
+            # Note that 'None' is interpreted specially meaning that the option should not be present
+            if value is not None:
+                outdict[key] = value
+        return AttributeDict(outdict)
 
     def to_aiida_dict(self):
         """Return an `aiida.orm.Dict` presentation """

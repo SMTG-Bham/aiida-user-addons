@@ -3,8 +3,8 @@ Test the utilties
 """
 import pytest
 from aiida.common.exceptions import InputValidationError
-from .opthold import (IntOption, OptionContainer, OptionHolder, typed_field, required_field, FloatOption, BoolOption, TypedOption, Option,
-                      OptionContainer)
+from .opthold import (ChoiceOption, IntOption, OptionContainer, OptionHolder, typed_field, required_field, FloatOption, BoolOption,
+                      TypedOption, Option, OptionContainer)
 
 ##### Tests for the new option holder interface using descriptors
 
@@ -14,6 +14,7 @@ class DummyOptionClass:
     a = Option('test-option-a')
     b = Option('test-option-b', 0)
     c = Option('test-option-c', 0, True)
+    d = Option('test-option-d', None)
 
     def __init__(self):
 
@@ -29,6 +30,11 @@ class DummyOptionClassWithType(DummyOptionClass):
     e = FloatOption('test option', default_value=2, enforce_type=False)
 
 
+class DummyOptionClassWithChoices(DummyOptionClass):
+
+    d = ChoiceOption('Option with choices', ['a', 'b'], default_value='a')
+
+
 def test_dummy_option_class():
     """Test for the dummy option class"""
 
@@ -39,6 +45,8 @@ def test_dummy_option_class():
     assert obj.b == 0
     with pytest.raises(ValueError):
         _ = obj.c
+
+    assert obj.d is None
 
     obj.b = 10
     assert obj.b == 10
@@ -70,17 +78,31 @@ def test_dummy_option_class_with_type():
     assert obj.e == 10.2
 
 
+def test_dummy_option_class_with_choices():
+    """Tests for the ChoiceOption"""
+    obj = DummyOptionClassWithChoices()
+    assert obj.d == 'a'
+
+    # This would raise an error as 'z' is not allowed
+    with pytest.raises(ValueError, match='not a valid choice'):
+        obj.d = 'z'
+
+    obj.d = 'b'
+    assert obj.d == 'b'
+
+
 class DummyContainer(OptionContainer):
 
     a = FloatOption('test', 2.0)
     b = FloatOption('test', 2.0, required=True)
+    e = FloatOption('test', None, required=False)
 
 
 def test_option_container():
     """Test the option container"""
 
     cont = DummyContainer()
-    assert cont.valid_options == ['a', 'b']
+    assert cont.valid_options == ['a', 'b', 'e']
     assert cont.required_options == ['b']
     assert cont.a == 2.0
 

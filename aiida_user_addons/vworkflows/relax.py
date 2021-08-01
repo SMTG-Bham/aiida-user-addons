@@ -35,9 +35,10 @@ from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_vasp.utils.aiida_utils import get_data_class
 from aiida_vasp.utils.workchains import compose_exit_code
+from sqlalchemy.sql.sqltypes import Float
 
 from .mixins import WithVaspInputSet
-from ..common.opthold import OptionHolder, typed_field
+from ..common.opthold import BoolOption, OptionHolder, typed_field, OptionContainer, IntOption, FloatOption, ChoiceOption, StringOption
 from .common import OVERRIDE_NAMESPACE
 
 __version__ = '0.4.0'
@@ -695,6 +696,36 @@ def compare_structures(structure_a, structure_b):
     delta.relative.cell_angles = np.absolute(cell_angles_a - np.array(structure_b.cell_angles)) / cell_angles_a
 
     return delta
+
+
+class RelaxOptionsNew(OptionContainer):
+
+    algo = ChoiceOption('The algorithm to use for relaxation', ['cg', 'rd'], default_value='cg')
+    energy_cutoff = FloatOption('The cut off energy difference when the relaxation is stopped (e.g. EDIFF)',
+                                default_value=None,
+                                required=False)
+    force_cutoff = FloatOption('The maximum force when the relaxation is stopped (e.g. EDIFFG)', default_value=0.03, required=False)
+    steps = IntOption('Number of relaxation steps to perform (eg. NSW)', 60)
+    positions = BoolOption('If True, perform relaxation of the atomic positions', default_value=True)
+    shape = BoolOption('If True, perform relaxation of the cell shape', default_value=True)
+    volume = BoolOption('If True, perform relaxation of the cell volume', default_value=True)
+    convergence_on = BoolOption('If True, perform convergence checkes withint the workchain', default_value=True)
+    convergence_absolute = BoolOption('If True, use absolute values where possible when performing convergence checkes',
+                                      default_value=False)
+    convergence_max_iterations = IntOption('Maximum interations for convergence checking', 5)
+    convergence_positions = FloatOption('The cutoff value for the convergence check on positions in Angstram.', 0.1)
+    convergence_volume = FloatOption('The cutoff value for the convergence check on volume between the two structures.', 0.01)
+    convergence_shape_lengths = FloatOption(
+        'The cutoff value for the convergence check on the lengths of the unit cell vectors, between input and the outputs structure', 0.1)
+    convergence_shape_angles = FloatOption(
+        'The cutoff value for the convergence check on the angles of the unit cell vectors, between input and the outputs structure', 0.1)
+    convergence_mode = ChoiceOption('Mode of the convergence', choices=['inout', 'last'], default_value='inout')
+    reuse = BoolOption('Whether reuse the previous calculation by copying over the remote folder', default_value=False)
+    clean_reuse = BoolOption('Whether to perform a final cleaning of the reused calculations', True)
+    keep_sp_workdir = BoolOption('Whether to keep the workdir of the final singlepoint calculation', False)
+    perform = BoolOption('Do not perform any relaxation if set to \'False\'', True)
+    hybrid_calc_bootstrap = BoolOption('Wether to bootstrap hybrid calculation by perfroming standard DFT first', None)
+    hybrid_calc_bootstrap_wallclock = IntOption('Wallclock limit in second for the bootstrap calculation', None)
 
 
 class RelaxOptions(OptionHolder):
