@@ -148,11 +148,11 @@ class OptionContainer:
                 invalid.append(key)
         return invalid
 
-    def to_dict(self) -> AttributeDict:
+    def to_dict(self, check_invalids=True) -> AttributeDict:
         """Return a python dict representation - including all fields"""
         # Check for any additional attributes
         invalid_attrs = self._invalid_attributes
-        if invalid_attrs:
+        if check_invalids and invalid_attrs:
             raise ValueError(f'The following attributes are not valid options: {invalid_attrs}')
 
         return AttributeDict({key: getattr(self, key) for key in self.valid_options})
@@ -171,7 +171,7 @@ class OptionContainer:
 
     def to_string(self) -> str:
         """In string format"""
-        return self.to_dict().__repr__().replace('AttributeDict', '')
+        return self.to_dict(check_invalids=False).__repr__().replace('AttributeDict', '')
 
     def __getitem__(self, key):
         """Set items - we just the getattr method"""

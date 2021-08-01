@@ -106,6 +106,26 @@ def test_option_container():
     with pytest.raises(ValueError, match='not valid options'):
         cont.to_dict()
 
+    # Test for setting/getting items
+    assert cont['a'] == 2.0
+    cont['b'] = 3.2
+    assert cont.b == 3.2
+
+    # Test for to_string
+    del cont.c
+    cont.to_string()
+    cont.__repr__()
+
+    # Test for deletion
+    del cont.a
+    assert cont.a == 2.0
+    assert 'a' not in cont._opt_data
+
+    del cont.b
+    assert 'a' not in cont._opt_data
+    with pytest.raises(ValueError, match='has not been set'):
+        _ = cont.b
+
 
 ##### Existing tests
 
