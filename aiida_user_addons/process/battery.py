@@ -1,9 +1,17 @@
 """
 Module with battery related processes
 """
+from typing import List, Dict, Tuple
+
+from pymatgen.core import Structure, Composition, Element
+from pymatgen.entries import Entry
+from pymatgen.analysis.reaction_calculator import Reaction
+
+from bsym.interface.pymatgen import unique_structure_substitutions
+from pymatgen.analysis.phase_diagram import CompoundPhaseDiagram
+
 from aiida.orm import Float
 from aiida.engine import calcfunction
-from pymatgen.analysis.reaction_calculator import Reaction
 
 from aiida_user_addons.common.misc import get_energy_from_misc
 
@@ -202,3 +210,221 @@ def get_input_parameters_dict(out_node):
     qdb.append(CalcJobNode, with_outgoing='out')
     qdb.append(Dict, with_outgoing=CalcJobNode, edge_filters={'label': 'parameters'})
     return qdb.one()[0].get_dict()
+
+
+class DelithiationManager:
+    """Utility tool for managing delithiation process"""
+
+    def __init__(self, structure: Structure, working_ion='Li', tm_ions=('Fe', 'Mn', 'Co', 'Ni')):
+        """Instantiate a `DelithiationManager` object by giving a structure"""
+        self.structure = structure
+        comp = structure.composition
+        self.composition = comp
+        self.working_ion = working_ion
+        self.tm_ions = tm_ions
+
+        # Analyse the content
+        self.nli = int(self.composition[working_ion])
+        self.composition_without_li = Composition({key: comp[key] for key in comp if key.symbol != working_ion})
+        self.nother = self.composition_without_li.num_atoms
+
+    @property
+    def reduced_non_working_composition(self):
+        return self.composition_without_li.reduced_composition
+
+    @property
+    def lithiation_level(self):
+        """Stable lithiation level normalised per reduced non-working formula"""
+        _, factor = self.composition_without_li.get_reduced_composition_and_factor()
+        return self.nli / factor
+
+    def get_conventional_li_level_representation(self):
+        """
+        Return the number of working ions per reduced formula for the non-working part
+        For example: LiCoO2 -> (1, CoO2), Li3Co4O8 -> (3/4, CoO2).
+        This is useful when plotting the level of delithiations.
+        """
+        reduced, factor = self.composition_without_li.get_reduced_composition_and_factor()
+        return self.nli / factor, reduced
+
+    def create_delithaited_structures(self, num_remove, dummy='He') -> List[Structure]:
+        """
+        Generated delithiated structures
+        """
+
+        nli = self.nli
+        subs = unique_structure_substitutions(self.structure, 'Li', {'Li': nli - num_remove, dummy: num_remove})
+        for structure in subs:
+            structure.remove_species([dummy])
+        return subs
+
+    def create_delithiated_structures_multiple_levels(self, final_li_level: float = 0.0, dummy='He') -> Dict[int, List[Structure]]:
+        """
+        Create delithiated structures at multiple levels
+
+        This method is useful for generating structures to be relaxed for voltage curve extraction.
+
+        Args:
+            final_li_level(float): The final level of lithiation
+            dummy(str): Symbol of the dummy specie to be used
+        """
+
+        nli = self.nli
+        frac_remove = 1 - (final_li_level / self.lithiation_level)
+        max_remove = nli * frac_remove
+        if abs(int(max_remove) - max_remove) > 1e-5:
+            raise RuntimeError(
+                f'The final lithiation level does not represent an integer number of {self.working_ion} atoms in the unit cell.')
+        max_remove = int(round(max_remove))
+        records = {}
+        for num_remove in range(1, max_remove + 1):
+            frames = self.create_delithaited_structures(num_remove, dummy=dummy)
+            records[num_remove] = frames
+        return records
+
+
+def remove_composition(entries: List[Entry], comp: str) -> List[Entry]:
+    """Remove a specific composition from a list of entries"""
+    return [entry for entry in entries if entry.composition.reduced_formula != comp.reduced_formula]
+
+
+class VoltageCurve:
+    """
+    Class for analysing and computing the voltage
+
+    Attributes:
+        entries: list of entries from which the voltage curves to be computed.
+        ref_entry: The reference entry for the working ion.
+        working_ion: name of the working ion.
+    """
+
+    def __init__(self, entries: List[Entry], ref_entry: Entry, working_ion='Li'):
+        """Instantiate a VoltageCurve object"""
+        self.entries = list(entries)
+        self.ref_entry = ref_entry
+        self.working_ion = working_ion
+
+        # Sort the entries with decreasing Li content
+        self.entries.sort(key=lambda x: x.composition[working_ion] / x.composition.num_atoms, reverse=True)
+        self.phase_diagram = CompoundPhaseDiagram(self.entries,
+                                                  terminal_compositions=[self.entries[0].composition, self.entries[-1].composition])
+        self.stable_entries = [entry.original_entry for entry in self.phase_diagram.stable_entries]
+        self.stable_entries.sort(key=lambda x: x.composition[working_ion] / x.composition.num_atoms, reverse=True)
+
+    def compute_voltages(self) -> List[List[Tuple[Composition, Composition], float]]:
+        """
+        Compute the voltages
+        Returns:
+            a list of composition pairs and voltages.
+        """
+        nstable = len(self.stable_entries)
+        conc_pair_and_voltage = []
+        for i in range(nstable - 1):
+            lith = self.stable_entries[i]
+            deli = self.stable_entries[i + 1]
+            voltage = voltage_between_pair(lith, deli, self.ref_entry, self.working_ion)
+            conc_pair_and_voltage.append([(lith.composition, deli.composition), voltage])
+        return conc_pair_and_voltage
+
+    def get_plot_data(self, norm_formula=None, x_axis_deli=False) -> Tuple[List[float], List[float]]:
+        """
+        Return the data used for ploting.
+
+        Args:
+            norm_formula(str): Fully lithiated formula to be used for normalisation
+            x_axis_deli(bool): If set to True, return the level of delithiation for the x axis.
+
+        Returns:
+            a tuple of x and y values to be used for plotting.
+        """
+        x_comp = []
+        y_volt = []
+        for i, (comps, vol) in enumerate(self.compute_voltages()):
+            x_comp.extend(comps)
+            y_volt.extend([vol, vol])
+
+        # Now adapat the x axis
+        if norm_formula is None:
+            norm_formula = self.stable_entries[0].composition.reduced_formula
+
+        norm = Composition(norm_formula)
+        li_norm_conc = ion_conc(norm, self.working_ion)
+        nli_norm = norm[self.working_ion]
+        x_val = []
+        for comp in x_comp:
+            conc = ion_conc(comp, self.working_ion)
+            eff_nli = conc / li_norm_conc * nli_norm  # Effective Li number refected to the normalisation formula
+
+            if x_axis_deli:
+                x_val.append(nli_norm - eff_nli)
+            else:
+                x_val.append(eff_nli)
+
+        return x_val, y_volt
+
+    def plot_voltages(self, norm_formula=None, x_axis_deli=True, ax=None):
+        """Plot the voltages"""
+        import matplotlib.pyplot as plt
+        if ax is None:
+            _, ax = plt.subplots(1, 1)
+
+        if norm_formula is None:
+            norm_formula = self.stable_entries[0].composition.reduced_formula
+        x, y = self.get_plot_data(norm_formula, x_axis_deli)
+        ax.plot(x, y)
+        ax.set_label('Voltage (V)')
+        comp = dict(Composition(norm_formula))
+        string = ''
+        nli = comp[Element(self.working_ion)]
+        for key, value in comp.items():
+            if str(key) == self.working_ion:
+                if x_axis_deli:
+                    string += f'{str(key)}_{{{nli:.0f}-x}}'
+                else:
+                    string += f'{str(key)}_{{x}}'
+            elif value == 1.0:
+                string += f'{str(key)}'
+            else:
+                string += f'{str(key)}_{{{value:.0f}}}'
+
+        if x_axis_deli:
+            ax.set_ylabel('Voltage (V)')
+            ax.set_xlabel(r'$\mathrm{' + string + '}$')
+
+        return ax
+
+
+def voltage_between_pair(lith, deli, ref_entry, working_ion='Li') -> float:
+    """
+    Compute the voltages between two pair of entries
+
+    Args:
+        lith: Entry for the lithiate phase
+        deli: Entry for the delithiated phase
+        ref_entry: Entry for the working ion
+        working_ion: Name of teh workion ion. Defaults to Li
+
+    Returns:
+        The voltage
+    """
+    # Get the compensation factor
+    nform1 = lith.composition.num_atoms - lith.composition[working_ion]
+    nform2 = deli.composition.num_atoms - deli.composition[working_ion]
+    nli1 = lith.composition[working_ion]
+    nli2 = deli.composition[working_ion]
+    effective_change = nli1 - nli2 / nform2 * nform1  # Normalised to the delithiated phase
+    e1 = lith.energy
+    e2 = deli.energy
+    de = e2 / nform2 * nform1 - e1
+    #print(de, effective_change, nform1, nform2)
+    # Voltage is the change of free energy (energy) per Li
+    voltage = (de + effective_change * ref_entry.energy / ref_entry.composition.num_atoms) / effective_change
+    return voltage
+
+
+def ion_conc(comp: Composition, ion: str) -> float:
+    """Return the Li concentration, normalised to the non-Li part"""
+    nli = comp[ion]
+    nother = sum([comp[key] for key in comp if key.symbol != ion])
+    li_conc = nli / nother  # Li concentration in the reference
+    return li_conc
