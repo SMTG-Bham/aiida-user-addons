@@ -2,6 +2,7 @@
 Pymatgen related tools
 """
 from typing import Tuple, List
+import warnings
 from aiida.plugins.factories import WorkflowFactory
 from pymatgen.entries.computed_entries import ComputedStructureEntry
 from pymatgen.core.composition import get_el_sp, gcd, formula_double_format, Composition
@@ -109,21 +110,24 @@ def get_entry_from_calc(calc):
     else:
         entry_structure = in_structure.get_pymatgen()
 
-    if str(type(calc)) == 'VaspCalculations':
+    if calc.process_label == 'VaspCalculation':
         incar = calc.inputs.parameters.get_dict()
-        pot = 'PBE.54'  # Defaults to PBE.54
-    elif str(type(calc)) == 'VaspWorkChain':
+        pots = set(pot.functional for pot in calc.inputs.potential.values())
+        if len(pots) != 1:
+            raise RuntimeError('Inconsistency in POTCAR functionals! Something is very wrong...')
+        pot = pots.pop()
+
+    elif calc.process_label == 'VaspWorkChain':
         incar = calc.inputs.parameters['incar']
         pot = calc.inputs.potential_family.value
-    elif isinstance(calc, WorkflowFactory('vaspu.relax')):
+    elif calc.process_class == WorkflowFactory('vaspu.relax'):
         incar = calc.inputs.vasp.parameters['incar']
         pot = calc.inputs.vasp.potential_family.value
-    elif isinstance(calc, WorkflowFactory('vasp.relax')):
+    elif calc.process_class == WorkflowFactory('vasp.relax'):
         incar = calc.inputs.parameters['incar']
         pot = calc.inputs.potential_family.value
     else:
-        incar = {}
-        pot = 'PBE.54'
+        raise RuntimeError('Cannot determine calculation inputs')
 
     data = {
         'functional': get_functional(incar, pot),

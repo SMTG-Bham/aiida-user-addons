@@ -249,18 +249,19 @@ class DelithiationManager:
         reduced, factor = self.composition_without_li.get_reduced_composition_and_factor()
         return self.nli / factor, reduced
 
-    def create_delithaited_structures(self, num_remove, dummy='He') -> List[Structure]:
+    def create_delithaited_structures(self, num_remove, atol=1e-5, dummy='He') -> List[Structure]:
         """
         Generated delithiated structures
         """
 
         nli = self.nli
-        subs = unique_structure_substitutions(self.structure, 'Li', {'Li': nli - num_remove, dummy: num_remove})
+        subs = unique_structure_substitutions(self.structure, 'Li', {'Li': nli - num_remove, dummy: num_remove}, atol=atol)
         for structure in subs:
             structure.remove_species([dummy])
         return subs
 
-    def create_delithiated_structures_multiple_levels(self, final_li_level: float = 0.0, dummy='He') -> Dict[int, List[Structure]]:
+    def create_delithiated_structures_multiple_levels(self, final_li_level: float = 0.0, atol=1e-5,
+                                                      dummy='He') -> Dict[int, List[Structure]]:
         """
         Create delithiated structures at multiple levels
 
@@ -284,7 +285,7 @@ class DelithiationManager:
         max_remove = int(round(max_remove))
         records = {}
         for num_remove in range(1, max_remove + 1):
-            frames = self.create_delithaited_structures(num_remove, dummy=dummy)
+            frames = self.create_delithaited_structures(num_remove, dummy=dummy, atol=atol)
             records[num_remove] = frames
         return records
 
@@ -317,7 +318,7 @@ class VoltageCurve:
         self.stable_entries = [entry.original_entry for entry in self.phase_diagram.stable_entries]
         self.stable_entries.sort(key=lambda x: x.composition[working_ion] / x.composition.num_atoms, reverse=True)
 
-    def compute_voltages(self) -> List[List[Tuple[Composition, Composition], float]]:
+    def compute_voltages(self) -> List[Tuple[List[Composition], float]]:
         """
         Compute the voltages
         Returns:
@@ -436,15 +437,15 @@ def ion_conc(comp: Composition, ion: str) -> float:
     return li_conc
 
 
-def count_delithiated_multiple_level(structure: Structure, final_li_level: float):
+def count_delithiated_multiple_level(structure: Structure, final_li_level: float, atol=1e-5):
     """Return the total number of structures to be generated"""
     manager = DelithiationManager(structure)
-    frame_dict = manager.create_delithiated_structures_multiple_levels(float(final_li_level))
+    frame_dict = manager.create_delithiated_structures_multiple_levels(float(final_li_level), atol=atol)
     return sum(len(sublist) for sublist in frame_dict.values())
 
 
 @calcfunction
-def create_delithiated_multiple_level(structure, final_li_level, rattle) -> Dict[str, StructureData]:
+def create_delithiated_multiple_level(structure, final_li_level, rattle, **params) -> Dict[str, StructureData]:
     """
     Create a series of delithiated frames with different lithiation levels
 
@@ -453,9 +454,24 @@ def create_delithiated_multiple_level(structure, final_li_level, rattle) -> Dict
     The outputs are placed in a flat dictionary with the keying being '<nremoved>_<idex>'.
     """
 
+    if 'atol' in params:
+        atol = params['atol'].value
+    else:
+        atol = 1e-5
+
     struct = structure.get_pymatgen()
     manager = DelithiationManager(struct)
-    frame_dict = manager.create_delithiated_structures_multiple_levels(float(final_li_level))
+    ok = False
+    while not ok:
+        try:
+            frame_dict = manager.create_delithiated_structures_multiple_levels(float(final_li_level), atol=atol)
+        except ValueError:
+            atol *= 10
+            print(f'Increased symmetry tolerance to: {atol} and retry')
+        else:
+            ok = True
+        if atol > 0.01:
+            raise ValueError('Persisting symmetry error - aborting the process')
     # Process the frame_dict output and convert each frame to orm.StructureData
     output = {}
     for nremoved, value in frame_dict.items():
@@ -468,5 +484,5 @@ def create_delithiated_multiple_level(structure, final_li_level, rattle) -> Dict
             new_structure = StructureData(ase=sort(atoms))
             new_structure.label = structure.label + f' DELI {nremoved} {idx}'
             new_structure.description = f'Delithiated structure with {nremoved} removed Li atoms and index {nremoved} of the returned unique structures.'
-            output[str(nremoved) + f'_{idx}'] = new_structure
+            output['structure_' + str(nremoved) + f'_{idx}'] = new_structure
     return output

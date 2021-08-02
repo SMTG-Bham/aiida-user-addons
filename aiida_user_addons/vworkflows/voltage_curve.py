@@ -53,6 +53,7 @@ class VoltageCurveWorkChain(WorkChain):
                    default='li-metal-refs',
                    help='Name of the group containing calculations of Li metal references.')
         spec.input('structure', valid_type=orm.StructureData)
+        spec.input('rattle', valid_type=orm.Float, help='Amplitude of rattling', default=lambda: orm.Float(0.05))
         spec.input('final_li_level',
                    valid_type=orm.Float,
                    help='Final lithiation level with respect to the reduced formula of the non-Li part of the composition.')
@@ -69,6 +70,7 @@ class VoltageCurveWorkChain(WorkChain):
             required=True,
             help='The misc output of a reference calculation for Li metal',
         )
+        spec.input('atol', required=False, valid_type=orm.Float, help='Symmetry torlerance for generating unique structures.')
         spec.input_namespace('unique_options', required=False, populate_defaults=False, help='Options for delithiate by unique sites')
         spec.input('unique_options.excluded_sites', required=False, default=lambda: orm.List(list=[]), help='Excluded site indices.')
         spec.input('unique_options.nsub', required=False, default=lambda: orm.Int(1), help='Number of Li to remove')
@@ -116,12 +118,7 @@ class VoltageCurveWorkChain(WorkChain):
         self.ctx.delithiated_masks = {}  # masks for the delithiated structures
         self.ctx.workchains = []  # List of WorkChains for the underlying calculation
         self.ctx.current_structure = self.inputs.structure  # List of the current structure
-        self.ctx.initial_relax = None  # Initial relaxation workchain
-        strategy = self.inputs.strategy.value
-        if strategy not in self._allowed_strategies:
-            self.report(f'Strategy: {strategy} is not valid, valid ones are: {self._allowed_strategies}')
-            return self.exit_codes.ERROR_UNKNOWN_STRATEGY
-        self.ctx.strategy = strategy
+        self.ctx.lithiated_calc = None
 
         # Store the reference calculation for Li metal
         self.ctx.li_metal_calc = get_creator(self.inputs.li_metal_calc_misc)
@@ -160,6 +157,8 @@ class VoltageCurveWorkChain(WorkChain):
         except AttributeError:
             self.ctx.current_structure = workchain.outputs.relax.structure  # WORKCHAIN specific!
 
+        # Makes sure that the current structure is labelled - as it will be used in the next steps
+        self.ctx.current_structure.label = workchain.inputs.structure.label + ' RELAXED'
         # Record the calculation for the lithiated structure
         self.ctx.lithiated_calc = get_creator(workchain.outputs.misc)
 
@@ -171,7 +170,11 @@ class VoltageCurveWorkChain(WorkChain):
         from aiida_user_addons.process.battery import create_delithiated_multiple_level
         structure = self.ctx.current_structure
         # Generate all of the delithiated frames
-        delithiated = create_delithiated_multiple_level(structure, self.inputs.final_li_level)
+        if 'atol' in self.inputs:
+            delithiated = create_delithiated_multiple_level(structure, self.inputs.final_li_level, self.inputs.rattle, self.inputs.atol)
+        else:
+            delithiated = create_delithiated_multiple_level(structure, self.inputs.final_li_level, self.inputs.rattle)
+
         self.ctx.delithiated_frames = delithiated
 
     def run_delithiated_relax(self):
@@ -261,7 +264,7 @@ class VoltageCurveWorkChain(WorkChain):
                 relaxed = q.one()[0]
             except Exception:
                 continue
-            self.out(f'relaxed_delithiated_structures.structure_{key}', relaxed)
+            self.out(f'relaxed_delithiated_structures.{key}', relaxed)
 
         return
 
