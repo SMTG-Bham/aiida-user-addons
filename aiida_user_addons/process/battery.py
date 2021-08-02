@@ -3,6 +3,8 @@ Module with battery related processes
 """
 from typing import List, Dict, Tuple
 
+from ase.build import sort
+
 from pymatgen.core import Structure, Composition, Element
 from pymatgen.entries import Entry
 from pymatgen.analysis.reaction_calculator import Reaction
@@ -10,7 +12,7 @@ from pymatgen.analysis.reaction_calculator import Reaction
 from bsym.interface.pymatgen import unique_structure_substitutions
 from pymatgen.analysis.phase_diagram import CompoundPhaseDiagram
 
-from aiida.orm import Float
+from aiida.orm import Float, StructureData
 from aiida.engine import calcfunction
 
 from aiida_user_addons.common.misc import get_energy_from_misc
@@ -267,6 +269,10 @@ class DelithiationManager:
         Args:
             final_li_level(float): The final level of lithiation
             dummy(str): Symbol of the dummy specie to be used
+
+        Returns:
+            a dictionary with keys being the number of Li removed from the structure and values being the unique
+                structures at such delithiation level.
         """
 
         nli = self.nli
@@ -428,3 +434,39 @@ def ion_conc(comp: Composition, ion: str) -> float:
     nother = sum([comp[key] for key in comp if key.symbol != ion])
     li_conc = nli / nother  # Li concentration in the reference
     return li_conc
+
+
+def count_delithiated_multiple_level(structure: Structure, final_li_level: float):
+    """Return the total number of structures to be generated"""
+    manager = DelithiationManager(structure)
+    frame_dict = manager.create_delithiated_structures_multiple_levels(float(final_li_level))
+    return sum(len(sublist) for sublist in frame_dict.values())
+
+
+@calcfunction
+def create_delithiated_multiple_level(structure, final_li_level, rattle) -> Dict[str, StructureData]:
+    """
+    Create a series of delithiated frames with different lithiation levels
+
+    This function is essentially an wrapper for the DelithiationManager methods
+
+    The outputs are placed in a flat dictionary with the keying being '<nremoved>_<idex>'.
+    """
+
+    struct = structure.get_pymatgen()
+    manager = DelithiationManager(struct)
+    frame_dict = manager.create_delithiated_structures_multiple_levels(float(final_li_level))
+    # Process the frame_dict output and convert each frame to orm.StructureData
+    output = {}
+    for nremoved, value in frame_dict.items():
+        for idx, frame in enumerate(value):
+            # Rattle the atoms and perform sorting by species
+            new_structure = StructureData(pymatgen=frame)
+            atoms = new_structure.get_ase()
+            if rattle.value > 0:
+                atoms.rattle(rattle.value)
+            new_structure = StructureData(ase=sort(atoms))
+            new_structure.label = structure.label + f' DELI {nremoved} {idx}'
+            new_structure.description = f'Delithiated structure with {nremoved} removed Li atoms and index {nremoved} of the returned unique structures.'
+            output[str(nremoved) + f'_{idx}'] = new_structure
+    return output

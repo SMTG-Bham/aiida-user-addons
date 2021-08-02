@@ -1,8 +1,15 @@
 """
 Pymatgen related tools
 """
-from typing import Tuple
+from typing import Tuple, List
+from aiida.plugins.factories import WorkflowFactory
+from pymatgen.entries.computed_entries import ComputedStructureEntry
 from pymatgen.core.composition import get_el_sp, gcd, formula_double_format, Composition
+
+import aiida.orm as orm
+from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
+
+from aiida_user_addons.common.misc import get_energy_from_misc
 
 
 def load_mp_struct(mp_id):
@@ -79,3 +86,113 @@ def reduce_formula_no_polyanion(sym_amt, iupac_ordering=False) -> Tuple[str, int
 
     reduced_form = ''.join(reduced_form + polyanion)
     return reduced_form, factor
+
+
+def get_entry_from_calc(calc):
+    """Get a ComputedStructure entry from a given calculation/workchain"""
+    misc = calc.outputs.misc
+    energy = get_energy_from_misc(misc)
+    in_structure = calc.inputs.structure
+
+    # Check if there is any output structure - support for multiple interfaces
+    if 'structure' in calc.outputs:
+        out_structure = calc.outputs.structure
+    elif 'relax' in calc.outputs:
+        out_structure = calc.outputs.relax.structure
+    elif 'relax__structure' in calc.outputs:
+        out_structure = calc.outputs.relax__structure
+    else:
+        out_structure = None
+
+    if out_structure:
+        entry_structure = out_structure.get_pymatgen()
+    else:
+        entry_structure = in_structure.get_pymatgen()
+
+    if str(type(calc)) == 'VaspCalculations':
+        incar = calc.inputs.parameters.get_dict()
+        pot = 'PBE.54'  # Defaults to PBE.54
+    elif str(type(calc)) == 'VaspWorkChain':
+        incar = calc.inputs.parameters['incar']
+        pot = calc.inputs.potential_family.value
+    elif isinstance(calc, WorkflowFactory('vaspu.relax')):
+        incar = calc.inputs.vasp.parameters['incar']
+        pot = calc.inputs.vasp.potential_family.value
+    elif isinstance(calc, WorkflowFactory('vasp.relax')):
+        incar = calc.inputs.parameters['incar']
+        pot = calc.inputs.potential_family.value
+    else:
+        incar = {}
+        pot = 'PBE.54'
+
+    data = {
+        'functional': get_functional(incar, pot),
+        'umap': get_u_map(in_structure, incar.get('ldauu')),
+        'calc_uuid': calc.uuid,
+        'volume': entry_structure.volume
+    }
+
+    out_entry = ComputedStructureEntry(entry_structure, energy, parameters=data)
+    return out_entry
+
+
+def get_u_elem(struc, ldauu, elem):
+    """
+    Reliably get the value of U for a given element.
+    Return -1 if the entry does not have the element - so compatible with any U calculations
+    """
+    species = MultiPotcarIo.potentials_order(struc)
+    if elem in species:
+        ife = species.index(elem)
+        if ldauu is None:
+            return 0.
+        return ldauu[ife]
+    return -1
+
+
+def get_u_map(struc: orm.StructureData, ldauu: List[int]) -> dict:
+    """
+    Reliably get the value of U for all elements.
+    Return -1 if the entry does not have Fe - so compatible with any U calculations
+    """
+    species = MultiPotcarIo.potentials_order(struc)
+    mapping = {}
+    for symbol in species:
+        isym = species.index(symbol)
+        if ldauu is None:
+            mapping[symbol] = 0.0
+        else:
+            mapping[symbol] = ldauu[isym]
+    return mapping
+
+
+def get_functional(incar: dict, pot: str) -> str:
+    """
+    Return the name of the functional
+
+    Args:
+        incar (dict): A dictionary for setting the INCAR
+        pot (str): Potential family
+    """
+    if incar.get('metagga'):
+        return incar.get('metagga').lower()
+
+    if pot.startswith('LDA'):
+        if incar.get('gga'):
+            return 'gga+ldapp'
+        else:
+            return 'lda'
+    elif pot.startswith('PBE'):
+        gga = incar.get('gga')
+        hf = incar.get('lhfcalc')
+        if not hf:
+            if (not gga) or gga.lower() == 'pe':
+                return 'pbe'
+            if gga.lower() == 'ps':
+                return 'pbesol'
+        else:
+            if (not gga) or gga.lower() == 'pe':
+                if incar.get('aexx') in [0.25, None] and (incar.get('hfscreen') - 0.2 < 0.01):
+                    return 'hse06'
+
+    return 'unknown'

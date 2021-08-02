@@ -1,15 +1,17 @@
 """
 WorkChain to perform delithiation
 """
+from typing import Dict
 import numpy as np
 
 import aiida.orm as orm
 from aiida.common.links import LinkType
 from aiida.engine import WorkChain, if_, append_, calcfunction
 from aiida.plugins import WorkflowFactory
+from pymatgen.core.structure import Structure
 
 from aiida_user_addons.process.transform import delithiate_by_wyckoff, delithiate_full, delithiate_unique_sites, rattle
-from aiida_user_addons.process.battery import compute_li_voltage_shortcut, check_li_ref_calc
+from aiida_user_addons.process.battery import DelithiationManager, compute_li_voltage_shortcut, check_li_ref_calc
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 from aiida_user_addons.common.misc import get_energy_from_misc
 
