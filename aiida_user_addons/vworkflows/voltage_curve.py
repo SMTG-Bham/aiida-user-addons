@@ -40,6 +40,7 @@ Relax = WorkflowFactory('vaspu.relax')
 
 class VoltageCurveWorkChain(WorkChain):
     """Workchain for compute voltage curves (or the necessary information to assemble one"""
+    ALLOWED_OK_EXIT_CODES = [601]
 
     @classmethod
     def define(cls, spec):
@@ -92,19 +93,13 @@ class VoltageCurveWorkChain(WorkChain):
             cls.run_delithiated_relax,  # Deploy relaxation for the delithiated structures
             cls.result,  # Finialise the results
         )
-        spec.output_namespace('delithiated_structures',
-                              dynamic=True,
-                              valid_type=orm.StructureData,
-                              required=True,
-                              help='Delithiated structures generated for relaxation.')
         spec.output_namespace('relaxed_delithiated_structures',
                               dynamic=True,
                               valid_type=orm.StructureData,
                               required=True,
                               help='Relaxed delithiated structures')
         spec.output('relaxed_lithiated_structure', valid_type=orm.StructureData, required=False, help='Relaxed original structure')
-
-        spec.output('output_parameters', valid_type=orm.Dict, required=True, help='Summary of the result of delithiation.')
+        spec.output('voltage_curve_data', valid_type=orm.Dict, required=True, help='Summary data regarding the voltage curve.')
 
         spec.exit_code(301, 'ERROR_INITIAL_RELAX_FAILED', message='The initial relaxation is failed.')
         spec.exit_code(401,
@@ -247,7 +242,7 @@ class VoltageCurveWorkChain(WorkChain):
             return self.exit_codes.ERROR_ALL_SUB_WORK_FAILED
 
         # Construct the record node
-        record_node = compose_voltage_curve_data(self.ctx.li_metal_calc, **miscs)
+        record_node = compose_voltage_curve_data(self.inputs.li_metal_calc_misc, **miscs)
         self.out('voltage_curve_data', record_node)
 
         if nfail > 1:
@@ -257,7 +252,7 @@ class VoltageCurveWorkChain(WorkChain):
         frames = self.ctx.delithiated_frames
         for key, frame in frames.items():
             q = orm.QueryBuilder()
-            q.append(orm.Node, filters={'id': frame})
+            q.append(orm.Node, filters={'id': frame.id})
             q.append(Relax, filters={'attributes.exit_status': 0})
             q.append(orm.StructureData, edge_filters={'label': 'relax__structure'})
             try:
