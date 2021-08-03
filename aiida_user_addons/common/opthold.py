@@ -275,6 +275,27 @@ class OptionContainer:
         else:
             spec.input(port_name, validator=cls.validate_dict, default=lambda: cls().to_aiida_dict(), serializer=cls.serialise, **kwargs)
 
+    @classmethod
+    def get_description(cls):
+        """
+        Return a string for the options of a OptionContains in a human-readable format.
+        """
+
+        obj = cls()
+        template = '{:>{width_name}s}:  {:10s} \n{default:>{width_name2}}: {}'
+        entries = []
+        for name in obj.valid_options:
+            value = getattr(obj, name)
+            # Each entry is name, type, doc, default value
+            entries.append([name, getattr(cls, name).__doc__, str(type(value)), value])
+
+        max_width_name = max([len(entry[0]) for entry in entries]) + 2
+
+        lines = []
+        for entry in entries:
+            lines.append(template.format(*entry, width_name=max_width_name, width_name2=max_width_name + 10, default='Default'))
+        return '\n'.join(lines)
+
 
 ########
 #
