@@ -318,6 +318,34 @@ class VoltageCurve:
         self.stable_entries = [entry.original_entry for entry in self.phase_diagram.stable_entries]
         self.stable_entries.sort(key=lambda x: x.composition[working_ion] / x.composition.num_atoms, reverse=True)
 
+    @property
+    def included_compositions(self):
+        all_comps = list(set([entry.composition.reduced_composition for entry in self.entries]))
+        all_comps.sort(key=lambda x: x[self.working_ion] / x.num_atoms, reverse=True)
+        return all_comps
+
+    @property
+    def stable_compositions(self):
+        all_comps = list(set([entry.composition.reduced_composition for entry in self.stable_entries]))
+        all_comps.sort(key=lambda x: x[self.working_ion] / x.num_atoms, reverse=True)
+        return all_comps
+
+    def __repr__(self):
+
+        formula = self.entries[0].composition.reduced_formula
+        nentry = len(self.entries)
+        output = f'VoltageCurve for {formula} with {nentry} entries'
+        avgvol = voltage_between_pair(self.entries[0], self.entries[-1], self.ref_entry, self.working_ion)
+        output += f'\nAverage voltage: {avgvol:.3f}\nCompositions: (* stable)'
+        # Find the compositions
+        all_comps = self.included_compositions
+        stable_comps = self.stable_compositions
+        for comp in all_comps:
+            output += f'\n{comp.reduced_formula}'
+            if comp in stable_comps:
+                output += ' (*)'
+        return output
+
     def compute_voltages(self) -> List[Tuple[List[Composition], float]]:
         """
         Compute the voltages
