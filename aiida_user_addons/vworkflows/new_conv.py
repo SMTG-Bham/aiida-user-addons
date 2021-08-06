@@ -18,7 +18,7 @@ from aiida.common.extendeddicts import AttributeDict
 from aiida.plugins import WorkflowFactory
 from aiida.common.utils import classproperty
 
-from aiida_user_addons.common.opthold import OptionHolder, typed_field
+from aiida_user_addons.common.opthold import OptionHolder, typed_field, OptionContainer, BoolOption, FloatOption, IntOption
 
 
 class VaspConvergenceWorkChain(WorkChain):
@@ -221,7 +221,7 @@ class VaspConvergenceWorkChain(WorkChain):
         return cdf, kdf
 
 
-class ConvOptions(OptionHolder):
+class ConvOptionsOld(OptionHolder):
     _allowed_options = ('cutoff_start', 'cutoff_stop', 'cutoff_step', 'kspacing_start', 'kspacing_stop', 'kspacing_step', 'cutoff_kconv',
                         'kspacing_cutconv')
 
@@ -233,6 +233,19 @@ class ConvOptions(OptionHolder):
     kspacing_step = typed_field('kspacing_step', (float,), 'Step size of the cut-off energy', 0.01)
     cutoff_kconv = typed_field('cutoff_kconv', (float,), 'The cut-off energy used for kpoints convergence tests', 450)
     kspacing_cutconv = typed_field('kspacing_cutconv', (float,), 'The kpoints spacing used for cut-off energy convergence tests', 0.07)
+
+
+class ConvOptions(OptionContainer):
+    """Template for the Dict node controlling the workchain behaviour"""
+
+    cutoff_start = FloatOption('The starting cut-off energy', 300)
+    cutoff_stop = FloatOption('The Final cut-off energy', 700)
+    cutoff_step = FloatOption('Step size of the cut-off energy', 50)
+    kspacing_start = FloatOption('The starting kspacing', 0.07)
+    kspacing_stop = FloatOption('The final kspacing', 0.02)
+    kspacing_step = FloatOption('Step size of the cut-off energy', 0.01)
+    cutoff_kconv = FloatOption('The cut-off energy used for kpoints convergence tests', 450)
+    kspacing_cutconv = FloatOption('The kpoints spacing used for cut-off energy convergence tests', 0.07)
 
 
 def nested_update(dict_in, update_dict):
