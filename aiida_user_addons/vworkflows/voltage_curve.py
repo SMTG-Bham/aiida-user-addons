@@ -14,7 +14,6 @@ The basic logic is the following:
 6. Store the segments of the curve
 
 """
-from re import L
 from aiida.orm.querybuilder import QueryBuilder
 import numpy as np
 
@@ -28,6 +27,7 @@ from sqlalchemy.orm.query import Query
 
 from aiida_user_addons.process.transform import delithiate_by_wyckoff, delithiate_full, delithiate_unique_sites, rattle
 from aiida_user_addons.process.battery import VoltageCurve, _obtain_li_ref_calc, compute_li_voltage_shortcut, check_li_ref_calc
+from aiida_user_addons.common.opthold import OptionContainer, IntOption, Option
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 from aiida_user_addons.common.misc import get_energy_from_misc
 from aiida_user_addons.tools.pymatgen import get_entry_from_calc
@@ -36,6 +36,12 @@ from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE
 
 VaspRelaxWorkChain = WorkflowFactory('vaspu.relax')
+
+
+class EwaldFilterOptions(OptionContainer):
+    """Options for filtering the delithiated structure by electrostatic energies"""
+    oxidation_state_mapping = Option('Mapping for the oxidation states', required=True)
+    pick_ewald_n_lowest = IntOption('Number of lowest energy structures to be picked', default_value=10)
 
 
 class VoltageCurveWorkChain(WorkChain):
@@ -48,6 +54,10 @@ class VoltageCurveWorkChain(WorkChain):
         super().define(spec)
 
         spec.expose_inputs(VaspRelaxWorkChain, 'relax', exclude=('structure',))
+        spec.inputs('ewald_filter_settings',
+                    vaid_type=orm.Dict,
+                    serializer=EwaldFilterOptions.serialise,
+                    help=f'Parameters for controlling filtering structure using Ewald summation\n{EwaldFilterOptions.get_description()}')
         spec.input('structure', valid_type=orm.StructureData)
         spec.input('rattle', valid_type=orm.Float, help='Amplitude of rattling', default=lambda: orm.Float(0.05))
         spec.input('final_li_level',
@@ -159,11 +169,14 @@ class VoltageCurveWorkChain(WorkChain):
         """Delithiate the structure at a range of Li concentrations"""
         from aiida_user_addons.process.battery import create_delithiated_multiple_level
         structure = self.ctx.current_structure
-        # Generate all of the delithiated frames
+        params = {}
         if 'atol' in self.inputs:
-            delithiated = create_delithiated_multiple_level(structure, self.inputs.final_li_level, self.inputs.rattle, self.inputs.atol)
-        else:
-            delithiated = create_delithiated_multiple_level(structure, self.inputs.final_li_level, self.inputs.rattle)
+            params['atol'] = self.inputs.atol
+        if 'ewald_filter_settings' in self.inputs:
+            params['ewald_filter_settings'] = self.inputs.ewald_filter_settings
+
+        # Generate all of the delithiated frames
+        delithiated = create_delithiated_multiple_level(structure, self.inputs.final_li_level, self.inputs.rattle, **params)
 
         self.ctx.delithiated_frames = delithiated
 

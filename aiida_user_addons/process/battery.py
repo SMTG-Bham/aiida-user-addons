@@ -11,6 +11,7 @@ from pymatgen.analysis.reaction_calculator import Reaction
 
 from bsym.interface.pymatgen import unique_structure_substitutions
 from pymatgen.analysis.phase_diagram import CompoundPhaseDiagram
+from pymatgen.analysis.ewald import EwaldSummation
 
 from aiida.orm import Float, StructureData
 from aiida.engine import calcfunction
@@ -260,19 +261,27 @@ class DelithiationManager:
             structure.remove_species([dummy])
         return subs
 
-    def create_delithiated_structures_multiple_levels(self, final_li_level: float = 0.0, atol=1e-5,
-                                                      dummy='He') -> Dict[int, List[Structure]]:
+    def create_delithiated_structures_multiple_levels(
+        self,
+        final_li_level: float = 0.0,
+        atol=1e-5,
+        dummy='He',
+        oxidation_state_mapping: Dict[str, float] = None,
+        pick_ewald_n_lowest: int = None,
+    ) -> Dict[int, List[Structure]]:
         """
         Create delithiated structures at multiple levels
 
         This method is useful for generating structures to be relaxed for voltage curve extraction.
 
         Args:
-            final_li_level(float): The final level of lithiation
-            dummy(str): Symbol of the dummy specie to be used
+            final_li_level (float): The final level of lithiation
+            oxidation_state_mapping (dict): Mapping of the oxidation states, used for filtering using Ewald summation.
+            pick_ewald_n_lowest (Int): Pick only the N lowest structures for each level.
+            dummy (str): Symbol of the dummy specie to be used.
 
         Returns:
-            a dictionary with keys being the number of Li removed from the structure and values being the unique
+            A dictionary with keys being the number of Li removed from the structure and values being the unique
                 structures at such delithiation level.
         """
 
@@ -286,7 +295,20 @@ class DelithiationManager:
         records = {}
         for num_remove in range(1, max_remove + 1):
             frames = self.create_delithaited_structures(num_remove, dummy=dummy, atol=atol)
-            records[num_remove] = frames
+            # If taking only N lowest energy states....
+            if pick_ewald_n_lowest is not None:
+                if oxidation_state_mapping is None:
+                    raise ValueError('Keyword argument \'oxidation_state_mapping\' must be passed for ranking with electrostatic energy.')
+                for frame in frames:
+                    frame.add_oxidation_state_by_element(oxidation_state_mapping)
+                frames = sorted_by_ewald(frames)
+                # Remove the oxidation states
+                for frame in frames:
+                    frame.remove_oxidation_states()
+                # Pick only the top structures
+                records[num_remove] = frames[:pick_ewald_n_lowest]
+            else:
+                records[num_remove] = frames
         return records
 
 
@@ -486,13 +508,16 @@ def create_delithiated_multiple_level(structure, final_li_level, rattle, **param
         atol = params['atol'].value
     else:
         atol = 1e-5
+    ewald_filter_settings = params.get('ewald_filter_settings', {})
+    if ewald_filter_settings:
+        ewald_filter_settings = ewald_filter_settings.get_dict()
 
     struct = structure.get_pymatgen()
     manager = DelithiationManager(struct)
     ok = False
     while not ok:
         try:
-            frame_dict = manager.create_delithiated_structures_multiple_levels(float(final_li_level), atol=atol)
+            frame_dict = manager.create_delithiated_structures_multiple_levels(float(final_li_level), atol=atol, **ewald_filter_settings)
         except ValueError:
             atol *= 10
             print(f'Increased symmetry tolerance to: {atol} and retry')
@@ -514,3 +539,10 @@ def create_delithiated_multiple_level(structure, final_li_level, rattle, **param
             new_structure.description = f'Delithiated structure with {nremoved} removed Li atoms and index {nremoved} of the returned unique structures.'
             output['structure_' + str(nremoved) + f'_{idx}'] = new_structure
     return output
+
+
+def sorted_by_ewald(structures: List[Structure]) -> List[Structure]:
+    """
+    Sort the structures by Ewald energy
+    """
+    return sorted(structures, key=lambda x: EwaldSummation(x).total_energy)
