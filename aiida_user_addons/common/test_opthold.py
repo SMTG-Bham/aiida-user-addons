@@ -57,7 +57,7 @@ def test_dummy_option_class_with_type():
 
     obj = DummyOptionClassWithType()
 
-    assert obj.a == False
+    assert obj.a is None
     assert obj.b == True
     with pytest.raises(ValueError):
         obj.b = 2
