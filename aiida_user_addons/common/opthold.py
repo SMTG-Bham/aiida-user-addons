@@ -285,9 +285,12 @@ class OptionContainer:
         template = '{:>{width_name}s}:  {:10s} \n{default:>{width_name2}}: {}'
         entries = []
         for name in obj.valid_options:
-            value = getattr(obj, name)
-            # Each entry is name, type, doc, default value
-            entries.append([name, getattr(cls, name).__doc__, str(type(value)), value])
+            if name not in obj.required_options:
+                value = getattr(obj, name)
+                # Each entry is name, type, doc, default value
+                entries.append([name, getattr(cls, name).__doc__, str(type(value)), value])
+            else:
+                entries.append([name, getattr(cls, name).__doc__, 'Undefined', 'None (required)'])
 
         max_width_name = max([len(entry[0]) for entry in entries]) + 2
 

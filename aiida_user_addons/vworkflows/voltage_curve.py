@@ -54,10 +54,10 @@ class VoltageCurveWorkChain(WorkChain):
         super().define(spec)
 
         spec.expose_inputs(VaspRelaxWorkChain, 'relax', exclude=('structure',))
-        spec.inputs('ewald_filter_settings',
-                    vaid_type=orm.Dict,
-                    serializer=EwaldFilterOptions.serialise,
-                    help=f'Parameters for controlling filtering structure using Ewald summation\n{EwaldFilterOptions.get_description()}')
+        spec.input('ewald_filter_settings',
+                   valid_type=orm.Dict,
+                   serializer=EwaldFilterOptions.serialise,
+                   help=f'Parameters for controlling filtering structure using Ewald summation\n{EwaldFilterOptions.get_description()}')
         spec.input('structure', valid_type=orm.StructureData)
         spec.input('rattle', valid_type=orm.Float, help='Amplitude of rattling', default=lambda: orm.Float(0.05))
         spec.input('final_li_level',
@@ -77,11 +77,6 @@ class VoltageCurveWorkChain(WorkChain):
             help='The misc output of a reference calculation for Li metal',
         )
         spec.input('atol', required=False, valid_type=orm.Float, help='Symmetry torlerance for generating unique structures.')
-        spec.input_namespace('unique_options', required=False, populate_defaults=False, help='Options for delithiate by unique sites')
-        spec.input('unique_options.excluded_sites', required=False, default=lambda: orm.List(list=[]), help='Excluded site indices.')
-        spec.input('unique_options.nsub', required=False, default=lambda: orm.Int(1), help='Number of Li to remove')
-        spec.input('unique_options.atol', required=False, default=lambda: orm.Float(1e-5), help='Symmetry tolerance')
-        spec.input('unique_options.limit', required=False, help='Maximum number of structures to attempt')
         spec.input(
             'ldau_mapping',
             required=True,  # I set it to be mandatory here as in most cases we will need a U
