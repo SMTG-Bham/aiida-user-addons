@@ -3,6 +3,7 @@ Pymatgen related tools
 """
 from typing import Tuple, List
 import warnings
+from aiida.common.exceptions import NotExistentAttributeError
 from aiida.plugins.factories import WorkflowFactory
 from pymatgen.entries.computed_entries import ComputedStructureEntry
 from pymatgen.core.composition import get_el_sp, gcd, formula_double_format, Composition
@@ -121,8 +122,13 @@ def get_entry_from_calc(calc):
         incar = calc.inputs.parameters['incar']
         pot = calc.inputs.potential_family.value
     elif calc.process_class == WorkflowFactory('vaspu.relax'):
-        incar = calc.inputs.vasp.parameters['incar']
-        pot = calc.inputs.vasp.potential_family.value
+        # For backword compatibility
+        try:
+            incar = calc.inputs.vasp.parameters['incar']
+            pot = calc.inputs.vasp.potential_family.value
+        except AttributeError:
+            incar = calc.inputs.parameters['incar']
+            pot = calc.inputs.potential_family.value
     elif calc.process_class == WorkflowFactory('vasp.relax'):
         incar = calc.inputs.parameters['incar']
         pot = calc.inputs.potential_family.value
