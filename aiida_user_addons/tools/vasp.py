@@ -1,9 +1,7 @@
 """
 Module for VASP related stuff
 """
-import gzip
 import shutil
-import os
 import tempfile
 from pathlib import Path
 from functools import wraps
@@ -15,8 +13,7 @@ from ase.calculators.singlepoint import SinglePointCalculator
 from ase import Atoms
 from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
 
-from aiida.repository import FileType
-from sqlalchemy.sql.elements import outparam
+from aiida_user_addons.common.repository import save_all_repository_objects
 
 
 def with_node(f):
@@ -382,49 +379,3 @@ def traj_to_atoms(node):
             else:
                 eng = None
             return _traj_node_to_atoms(traj, eng)
-
-
-def copy_from_aiida(name: str, node, dst: Path, decompress=False):
-    """
-    Copy objects from aiida repository.
-
-    :param name: The full name (including the parent path) of the object.
-    :param node: Node object for which the files in the repo to be copied.
-    :param dst: Path of the destination folder.
-
-    This is a recursive function so directory copying also works.
-    """
-    obj = node.get_object(name)
-
-    # If it is a directory, copy the contents one by one
-    if obj.file_type == FileType.DIRECTORY:
-        for sub_obj in node.list_objects(name):
-            copy_from_aiida(os.path.join(name, sub_obj.name), node, dst)
-    else:
-        # It is a file
-        with node.open(name, mode='rb') as fsource:
-            # Make parent directory if needed
-            frepo_path = dst / name
-            Path(frepo_path.parent).mkdir(exist_ok=True, parents=True)
-            # Write the file
-            if name.endswith('.gz') and decompress:
-                out_path = str(frepo_path)[:-3]
-                out_decompress = True
-            else:
-                out_decompress = False
-                out_path = str(frepo_path)
-
-            if not out_decompress:
-                with open(out_path, 'wb') as fdst:
-                    shutil.copyfileobj(fsource, fdst)
-            else:
-                gobj = gzip.GzipFile(fileobj=fsource, mode='rb')
-                with open(out_path, 'wb') as fdst:
-                    shutil.copyfileobj(gobj, fdst)
-
-
-def save_all_repository_objects(node, folder: Path, decompress=False):
-    """Copy all objects of a node saved in the repository to the disc"""
-    for ifile in node.list_objects():
-        name, _ = ifile
-        copy_from_aiida(name, node, folder, decompress)
