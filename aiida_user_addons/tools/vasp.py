@@ -6,12 +6,14 @@ import tempfile
 from pathlib import Path
 from functools import wraps
 from itertools import zip_longest
+from aiida.orm.nodes.data.array import TrajectoryData
 
 import numpy as np
 
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase import Atoms
 from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
+from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser, BaseFileParser, SingleFile, Xml
 
 from aiida_user_addons.common.repository import save_all_repository_objects
 
@@ -316,6 +318,35 @@ def _traj_node_to_atoms(traj, energies=None):
     return atoms_list
 
 
+def combine_trajectories(**traj_nodes):
+    """Combine a series of trajectory nodes"""
+
+    nodes = list(traj_nodes.values())
+    # Sort by the time of creation - we assume the trajectory are created in sequence
+    nodes.sort(key=lambda x: x.ctime)
+
+    # Set up storage
+    names = nodes[0].get_arraynames()
+    collect_dict = {name: [] for name in names if name != 'steps'}
+
+    # collect the results
+    for node in nodes:
+        for key, value in collect_dict.items():
+            # Extend the target list
+            value.extend(node.get_array(key))
+    symbols = node.symbols
+
+    # Join the numpy arrays - concatnate along the first axis
+    new_traj = TrajectoryData()
+    for name, value in collect_dict.items():
+        new_traj.set_array(name, np.concatenate(value, axis=0))
+    new_traj.set_attribute('symbols', symbols)
+
+    nframes = new_traj.get_array('positions').shape[0]
+    new_traj.set_array('steps', np.arange(nframes))
+    return new_traj
+
+
 @with_node
 def traj_to_atoms(node):
     """Converge trajectory nodes to atoms"""
@@ -379,3 +410,66 @@ def traj_to_atoms(node):
             else:
                 eng = None
             return _traj_node_to_atoms(traj, eng)
+
+
+class VasprunParserWithHandler(VasprunParser):
+    """
+    A vasprun parser that support file handler inputs
+    """
+
+    def __init__(self, *args, **kwargs):
+        """
+        Initialize vasprun.xml parser
+
+        file_path : str
+            File path.
+        file_object : str
+            An opened file object handler for the vapsrun.xml file.
+        data : SingleFileData
+            AiiDA Data class install to store a single file.
+        settings : ParserSettings
+        exit_codes : CalcJobNode.process_class.exit_codes
+
+        """
+
+        BaseFileParser.__init__(self, *args, **kwargs)
+        self._xml = None
+        self._xml_truncated = False
+        self._settings = kwargs.get('settings', None)
+        self._exit_codes = kwargs.get('exit_codes', None)
+        if 'file_path' in kwargs:
+            self._init_xml(file_path=kwargs['file_path'])
+        if 'file_obj' in kwargs:
+            self._init_xml(file_obj=kwargs['file_obj'])
+        if 'data' in kwargs:
+            self._init_xml(file_path=kwargs['data'].get_file_abs_path())
+
+    def _init_xml(self, file_path=None, file_obj=None):
+        """Create parsevasp Xml instance"""
+
+        if file_path:
+            self._data_obj = SingleFile(path=file_path)
+
+            # Since vasprun.xml can be fairly large, we will parse it only
+            # once and store the parsevasp Xml object.
+            try:
+                self._xml = Xml(file_path=file_path, k_before_band=True, logger=self._logger)
+                # Let us also check if the xml was truncated as the parser uses lxml and its
+                # recovery mode in case we can use some of the results.
+                self._xml_truncated = self._xml.truncated
+            except SystemExit:
+                self._logger.warning('Parsevasp exited abruptly. Returning None.')
+                self._xml = None
+        else:
+            self._data_obj = SingleFile(path='.')
+
+            # Since vasprun.xml can be fairly large, we will parse it only
+            # once and store the parsevasp Xml object.
+            try:
+                self._xml = Xml(file_obj=file_obj, k_before_band=True, logger=self._logger)
+                # Let us also check if the xml was truncated as the parser uses lxml and its
+                # recovery mode in case we can use some of the results.
+                self._xml_truncated = self._xml.truncated
+            except SystemExit:
+                self._logger.warning('Parsevasp exited abruptly. Returning None.')
+                self._xml = None
