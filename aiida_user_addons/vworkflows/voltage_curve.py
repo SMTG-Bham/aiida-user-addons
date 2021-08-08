@@ -57,6 +57,7 @@ class VoltageCurveWorkChain(WorkChain):
         spec.input('ewald_filter_settings',
                    valid_type=orm.Dict,
                    serializer=EwaldFilterOptions.serialise,
+                   required=False,
                    help=f'Parameters for controlling filtering structure using Ewald summation\n{EwaldFilterOptions.get_description()}')
         spec.input('structure', valid_type=orm.StructureData)
         spec.input('rattle', valid_type=orm.Float, help='Amplitude of rattling', default=lambda: orm.Float(0.05))
