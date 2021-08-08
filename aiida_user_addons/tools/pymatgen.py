@@ -127,7 +127,7 @@ def get_entry_from_calc(calc):
             incar = calc.inputs.vasp.parameters['incar']
             pot = calc.inputs.vasp.potential_family.value
         except AttributeError:
-            incar = calc.inputs.parameters['incar']
+            incar = calc.inputs.parameters['vasp']
             pot = calc.inputs.potential_family.value
     elif calc.process_class == WorkflowFactory('vasp.relax'):
         incar = calc.inputs.parameters['incar']
