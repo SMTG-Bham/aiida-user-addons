@@ -338,10 +338,9 @@ class VoltageCurve:
 
         # Find the terminal compositions
         lithiated = self.entries[0].composition  # One with the maximum lithation level
-        non_working_lithiated = Composition({key: lithiated.composition[key] for key in lithiated.composition if key.symbol != working_ion})
+        non_working_lithiated = Composition({key: lithiated[key] for key in lithiated if key.symbol != working_ion})
         delithiated = self.entries[-1].composition
-        non_working_delithiated = Composition(
-            {key: delithiated.composition[key] for key in delithiated.composition if key.symbol != working_ion})
+        non_working_delithiated = Composition({key: delithiated[key] for key in delithiated if key.symbol != working_ion})
 
         # Sanity check
         assert non_working_lithiated.reduced_composition == non_working_delithiated.reduced_composition
