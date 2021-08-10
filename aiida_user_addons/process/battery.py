@@ -335,9 +335,24 @@ class VoltageCurve:
 
         # Sort the entries with decreasing Li content
         self.entries.sort(key=lambda x: x.composition[working_ion] / x.composition.num_atoms, reverse=True)
-        self.phase_diagram = CompoundPhaseDiagram(self.entries,
-                                                  terminal_compositions=[self.entries[0].composition, self.entries[-1].composition],
-                                                  normalize_terminal_compositions=False)
+
+        # Find the terminal compositions
+        lithiated = self.entries[0].composition  # One with the maximum lithation level
+        non_working_lithiated = Composition({key: lithiated.composition[key] for key in lithiated.composition if key.symbol != working_ion})
+        delithiated = self.entries[-1].composition
+        non_working_delithiated = Composition(
+            {key: delithiated.composition[key] for key in delithiated.composition if key.symbol != working_ion})
+
+        # Sanity check
+        assert non_working_lithiated.reduced_composition == non_working_delithiated.reduced_composition
+
+        # Normalise terminal composition to the delithiated composition
+        factor = non_working_lithiated.num_atoms / non_working_delithiated.num_atoms
+
+        self.phase_diagram = CompoundPhaseDiagram(
+            self.entries,
+            terminal_compositions=[self.entries[0].composition, self.entries[-1].composition * factor],
+            normalize_terminal_compositions=False)
         self.stable_entries = [entry.original_entry for entry in self.phase_diagram.stable_entries]
         self.stable_entries.sort(key=lambda x: x.composition[working_ion] / x.composition.num_atoms, reverse=True)
 
