@@ -262,12 +262,12 @@ class DelithiationManager:
         return subs
 
     def create_delithiated_structures_multiple_levels(
-        self,
-        final_li_level: float = 0.0,
-        atol=1e-5,
-        dummy='He',
-        oxidation_state_mapping: Dict[str, float] = None,
-        pick_ewald_n_lowest: int = None,
+            self,
+            final_li_level: float = 0.0,
+            atol=1e-5,
+            dummy='He',
+            oxidation_state_mapping: Dict[str, float] = None,
+            pick_ewald_n_lowest: int = None,
     ) -> Dict[int, List[Structure]]:
         """
         Create delithiated structures at multiple levels
@@ -336,7 +336,8 @@ class VoltageCurve:
         # Sort the entries with decreasing Li content
         self.entries.sort(key=lambda x: x.composition[working_ion] / x.composition.num_atoms, reverse=True)
         self.phase_diagram = CompoundPhaseDiagram(self.entries,
-                                                  terminal_compositions=[self.entries[0].composition, self.entries[-1].composition])
+                                                  terminal_compositions=[self.entries[0].composition, self.entries[-1].composition],
+                                                  normalize_terminal_compositions=False)
         self.stable_entries = [entry.original_entry for entry in self.phase_diagram.stable_entries]
         self.stable_entries.sort(key=lambda x: x.composition[working_ion] / x.composition.num_atoms, reverse=True)
 
