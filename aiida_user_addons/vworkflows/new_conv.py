@@ -81,16 +81,23 @@ class VaspConvergenceWorkChain(WorkChain):
             # Start is equal or larger than stop - signalling no need to do the test
             cutoff_list = []
 
-        # kpoints spacing
-        spacing = settings['kspacing_start']
-        kspacing_list = [spacing]
-        while True:
-            spacing -= settings['kspacing_step']
-            if spacing > settings['kspacing_stop']:
-                kspacing_list.append(spacing)
-            else:
-                kspacing_list.append(settings['kspacing_stop'])
-                break
+        # Same treatment for kspacing
+        start = settings['kspacing_start']
+        stop = settings['kspacing_stop']
+
+        if start > stop:
+            spacing = start
+            kspacing_list = [spacing]
+            while True:
+                spacing -= settings['kspacing_step']
+                if spacing > settings['kspacing_stop']:
+                    kspacing_list.append(spacing)
+                else:
+                    kspacing_list.append(settings['kspacing_stop'])
+                    break
+        else:
+            kspacing_list = []
+
         self.ctx.cutoff_list = cutoff_list
         self.ctx.kspacing_list = kspacing_list
 
@@ -98,8 +105,17 @@ class VaspConvergenceWorkChain(WorkChain):
         """
         Setup and launch the convergence calculations
         """
-        cutoff_for_kconv = self.ctx.settings.get('cutoff_kconv', min(self.ctx.cutoff_list))
-        kspacing_for_cutoffconv = orm.Float(self.ctx.settings.get('kspacing_cutconv', max(self.ctx.kspacing_list)))
+        if self.ctx.cutoff_list:
+            cut_k = 400  # Default if not supplied
+        else:
+            cut_k = min(self.ctx.cutoff_list)
+        if self.ctx.kspacing_list:
+            k_cut = 0.06  # Default if not supplied
+        else:
+            k_cut = min(self.ctx.kspacing_list)
+
+        cutoff_for_kconv = self.ctx.settings.get('cutoff_kconv', cut_k)
+        kspacing_for_cutoffconv = orm.Float(self.ctx.settings.get('kspacing_cutconv', k_cut))
 
         # Launch cut off energy tests
         for cut in self.ctx.cutoff_list:
