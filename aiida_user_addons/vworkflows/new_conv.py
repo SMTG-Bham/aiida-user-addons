@@ -64,15 +64,22 @@ class VaspConvergenceWorkChain(WorkChain):
         self.ctx.settings = settings
 
         # Planewave cut off energies
-        cut = settings['cutoff_start']
-        cutoff_list = [cut]
-        while True:
-            cut += settings['cutoff_step']
-            if cut < settings['cutoff_stop']:
-                cutoff_list.append(cut)
-            else:
-                cutoff_list.append(settings['cutoff_stop'])
-                break
+        start = settings['cutoff_start']
+        stop = settings['cutoff_stop']
+        if start < stop:
+            cutoff_list = [start]
+            cut = start
+            # Ensure start and stop are always included
+            while True:
+                cut += settings['cutoff_step']
+                if cut < stop:
+                    cutoff_list.append(cut)
+                else:
+                    cutoff_list.append(stop)
+                    break
+        else:
+            # Start is equal or larger than stop - signalling no need to do the test
+            cutoff_list = []
 
         # kpoints spacing
         spacing = settings['kspacing_start']

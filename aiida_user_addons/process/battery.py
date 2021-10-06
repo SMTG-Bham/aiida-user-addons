@@ -49,7 +49,6 @@ def compute_li_voltage_shortcut(lithiated, delithiated, li_ref=None, li_ref_grou
     """
     Compute voltage from three calculations.
 
-    WARNING: This works for only calculation performed using PBE pseudopotentials
     """
     if li_ref is None:
         indict = get_input_parameters_dict(lithiated.outputs.misc)
