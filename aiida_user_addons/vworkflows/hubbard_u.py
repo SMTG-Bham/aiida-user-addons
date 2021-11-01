@@ -31,6 +31,16 @@ from aiida.common.links import LinkType
 from aiida.engine import WorkChain, if_, append_, calcfunction
 from aiida.plugins import WorkflowFactory
 from reentry.config import make_config_parser
+from ..common.opthold import BoolOption, OptionHolder, DictOption, ListOption, typed_field, OptionContainer, IntOption, FloatOption, ChoiceOption, StringOption
+
+
+class LinearResponseUOptions(OptionContainer):
+    """Container for settings of the linear response U workchain"""
+    l = IntOption('Angular momentum channel', 2)
+    magmom_mapping = DictOption('Mapping for the magnetic moment')
+    magmom = ListOption('Magnetic moment of each site in the supercell')
+    sites = ListOption('A list of sites in the input cell to be perturbed', required=True)
+    supercell = ListOption('Matrix or list specifying the supercell to be used', required=True)
 
 
 class LinearResponseU(WorkChain):
@@ -44,7 +54,11 @@ class LinearResponseU(WorkChain):
         super().define(spec)
         spec.expose_inputs(cls._base_workchain, 'vasp', exclude=('structure',))
         spec.input('structure', valid_type=orm.StructureData)
-        spec.input('response_settings', valid_type=orm.Dict, help='Settings of the workchain')
+        spec.input('response_settings',
+                   valid_type=orm.Dict,
+                   help='Settings of the workchain',
+                   serializer=LinearResponseUOptions.serialise,
+                   validator=LinearResponseUOptions.validate_dict)
         spec.outline(
             cls.initialize,  # internal parameters
             cls.make_supercell,  # Make the supercell with correct species

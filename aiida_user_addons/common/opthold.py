@@ -114,6 +114,16 @@ class IntOption(TypedOption):
     target_type = int
 
 
+class DictOption(TypedOption):
+    """Class for an option that accepts a dictionary"""
+    target_type = dict
+
+
+class ListOption(TypedOption):
+    """Class for an option that accepts a list"""
+    target_type = list
+
+
 class StringOption(TypedOption):
     """Class for an option that accepts only string values"""
 
