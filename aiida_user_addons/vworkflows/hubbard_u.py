@@ -20,6 +20,7 @@ Note that VASP does not seems to allow having the `self-consistent` response, as
 In principles this should be possible, by altering the source code?
 """
 from typing import Dict
+from aiida.orm.nodes.process import calculation
 from ase.atoms import default
 import numpy as np
 
@@ -30,7 +31,10 @@ import aiida.orm as orm
 from aiida.common.links import LinkType
 from aiida.engine import WorkChain, if_, append_, calcfunction
 from aiida.plugins import WorkflowFactory
+from numpy.core.fromnumeric import nonzero
 from reentry.config import make_config_parser
+
+from ..common.repository import open_compressed
 from ..common.opthold import BoolOption, OptionHolder, DictOption, ListOption, typed_field, OptionContainer, IntOption, FloatOption, ChoiceOption, StringOption
 
 
@@ -71,8 +75,8 @@ class LinearResponseU(WorkChain):
         spec.exit_code(301, 'ERROR_INITIAL_SCF_FAILED', message='The initial SCF is failed.')
 
     def initialize(self):
-        self.ctx.response_settings = self.input['response_settings']
-        self.ctx.structure_in = self.input['structure']
+        self.ctx.response_settings = self.inputs['response_settings'].get_dict()
+        self.ctx.structure_in = self.inputs['structure']
         self.ctx.potential_mapping = None  # Update potcar mapping
         assert 'supercell' in self.ctx.response_settings
         assert 'sites' in self.ctx.response_settings
@@ -104,6 +108,10 @@ class LinearResponseU(WorkChain):
         inputs.structure = self.ctx.supercell_structure
         inputs.potential_mapping = self.ctx.potential_mapping
 
+        # Ensure that we DO NOT clean the workdir
+        if 'clean_workdir' in inputs and inputs.clean_workdir.value is True:
+            inputs.clean_workdir = orm.Bool(False)
+
         param = inputs.parameters.get_dict()
 
         # Default magmoment for fully FM state
@@ -116,9 +124,9 @@ class LinearResponseU(WorkChain):
 
         incar_update = {
             'ldau': False,
-            'lcharge': True,
+            'lcharg': True,
             'lwave': True,
-            'lmixmax': param['incar'].get('lmixmax', 4),
+            'lmaxmix': param['incar'].get('lmixmax', 4),
             'lorbit': 11,
             'ibrion': -1,
             'nsw': 0,
@@ -132,7 +140,7 @@ class LinearResponseU(WorkChain):
 
         # Update the input if any change is made
         if param != inputs.parameters.get_dict():
-            inputs.parameteters = orm.Dict(dict=param)
+            inputs.parameters = orm.Dict(dict=param)
 
         inputs.metadata.label = self.inputs.metadata.label + ' INITIAL SCF'
         running = self.submit(self._base_workchain, **inputs)
@@ -148,7 +156,7 @@ class LinearResponseU(WorkChain):
     def do_responses(self):
         """Run the response calculations"""
         alphas = self.ctx.response_settings.get('alphas', [-0.2, -0.1, 0.1, 0.2])
-        nkinds = len(self.structure_structure.kinds)
+        nkinds = len(self.ctx.supercell_structure.kinds)
         ldaul = [-1] * nkinds
         # Update for the last specie (to be perturbed)
         ldaul[-1] = self.ctx.response_settings['l']
@@ -161,7 +169,7 @@ class LinearResponseU(WorkChain):
             'ldaul': ldaul,
             'ldauu': ldauu,
             'ldauj': ldauj,
-            'icharge': 11,
+            'icharg': 11,
         }
 
         inputs = self.exposed_inputs(self._base_workchain, 'vasp')
@@ -175,27 +183,84 @@ class LinearResponseU(WorkChain):
             incar_update['ldauu'][-1] = alpha
             scf_param['incar'].update(incar_update)
             scf_param['incar']['icharg'] = 11
-            inputs.parameters = Dict(dict=scf_param)
+            inputs.parameters = orm.Dict(dict=scf_param)
             inputs.metadata.label = self.inputs.metadata.label + f' NONSCF ALPHA={alpha}'
             # Link the restart folder
-            inputs.restart_folder = self.ctx.initial_scf.outputs.remote_data
+            inputs.restart_folder = self.ctx.initial_scf.outputs.remote_folder
 
             running = self.submit(self._base_workchain, **inputs)
+            running.set_extra('alpha', alpha)
             self.report(f'Submitted {running} for NSCF ALPHA={alpha}')
             self.to_context(nscf_workchains=append_(running))
 
             # For the SCF response
             scf_param['incar'].pop('icharg')  # Use default ICHARG - this should reuse the wave function
-            inputs.parameters = Dict(dict=scf_param)
+            inputs.parameters = orm.Dict(dict=scf_param)
             inputs.metadata.label = self.inputs.metadata.label + f' SCF ALPHA={alpha}'
             running = self.submit(self._base_workchain, **inputs)
+            running.set_extra('alpha', alpha)
             self.report(f'Submitted {running} for SCF ALPHA={alpha}')
             self.to_context(scf_workchains=append_(running))
 
         self.report(f'All response calculations have been submitted')
 
     def result(self):
-        pass
+        """
+        Analyse the results
+        """
+        nonzero = [node for node in (self.ctx.scf_workchains + self.ctx.nscf_workchains) if not node.is_finished_ok]
+        if nonzero:
+            self.report(f'Workchains: {nonzero} finished with error, hence will not be used for fitting.')
+
+        lmap = {0: 's', 1: 'p', 2: 'd', 3: 'f'}
+        channel = lmap[self.ctx.response_settings['l']]
+        nsites = len(self.ctx.response_settings['sites'])
+
+        base_occ = parse_charge_projection(self.ctx.initial_scf)[channel][-nsites:]
+
+        # Process NSCF
+        alphas_nscf = [0.]
+        occ_nscf = [base_occ]
+
+        for work in self.ctx.nscf_workchains:
+            if not work.is_finished_ok:
+                continue
+            projection = parse_charge_projection(work)
+            # Assuming single site, for now
+            occ_nscf.append(projection[channel][-nsites:])
+            alphas_nscf.append(work.get_extra('alpha'))
+
+        alphas_scf = [0.]
+        occ_scf = [base_occ]
+        for work in self.ctx.scf_workchains:
+            if not work.is_finished_ok:
+                continue
+            projection = parse_charge_projection(work)
+            # Assuming single site, for now
+            occ_scf.append(projection[channel][-nsites:])
+            alphas_scf.append(work.get_extra('alpha'))
+
+        occ_scf = np.array(occ_scf)
+        alphas_nscf = np.array(alphas_nscf)
+        alphas_scf = np.array(alphas_scf)
+        occ_nscf = np.array(occ_nscf)
+
+        scf_fit = np.polyfit(alphas_scf, occ_scf, deg=1)
+        nscf_fit = np.polyfit(alphas_nscf, occ_nscf, deg=1)
+        # The higher power is the first element
+        fit_u = 1 / scf_fit[0, :] - 1 / nscf_fit[0, :]
+
+        # We do not have it wrapped in a calcfunction for now....
+        output = {
+            'occ_scf': occ_scf.tolist(),
+            'occ_nscf': occ_nscf.tolist(),
+            'alphas_scf': alphas_scf.tolist(),
+            'alphas_nscf': alphas_nscf.tolist(),
+            'fit_u': fit_u.tolist(),
+        }
+        output = orm.Dict(dict=output)
+        output.store()
+        self.out('fitting_results', output)
 
 
 @calcfunction
@@ -229,3 +294,36 @@ def create_supercell_with_tags(structure_in: orm.StructureData, supercell: orm.L
     structure_out = orm.StructureData(ase=repeated)
     structure_out.label = structure_in.label + ' SUPERCELL'
     return structure_out
+
+
+def read_charge_projection(lines):
+    """
+    Read out the charge projection from line of the OUTCAR file
+    """
+    charge_projection = None
+    for (n, line) in enumerate(lines):
+        if 'total charge' == line.strip():
+            charge_entries = []
+            for i in range(n + 4, len(lines)):
+                if lines[i].startswith('tot'):
+                    ilast = i
+            for subline in lines[n + 4:ilast - 1]:
+                if subline.startswith('----'):
+                    break
+                charge_entries.append([float(token) for token in subline.split()])
+
+            index, s, p, d, tot = zip(*charge_entries)
+            charge_projection = {'index': list(map(int, index)), 's': list(s), 'p': list(p), 'd': list(d), 'tot': list(tot)}
+    if charge_projection is None:
+        raise RuntimeError('No charge projection is found')
+    return charge_projection
+
+
+def parse_charge_projection(calcjob):
+    """
+    Bespoke parsing of the outcar data from calcjob
+    """
+    folder = calcjob.outputs.retrieved
+    with open_compressed(folder, 'OUTCAR', 'r') as fhandle:
+        outcar = fhandle.readlines()
+    return read_charge_projection(outcar)

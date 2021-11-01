@@ -103,3 +103,20 @@ def save_all_repository_objects(node: orm.Node, target_path: Path, decompress=Fa
     for ifile in node.list_objects():
         name, _ = ifile
         copy_from_aiida(name, node, target_path, decompress, exclude=exclude)
+
+
+@contextmanager
+def open_compressed(node, name, mode='r'):
+    """
+    Open compressed text file
+    """
+    stored = node.list_object_names()
+    if name in stored:
+        with node.open(name, mode=mode) as fhandle:
+            yield fhandle
+    elif name + '.gz' in stored:
+        with node.open(name, mode='rb') as fhandle:
+            with gzip.GzipFile(fileobj=fhandle, mode=mode) as zhandle:
+                yield zhandle
+    else:
+        raise ValueError(f'File {name} is not found.')

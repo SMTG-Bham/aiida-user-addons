@@ -19,7 +19,8 @@ def magnetic_structure_decorate(structure, magmom):
     """
     from aiida_user_addons.common.magmapping import create_additional_species
     magmom = magmom.get_list()
-    assert len(magmom) == len(structure.sites), f'Mismatch between the magmom ({len(magmom)}) and the nubmer of sites ({len(structure.sites)}).'
+    assert len(magmom) == len(
+        structure.sites), f'Mismatch between the magmom ({len(magmom)}) and the nubmer of sites ({len(structure.sites)}).'
     old_species = [structure.get_kind(site.kind_name).symbol for site in structure.sites]
     new_species, magmom_mapping = create_additional_species(old_species, magmom)
     new_structure = StructureData()
@@ -269,7 +270,9 @@ def make_supercell(structure, supercell, **kwargs):
         satoms = atoms.repeat(slist)
     else:
         satoms = ase_supercell(atoms, np.array(slist))
-    satoms = sort(satoms)
+    if 'no_sort' not in kwargs:
+        satoms = sort(satoms)
+
     if tags:
         stags = satoms.get_tags().tolist()
     satoms.set_tags(None)
