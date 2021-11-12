@@ -4,6 +4,7 @@ Collection of process functions for AiiDA, used for structure transformation
 import re
 import numpy as np
 from ase.build import sort
+from ase.neb import NEB
 from aiida.orm import StructureData, List, ArrayData, Node, QueryBuilder, CalcFunctionNode, Dict
 from aiida.engine import calcfunction
 
@@ -511,3 +512,44 @@ def niggli_reduce(structure):
     new_structure = StructureData(ase=atoms)
     new_structure.label = structure.label + ' NIGGLI'
     return new_structure
+
+
+@calcfunction
+def neb_interpolate(init_structure, final_strucrture, nimages):
+    """
+    Interplate NEB frames using the starting and the final structures
+
+    Get around the PBC warpping problem by calculating the MIC displacements
+    from the initial to the final structure
+    """
+
+    ainit = init_structure.get_ase()
+    afinal = final_strucrture.get_ase()
+    disps = []
+
+    # Find distances
+    acombined = ainit.copy()
+    acombined.extend(afinal)
+    # Get piece-wise MIC distances
+    for i in range(len(ainit)):
+        dist = acombined.get_distance(i, i + len(ainit), vector=True, mic=True)
+        disps.append(dist.tolist())
+    disps = np.asarray(disps)
+    ainit.wrap(eps=1e-1)
+    afinal = ainit.copy()
+
+    # Displace the atoms according to MIC distances
+    afinal.positions += disps
+    neb = NEB([ainit.copy() for i in range(int(nimages) + 1)] + [afinal.copy()])
+    neb.interpolate()
+    out_init = StructureData(ase=neb.images[0])
+    out_init.label = init_structure.label + ' INIT'
+    out_final = StructureData(ase=neb.images[-1])
+    out_final.label = init_structure.label + ' FINAL'
+
+    outputs = {'image_init': out_init}
+    for i, out in enumerate(neb.images[1:-1]):
+        outputs[f'image_{i+1:02d}'] = StructureData(ase=out)
+        outputs[f'image_{i+1:02d}'].label = init_structure.label + f' FRAME {i+1:02d}'
+    outputs['image_final'] = out_final
+    return outputs

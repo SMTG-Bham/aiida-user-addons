@@ -160,10 +160,15 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             settings = orm.Dict(dict={})
 
         if self.perform_relaxation():
-            settings = nested_update_dict_node(settings, {'parser_settings': {
-                'add_structure': True,
-                'add_trajectory': True,
-            }})
+            settings = nested_update_dict_node(
+                settings,
+                {
+                    'parser_settings': {
+                        'add_structure': True,
+                        'add_trajectory': True,  # This stores the ionic positions, forces and stresses etc.
+                        'add_energies': True,  # Retrieve the energies of each ionic step
+                    }
+                })
 
         # Update the settings for the relaxation
         if settings.get_dict():
