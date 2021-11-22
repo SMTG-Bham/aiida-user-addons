@@ -4,9 +4,13 @@ The functions are adapted from ase.io.res module
 """
 import re
 from functools import namedtuple
+from pathlib import Path
+from typing import Union, Tuple
 
 from ase.geometry import cellpar_to_cell
 from ase import Atoms
+from aiida.orm import SinglefileData, StructureData
+from aiida.engine import calcfunction
 
 # TITL 2LFP-11212-7612-5 -0.0373 309.998985 -1.21516192E+004 16.0000 16.2594 28 (P-1) n - 1
 #              0             1        2            3             4       5    6   7   8 9 10
@@ -32,7 +36,7 @@ def parse_titl(line):
     )
 
 
-def read_res(lines):
+def read_res(lines) -> Tuple[TitlInfo, Atoms]:
     """
     Reads a res file from a string
 
@@ -112,3 +116,22 @@ def read_stream(stream):
     titl_list.append(titl)
     atoms_list.append(atoms)
     return titl_list, atoms_list
+
+
+@calcfunction
+def structure_from_res(resfile):
+    """Return a structure from a given SHRELX file"""
+    lines = resfile.get_object_content(resfile.filename).split('\n')
+    title, atoms = read_res(lines)
+    atoms.wrap()
+    out = StructureData(ase=atoms)
+    out.set_attribute_many(title._asdict())
+    return out
+
+
+def import_res(fname: Union[str, Path]):
+    """Import and SHELX file into the database - store the original data"""
+
+    data = SinglefileData(Path(fname).resolve())
+    data.store()
+    return structure_from_res(data)

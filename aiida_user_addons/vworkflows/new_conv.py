@@ -105,11 +105,11 @@ class VaspConvergenceWorkChain(WorkChain):
         """
         Setup and launch the convergence calculations
         """
-        if self.ctx.cutoff_list:
+        if not self.ctx.cutoff_list:
             cut_k = 400  # Default if not supplied
         else:
             cut_k = min(self.ctx.cutoff_list)
-        if self.ctx.kspacing_list:
+        if not self.ctx.kspacing_list:
             k_cut = 0.06  # Default if not supplied
         else:
             k_cut = min(self.ctx.kspacing_list)
