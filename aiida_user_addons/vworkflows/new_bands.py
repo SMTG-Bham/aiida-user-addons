@@ -335,7 +335,9 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
                 bands_input = AttributeDict(self.exposed_inputs(base_work, namespace='bands'))
             else:
                 bands_input = AttributeDict({
-                    'settings': orm.Dict(dict={'add_bands': True}),
+                    'settings': orm.Dict(dict={'parser_settings': {
+                        'add_bands': True
+                    }}),
                     'parameters': orm.Dict(dict={'charge': {
                         'constant_charge': True
                     }}),
@@ -683,6 +685,14 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
             idx = int(key.split('_')[-1])
 
             inputs = self.exposed_inputs(workflow_class, 'scf')
+
+            # Ensure that the bands are parsed
+            if 'settings' not in inputs:
+                inputs.settings = orm.Dict(dict={'parser_settings': {'add_bands': True}})
+            else:
+                # Merge with 'parser_settings'
+                inputs.settings = nested_update_dict_node(inputs.settings, {'parser_settings': {'add_bands': True}})
+
             # Swap the kpoints the the one with zero-weight parts
             inputs.kpoints = value
             inputs.metadata.label = self.inputs.metadata.label + f' SPLIT {idx}'
