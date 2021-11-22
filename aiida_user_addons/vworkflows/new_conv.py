@@ -55,8 +55,8 @@ class VaspConvergenceWorkChain(WorkChain):
         spec.outline(cls.setup, cls.launch_conv_calcs, cls.analyse)
 
         spec.exit_code(401, 'ERROR_SUBWORKFLOW_ERRORED', message='At leaste one of the launched sub-workchain has failed')
-        spec.output('kpoints_conv_data')
-        spec.output('cutoff_conv_data')
+        spec.output('kpoints_conv_data', required=False)
+        spec.output('cutoff_conv_data', required=False)
 
     def setup(self):
         """Setup the convergence workflow"""
@@ -179,33 +179,36 @@ class VaspConvergenceWorkChain(WorkChain):
 
         cutoff_data = {}
         cutoff_miscs = {}
-        for iwork, workchain in enumerate(self.ctx.cutoff_conv_workchains):
+        if 'cutoff_conv_workchains' in self.ctx:
+            for iwork, workchain in enumerate(self.ctx.cutoff_conv_workchains):
 
-            if workchain.exit_status != 0:
-                exit_code = self.exit_codes.ERROR_SUBWORKFLOW_ERRORED
-                self.report(f'Skipping workchain {workchain} with exit status {workchain.exit_status} ')
-                continue
+                if workchain.exit_status != 0:
+                    exit_code = self.exit_codes.ERROR_SUBWORKFLOW_ERRORED
+                    self.report(f'Skipping workchain {workchain} with exit status {workchain.exit_status} ')
+                    continue
 
-            cutoff = workchain.inputs.parameters['incar']['encut']
-            cutoff_data[cutoff] = collect_data(workchain)
-            cutoff_data[cutoff]['mesh'] = workchain.called[0].inputs.kpoints.get_kpoints_mesh()[0]
-            cutoff_miscs[f'worchain_{iwork}'] = workchain.outputs.misc
+                cutoff = workchain.inputs.parameters['incar']['encut']
+                cutoff_data[cutoff] = collect_data(workchain)
+                cutoff_data[cutoff]['mesh'] = workchain.called[0].inputs.kpoints.get_kpoints_mesh()[0]
+                cutoff_miscs[f'worchain_{iwork}'] = workchain.outputs.misc
 
         kspacing_data = {}
         kspacing_miscs = {}
-        for iwork, workchain in enumerate(self.ctx.kpoints_conv_workchains):
 
-            if workchain.exit_status != 0:
-                exit_code = self.exit_codes.ERROR_SUBWORKFLOW_ERRORED
-                self.report(f'Skipping Workchain {workchain} with exit status {workchain.exit_status} ')
-                continue
+        if 'kpoints_conv_workchains' in self.ctx:
+            for iwork, workchain in enumerate(self.ctx.kpoints_conv_workchains):
 
-            spacing = float(workchain.inputs.kpoints_spacing)
-            kspacing_data[spacing] = collect_data(workchain)
-            kspacing_data[spacing]['mesh'] = workchain.called[0].inputs.kpoints.get_kpoints_mesh()[0]
-            kspacing_miscs[f'worchain_{iwork}'] = workchain.outputs.misc
-            cutoff = workchain.inputs.parameters['incar']['encut']
-            kspacing_data[spacing]['cutoff_energy'] = cutoff
+                if workchain.exit_status != 0:
+                    exit_code = self.exit_codes.ERROR_SUBWORKFLOW_ERRORED
+                    self.report(f'Skipping Workchain {workchain} with exit status {workchain.exit_status} ')
+                    continue
+
+                spacing = float(workchain.inputs.kpoints_spacing)
+                kspacing_data[spacing] = collect_data(workchain)
+                kspacing_data[spacing]['mesh'] = workchain.called[0].inputs.kpoints.get_kpoints_mesh()[0]
+                kspacing_miscs[f'worchain_{iwork}'] = workchain.outputs.misc
+                cutoff = workchain.inputs.parameters['incar']['encut']
+                kspacing_data[spacing]['cutoff_energy'] = cutoff
 
         # Calcfunction to link with the calculation output to the summary data node
         @calcfunction
@@ -218,8 +221,10 @@ class VaspConvergenceWorkChain(WorkChain):
             """Alias calcfunction to link summary node with miscs"""
             return orm.Dict(dict=unpack('cutoff_energy', cutoff_data))
 
-        self.out('kpoints_conv_data', create_links_kconv(**kspacing_miscs))
-        self.out('cutoff_conv_data', create_links_cutconv(**cutoff_miscs))
+        if kspacing_data:
+            self.out('kpoints_conv_data', create_links_kconv(**kspacing_miscs))
+        if cutoff_data:
+            self.out('cutoff_conv_data', create_links_cutconv(**cutoff_miscs))
 
         return exit_code
 
@@ -302,12 +307,19 @@ def get_conv_data(conv_work):
       A tuple of cut-off convergence and k-point convergence result data frame
     """
     import pandas as pd
-    cutdf = pd.DataFrame(conv_work.outputs.cutoff_conv_data.get_dict())
-    kdf = pd.DataFrame(conv_work.outputs.kpoints_conv_data.get_dict())
-    cutdf['energy_per_atom'] = cutdf['energy'] / len(conv_work.inputs.structure.sites)
-    kdf['energy_per_atom'] = kdf['energy'] / len(conv_work.inputs.structure.sites)
-    kdf['dE_per_atom'] = kdf['energy_per_atom'] - kdf['energy_per_atom'].iloc[-1]
-    cutdf['dE_per_atom'] = cutdf['energy_per_atom'] - cutdf['energy_per_atom'].iloc[-1]
+    if 'cutoff_conv_data' in conv_work.outputs:
+        cutdf = pd.DataFrame(conv_work.outputs.cutoff_conv_data.get_dict())
+        cutdf['energy_per_atom'] = cutdf['energy'] / len(conv_work.inputs.structure.sites)
+        cutdf['dE_per_atom'] = cutdf['energy_per_atom'] - cutdf['energy_per_atom'].iloc[-1]
+    else:
+        cutdf = None
+
+    if 'kpoints_conv_data' in conv_work.outputs:
+        kdf = pd.DataFrame(conv_work.outputs.kpoints_conv_data.get_dict())
+        kdf['energy_per_atom'] = kdf['energy'] / len(conv_work.inputs.structure.sites)
+        kdf['dE_per_atom'] = kdf['energy_per_atom'] - kdf['energy_per_atom'].iloc[-1]
+    else:
+        kdf = None
     return cutdf, kdf
 
 
@@ -318,37 +330,39 @@ def plot_conv_data(cdf, kdf, **kwargs):
     import matplotlib.pyplot as plt
     # Create a subplot
     figs = []
-    fig, axs = plt.subplots(3, 1, sharex=True, **kwargs)
-    figs.append(fig)
-    axs[0].plot(cdf.cutoff_energy, cdf.dE_per_atom, '-x')
-    i = 0
-    if 'maximum_force' in cdf.columns:
-        i += 1
-        axs[i].plot(cdf.cutoff_energy, cdf.maximum_force, '-x')
-        axs[i].set_ylabel(r'$F_{max}$ (eV$\AA^{-1}$)')
-    if 'maximum_stress' in cdf.columns:
-        i += 1
-        axs[i].plot(cdf.cutoff_energy, cdf.maximum_stress, '-x')
-        axs[i].set_ylabel(r'$S_{max}$ (kBar)')
-    axs[i].set_xlabel('Cut-off energy (eV)')
-    fig.tight_layout()
+    if cdf:
+        fig, axs = plt.subplots(3, 1, sharex=True, **kwargs)
+        figs.append(fig)
+        axs[0].plot(cdf.cutoff_energy, cdf.dE_per_atom, '-x')
+        i = 0
+        if 'maximum_force' in cdf.columns:
+            i += 1
+            axs[i].plot(cdf.cutoff_energy, cdf.maximum_force, '-x')
+            axs[i].set_ylabel(r'$F_{max}$ (eV$\AA^{-1}$)')
+        if 'maximum_stress' in cdf.columns:
+            i += 1
+            axs[i].plot(cdf.cutoff_energy, cdf.maximum_stress, '-x')
+            axs[i].set_ylabel(r'$S_{max}$ (kBar)')
+        axs[i].set_xlabel('Cut-off energy (eV)')
+        fig.tight_layout()
 
-    fig, axs = plt.subplots(3, 1, sharex=True, **kwargs)
-    figs.append(fig)
-    axs[0].plot(kdf.kpoints_spacing, kdf.dE_per_atom, '-x')
-    axs[0].set_ylabel('dE (eV / atom)')
-    i = 0
-    if 'maximum_force' in kdf.columns:
-        i += 1
-        axs[i].plot(kdf.kpoints_spacing, kdf.maximum_force, '-x')
-        axs[i].set_ylabel(r'$F_{max}$ (eV$\AA^{-1}$)')
-    if 'maximum_stress' in kdf.columns:
-        i += 1
-        axs[i].plot(kdf.kpoints_spacing, kdf.maximum_stress, '-x')
-        axs[i].set_ylabel(r'$S_{max}$ (kBar)')
-    axs[i].set_xticks(kdf.kpoints_spacing)
-    axs[i].set_xticklabels([f'{row.kpoints_spacing:.3f}\n{row.mesh}' for _, row in kdf.iterrows()], rotation=45)
-    axs[i].set_xlabel('K-pointing spacing (mesh)')
-    fig.tight_layout()
+    if kdf:
+        fig, axs = plt.subplots(3, 1, sharex=True, **kwargs)
+        figs.append(fig)
+        axs[0].plot(kdf.kpoints_spacing, kdf.dE_per_atom, '-x')
+        axs[0].set_ylabel('dE (eV / atom)')
+        i = 0
+        if 'maximum_force' in kdf.columns:
+            i += 1
+            axs[i].plot(kdf.kpoints_spacing, kdf.maximum_force, '-x')
+            axs[i].set_ylabel(r'$F_{max}$ (eV$\AA^{-1}$)')
+        if 'maximum_stress' in kdf.columns:
+            i += 1
+            axs[i].plot(kdf.kpoints_spacing, kdf.maximum_stress, '-x')
+            axs[i].set_ylabel(r'$S_{max}$ (kBar)')
+        axs[i].set_xticks(kdf.kpoints_spacing)
+        axs[i].set_xticklabels([f'{row.kpoints_spacing:.3f}\n{row.mesh}' for _, row in kdf.iterrows()], rotation=45)
+        axs[i].set_xlabel('K-pointing spacing (mesh)')
+        fig.tight_layout()
 
     return figs
