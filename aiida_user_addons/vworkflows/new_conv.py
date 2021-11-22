@@ -118,8 +118,8 @@ class VaspConvergenceWorkChain(WorkChain):
         kspacing_for_cutoffconv = orm.Float(self.ctx.settings.get('kspacing_cutconv', k_cut))
 
         # Launch cut off energy tests
+        inputs = self.exposed_inputs(self._sub_workchain)
         for cut in self.ctx.cutoff_list:
-            inputs = self.exposed_inputs(self._sub_workchain)
             new_param = nested_update_dict_node(inputs.parameters, {'incar': {'encut': cut}})
             inputs.parameters = new_param
             inputs.kpoints_spacing = kspacing_for_cutoffconv
