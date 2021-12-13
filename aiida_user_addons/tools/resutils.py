@@ -126,6 +126,7 @@ def structure_from_res(resfile):
     atoms.wrap()
     out = StructureData(ase=atoms)
     out.set_attribute_many(title._asdict())
+    out.label = title.label
     return out
 
 
