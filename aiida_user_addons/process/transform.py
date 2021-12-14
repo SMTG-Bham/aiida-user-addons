@@ -553,3 +553,38 @@ def neb_interpolate(init_structure, final_strucrture, nimages):
         outputs[f'image_{i+1:02d}'].label = init_structure.label + f' FRAME {i+1:02d}'
     outputs['image_final'] = out_final
     return outputs
+
+
+@calcfunction
+def fix_atom_order(reference, to_fix):
+    """
+    Fix atom order by finding NN distances bet ween two frames. This resolves
+    the issue where two closely matching structures having diffferent atomic orders.
+    Note that the two frames must be close enough for this to work
+    """
+
+    aref = reference.get_ase()
+    afix = to_fix.get_ase()
+
+    # Index of the reference atom in the second structure
+    new_indices = np.zeros(len(aref), dtype=int)
+
+    # Find distances
+    acombined = aref.copy()
+    acombined.extend(afix)
+    # Get piece-wise MIC distances
+    for i in range(len(aref)):
+        dists = []
+        for j in range(len(aref)):
+            dist = acombined.get_distance(i, j + len(aref), mic=True)
+            dists.append(dist)
+        min_idx = np.argmin(dists)
+        min_dist = min(dists)
+        if min_dist > 0.5:
+            print(f'Large displacement found - moving atom {j} to {i} - please check if this is correct!')
+        new_indices[i] = min_idx
+
+    afixed = afix[new_indices]
+    fixed_structure = StructureData(ase=afixed)
+    fixed_structure.label = to_fix.label + ' UPDATED ORDER'
+    return fixed_structure
