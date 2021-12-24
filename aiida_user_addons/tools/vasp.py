@@ -3,10 +3,12 @@ Module for VASP related stuff
 """
 import shutil
 import tempfile
+import re
 from pathlib import Path
 from functools import wraps
 from itertools import zip_longest
 from aiida.orm.nodes.data.array import TrajectoryData
+from aiida.orm.nodes.process.process import ProcessNode
 
 import numpy as np
 
@@ -15,7 +17,7 @@ from ase import Atoms
 from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
 from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser, BaseFileParser, SingleFile, Xml
 
-from aiida_user_addons.common.repository import save_all_repository_objects
+from aiida_user_addons.common.repository import open_compressed, save_all_repository_objects
 
 
 def with_node(f):
@@ -27,6 +29,19 @@ def with_node(f):
         if not isinstance(args[0], Node):
             args = list(args)
             args[0] = load_node(args[0])
+        return f(*args, **kwargs)
+
+    return wrapped
+
+
+def with_retrieved(f):
+    """Decorator to ensure that the function receives a FolderData"""
+    from aiida.orm import load_node, Node
+
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        if isinstance(args[0], ProcessNode):
+            args[0] = args[0].outputs.retrieved
         return f(*args, **kwargs)
 
     return wrapped
@@ -473,3 +488,48 @@ class VasprunParserWithHandler(VasprunParser):
             except SystemExit:
                 self._logger.warning('Parsevasp exited abruptly. Returning None.')
                 self._xml = None
+
+
+def parse_core_state_eigenenergies(fh):
+    """
+    Parse core state eigenenergies from a stream of OUTCAR
+
+    The calculation must be run with ICORELEVEL=1
+    """
+    capture = False
+    data = {}
+    all_data = {}
+    for line in fh:
+        if 'the core state eigenenergies are' in line:
+            capture = True
+            continue
+        if capture:
+            # Blank line - end of block
+            if not line.split():
+                if data:
+                    all_data[atom_number] = data
+                break
+            # Parse the atom indices
+            match = re.match(r'^ *(\d+)-', line)
+            if match:
+                # This is a new atom
+                if data:
+                    all_data[atom_number] = data
+                atom_number = int(match.group(1))
+                tokens = line.split()[1:]
+                data = {}
+            else:
+                # Continuation of the previous atom
+                tokens = line.split()
+            for i in range(0, len(tokens), 2):
+                data[tokens[i]] = float(tokens[i + 1])
+    return all_data
+
+
+@with_node
+@with_retrieved
+def get_corestate_eigenenergies(node):
+    """Parse the OUTCAR to get the core-state eigenenergies"""
+    with open_compressed(node, 'OUTCAR') as handle:
+        data = parse_core_state_eigenenergies(handle)
+    return data
