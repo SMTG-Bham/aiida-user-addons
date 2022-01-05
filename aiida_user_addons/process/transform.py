@@ -90,21 +90,25 @@ def make_vac_at_o(cell, excluded_sites, nsub, supercell):
     struc = cell.get_pymatgen()
     excluded = excluded_sites.get_list()
 
+    assert 'Ts' not in struc.composition
+    assert 'Og' not in struc.composition
+
     for n, site in enumerate(struc.sites):
         if n in excluded:
-            site.species = Composition('S')
+            site.species = Composition('Ts')
 
     # Expand the supercell with S subsituted strucutre
     struc = struc * supercell.get_list()
     noxygen = int(struc.composition['O'])
-    unique_structure = unique_structure_substitutions(struc, 'O', {'P': nsub, 'O': noxygen - nsub})
+    unique_structure = unique_structure_substitutions(struc, 'O', {'Og': nsub, 'O': noxygen - nsub})
     # Convert back to normal structure
     # Remove P as they are vacancies, Convert S back to O
     for ustruc in unique_structure:
-        p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition('P')]
+        p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition('Og')]
         ustruc.remove_sites(p_indices)
         # Convert S sites back to O
-        ustruc['S'] = 'O'
+        ustruc['Ts'] = 'O'
+
     output_structs = {}
     for n, s in enumerate(unique_structure):
         stmp = StructureData(pymatgen=s)
@@ -134,22 +138,25 @@ def make_vac_at_o_and_shake(cell, excluded_sites, nsub, supercell, shake_amp):
     struc = cell.get_pymatgen()
     excluded = excluded_sites.get_list()
 
+    assert 'Ts' not in struc.composition
+    assert 'Og' not in struc.composition
+
     for n, site in enumerate(struc.sites):
         if n in excluded:
-            site.species = Composition('S')
+            site.species = Composition('Ts')
 
     # Expand the supercell with S subsituted strucutre
     struc = struc * supercell.get_list()
     noxygen = int(struc.composition['O'])
-    unique_structure = unique_structure_substitutions(struc, 'O', {'P': nsub, 'O': noxygen - nsub})
+    unique_structure = unique_structure_substitutions(struc, 'O', {'Og': nsub, 'O': noxygen - nsub})
     # Convert back to normal structure
     # Remove P as they are vacancies, Convert S back to O
     for ustruc in unique_structure:
-        p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition('P')]
+        p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition('Og')]
 
         ustruc.remove_sites(p_indices)
         # Convert S sites back to O
-        ustruc['S'] = 'O'
+        ustruc['Ts'] = 'O'
 
     # Perturb structures
     trans = PerturbStructureTransformation(distance=float(shake_amp))
