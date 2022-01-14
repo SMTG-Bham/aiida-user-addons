@@ -4,15 +4,12 @@ VASP workchain.
 ---------------
 Contains the VaspWorkChain class definition which uses the BaseRestartWorkChain.
 """
-from pkgutil import get_data
 import numpy as np
 
 from aiida.engine import while_, if_
-from aiida.common.lang import override
 #from aiida.engine.job_processes import override
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import NotExistent, InputValidationError
-from aiida.common.utils import classproperty
 from aiida.plugins import CalculationFactory
 from aiida.orm import Code, KpointsData, Dict
 from aiida.orm.nodes.data.base import to_aiida_type
@@ -24,10 +21,7 @@ from aiida_vasp.utils.aiida_utils import get_data_class, get_data_node
 from aiida_vasp.utils.workchains import compose_exit_code
 from aiida_vasp.utils.workchains import prepare_process_inputs
 from aiida_vasp.assistant.parameters import ParametersMassage
-from aiida_vasp.calcs.vasp import VaspCalculation
 
-from aiida_user_addons.common.inputset.vaspsets import VASPInputSet
-from aiida_user_addons.vworkflows.relax import nested_update_dict_node
 from ..common.inputset.vaspsets import get_ldau_keys
 
 from .common import parameters_validator, site_magnetization_to_magmom
