@@ -14,12 +14,11 @@ No added wrapper etc.
 
 import aiida.orm as orm
 from aiida.engine import WorkChain, append_, calcfunction
-from aiida.common.extendeddicts import AttributeDict
 from aiida.plugins import WorkflowFactory
 from aiida.common.utils import classproperty
 
-from aiida_user_addons.common.opthold import OptionHolder, typed_field, OptionContainer, BoolOption, FloatOption, IntOption
-from .common import nested_update, nested_update_dict_node
+from aiida_user_addons.common.opthold import OptionContainer, FloatOption
+from .common import nested_update_dict_node
 
 
 class VaspConvergenceWorkChain(WorkChain):
@@ -120,11 +119,11 @@ class VaspConvergenceWorkChain(WorkChain):
 
         # Launch cut off energy tests
         inputs = self.exposed_inputs(self._sub_workchain)
+        inputs.kpoints_spacing = kspacing_for_cutoffconv
         original_label = inputs.metadata.get('label', '')
         for cut in self.ctx.cutoff_list:
             new_param = nested_update_dict_node(inputs.parameters, {'incar': {'encut': cut}})
             inputs.parameters = new_param
-            inputs.kpoints_spacing = kspacing_for_cutoffconv
             if original_label:
                 inputs.metadata.label = original_label + f' CUTCONV {cut:.2f}'
             else:
@@ -251,20 +250,6 @@ class VaspConvergenceWorkChain(WorkChain):
         if plot:
             plot_conv_data(cdf, kdf, **plot_kwargs)
         return cdf, kdf
-
-
-class ConvOptionsOld(OptionHolder):
-    _allowed_options = ('cutoff_start', 'cutoff_stop', 'cutoff_step', 'kspacing_start', 'kspacing_stop', 'kspacing_step', 'cutoff_kconv',
-                        'kspacing_cutconv')
-
-    cutoff_start = typed_field('cutoff_start', (float,), 'The starting cut-off energy', 300)
-    cutoff_stop = typed_field('cutoff_stop', (float,), 'The Final cut-off energy', 700)
-    cutoff_step = typed_field('cutoff_step', (float,), 'Step size of the cut-off energy', 50)
-    kspacing_start = typed_field('kspacing_start', (float,), 'The starting kspacing', 0.07)
-    kspacing_stop = typed_field('kspacing_stop', (float,), 'The final kspacing', 0.02)
-    kspacing_step = typed_field('kspacing_step', (float,), 'Step size of the cut-off energy', 0.01)
-    cutoff_kconv = typed_field('cutoff_kconv', (float,), 'The cut-off energy used for kpoints convergence tests', 450)
-    kspacing_cutconv = typed_field('kspacing_cutconv', (float,), 'The kpoints spacing used for cut-off energy convergence tests', 0.07)
 
 
 class ConvOptions(OptionContainer):
