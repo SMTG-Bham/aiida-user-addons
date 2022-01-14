@@ -19,6 +19,7 @@ from aiida.plugins import WorkflowFactory
 from aiida.common.utils import classproperty
 
 from aiida_user_addons.common.opthold import OptionHolder, typed_field, OptionContainer, BoolOption, FloatOption, IntOption
+from .common import nested_update, nested_update_dict_node
 
 
 class VaspConvergenceWorkChain(WorkChain):
@@ -274,26 +275,6 @@ class ConvOptions(OptionContainer):
     kspacing_step = FloatOption('Step size of the cut-off energy', 0.01)
     cutoff_kconv = FloatOption('The cut-off energy used for kpoints convergence tests', 450)
     kspacing_cutconv = FloatOption('The kpoints spacing used for cut-off energy convergence tests', 0.07)
-
-
-def nested_update(dict_in, update_dict):
-    """Update the dictionary - combine nested subdictionary with update as well"""
-    for key, value in update_dict.items():
-        if key in dict_in and isinstance(value, (dict, AttributeDict)):
-            nested_update(dict_in[key], value)
-        else:
-            dict_in[key] = value
-    return dict_in
-
-
-def nested_update_dict_node(dict_node, update_dict):
-    """Utility to update a Dict node in a nested way"""
-    pydict = dict_node.get_dict()
-    nested_update(pydict, update_dict)
-    if pydict == dict_node.get_dict():
-        return dict_node
-    else:
-        return orm.Dict(dict=pydict)
 
 
 def get_conv_data(conv_work):

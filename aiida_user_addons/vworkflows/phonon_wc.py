@@ -24,7 +24,7 @@ from aiida_phonopy.common.utils import (
     get_vasp_force_sets_dict,
 )
 
-from aiida_user_addons.vworkflows.common import OVERRIDE_NAMESPACE
+from aiida_user_addons.vworkflows.common import OVERRIDE_NAMESPACE, nested_update_dict_node, nested_update
 
 __version__ = '0.1.0'
 
@@ -501,26 +501,6 @@ class PhononSettings(OptionHolder):
         float,
         int,
     ), 'Distance for band structure', None)
-
-
-def nested_update(dict_in, update_dict):
-    """Update the dictionary - combine nested subdictionary with update as well"""
-    for key, value in update_dict.items():
-        if key in dict_in and isinstance(value, (dict, AttributeDict)):
-            nested_update(dict_in[key], value)
-        else:
-            dict_in[key] = value
-    return dict_in
-
-
-def nested_update_dict_node(dict_node, update_dict):
-    """Utility to update a Dict node in a nested way"""
-    pydict = dict_node.get_dict()
-    nested_update(pydict, update_dict)
-    if pydict == dict_node.get_dict():
-        return dict_node
-    else:
-        return orm.Dict(dict=pydict)
 
 
 def ensure_parse_objs(input_port, objs):

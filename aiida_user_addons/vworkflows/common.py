@@ -1,6 +1,8 @@
 # Name of the override name space
 # This is the namespace where raw VASP INCAR tags should reside for VaspWorkChain
 from aiida.common.exceptions import InputValidationError
+from aiida.common.extendeddicts import AttributeDict
+import aiida.orm as orm
 
 OVERRIDE_NAMESPACE = 'incar'
 
@@ -43,3 +45,22 @@ def site_magnetization_to_magmom(site_dict):
     tmp = list(site_dict[to_use]['site_moment'].items())
     tmp.sort(key=lambda x: int(x[0]))
     return [entry[1]['tot'] for entry in tmp]
+
+
+def nested_update(dict_in, update_dict):
+    """Update the dictionary - combine nested subdictionary with update as well"""
+    for key, value in update_dict.items():
+        if key in dict_in and isinstance(value, (dict, AttributeDict)):
+            nested_update(dict_in[key], value)
+        else:
+            dict_in[key] = value
+    return dict_in
+
+
+def nested_update_dict_node(dict_node, update_dict):
+    """Utility to update a Dict node in a nested way"""
+    pydict = dict_node.get_dict()
+    nested_update(pydict, update_dict)
+    if pydict == dict_node.get_dict():
+        return dict_node
+    return orm.Dict(dict=pydict)

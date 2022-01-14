@@ -15,7 +15,7 @@ from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 from aiida_user_addons.common.misc import get_energy_from_misc
 
 from .mixins import WithVaspInputSet
-from .common import OVERRIDE_NAMESPACE
+from .common import OVERRIDE_NAMESPACE, nested_update, nested_update_dict_node
 
 __version__ = '0.0.1'
 
@@ -232,23 +232,3 @@ def _get_all_spins(pstruc):
             continue
         out_dict.append(site.specie._properties.get('spin', 0.0))
     return out_dict
-
-
-def nested_update(dict_in, update_dict):
-    """Update the dictionary - combine nested subdictionary with update as well"""
-    for key, value in update_dict.items():
-        if key in dict_in and isinstance(value, (dict, AttributeDict)):
-            nested_update(dict_in[key], value)
-        else:
-            dict_in[key] = value
-    return dict_in
-
-
-def nested_update_dict_node(dict_node, update_dict):
-    """Utility to update a Dict node in a nested way"""
-    pydict = dict_node.get_dict()
-    nested_update(pydict, update_dict)
-    if pydict == dict_node.get_dict():
-        return dict_node
-    else:
-        return orm.Dict(dict=pydict)

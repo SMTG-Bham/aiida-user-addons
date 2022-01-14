@@ -23,7 +23,7 @@ from aiida.orm.nodes.data.base import to_aiida_type
 from aiida_user_addons.process.transform import magnetic_structure_decorate, magnetic_structure_dedecorate
 
 from .mixins import WithVaspInputSet
-from .common import OVERRIDE_NAMESPACE
+from .common import OVERRIDE_NAMESPACE, nested_update_dict_node, nested_update
 from aiida_vasp.utils.aiida_utils import get_data_class
 from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser
 
@@ -481,26 +481,6 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
 
             if cleaned_calcs:
                 self.report('cleaned remote folders of calculations: {}'.format(' '.join(map(str, cleaned_calcs))))
-
-
-def nested_update(dict_in, update_dict):
-    """Update the dictionary - combine nested subdictionary with update as well"""
-    for key, value in update_dict.items():
-        if key in dict_in and isinstance(value, (dict, AttributeDict)):
-            nested_update(dict_in[key], value)
-        else:
-            dict_in[key] = value
-    return dict_in
-
-
-def nested_update_dict_node(dict_node, update_dict):
-    """Utility to update a Dict node in a nested way"""
-    pydict = dict_node.get_dict()
-    nested_update(pydict, update_dict)
-    if pydict == dict_node.get_dict():
-        return dict_node
-    else:
-        return orm.Dict(dict=pydict)
 
 
 @calcfunction

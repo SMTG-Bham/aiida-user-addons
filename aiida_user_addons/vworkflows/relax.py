@@ -39,7 +39,7 @@ from sqlalchemy.sql.sqltypes import Float
 
 from .mixins import WithVaspInputSet
 from ..common.opthold import BoolOption, OptionHolder, typed_field, OptionContainer, IntOption, FloatOption, ChoiceOption, StringOption
-from .common import OVERRIDE_NAMESPACE, site_magnetization_to_magmom
+from .common import OVERRIDE_NAMESPACE, site_magnetization_to_magmom, nested_update_dict_node, nested_update
 
 __version__ = '0.4.0'
 
@@ -831,25 +831,6 @@ class RelaxOptions(OptionHolder):
             raise InputValidationError("Either 'force_cutoff' or 'energy_cutoff' should be supplied")
         if (force_cut is not None) and (energy_cut is not None):
             raise InputValidationError("Cannot set both 'force_cutoff' and 'energy_cutoff'")
-
-
-def nested_update(dict_in, update_dict):
-    """Update the dictionary - combine nested subdictionary with update as well"""
-    for key, value in update_dict.items():
-        if key in dict_in and isinstance(value, (dict, AttributeDict)):
-            nested_update(dict_in[key], value)
-        else:
-            dict_in[key] = value
-    return dict_in
-
-
-def nested_update_dict_node(dict_node, update_dict):
-    """Utility to update a Dict node in a nested way"""
-    pydict = dict_node.get_dict()
-    nested_update(pydict, update_dict)
-    if pydict == dict_node.get_dict():
-        return dict_node
-    return orm.Dict(dict=pydict)
 
 
 def get_step_structure(traj, step):
