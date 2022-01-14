@@ -4,6 +4,7 @@ VASP workchain.
 ---------------
 Contains the VaspWorkChain class definition which uses the BaseRestartWorkChain.
 """
+from pkgutil import get_data
 import numpy as np
 
 from aiida.engine import while_, if_
@@ -26,9 +27,10 @@ from aiida_vasp.assistant.parameters import ParametersMassage
 from aiida_vasp.calcs.vasp import VaspCalculation
 
 from aiida_user_addons.common.inputset.vaspsets import VASPInputSet
+from aiida_user_addons.vworkflows.relax import nested_update_dict_node
 from ..common.inputset.vaspsets import get_ldau_keys
 
-from .common import parameters_validator
+from .common import parameters_validator, site_magnetization_to_magmom
 
 assert issubclass(VanillaVaspWorkChain,
                   BaseRestartWorkChain), 'vasp.vasp workchain is not a subclass of BaseRestartWorkChain from aiida-core'
@@ -89,6 +91,7 @@ class VaspWorkChain(VanillaVaspWorkChain):
         spec.input('settings', valid_type=get_data_class('dict'), required=False, serializer=to_aiida_type)
         spec.input('wavecar', valid_type=get_data_class('vasp.wavefun'), required=False)
         spec.input('chgcar', valid_type=get_data_class('vasp.chargedensity'), required=False)
+        spec.input('site_magnetization', valid_type=get_data_class('dict'), required=False, help='Site magnetization to be used as MAGMOM')
         spec.input('restart_folder',
                    valid_type=get_data_class('remote'),
                    required=False,
@@ -156,6 +159,45 @@ class VaspWorkChain(VanillaVaspWorkChain):
             cls.results,
         )  # yapf: disable
         spec.output('parallel_settings', valid_type=get_data_class('dict'), required=False)
+
+    def prepare_inputs(self):
+        """
+        Enforce some settings for the restart folder and set parameters tags for a restart.
+        This is called because launching the sub process.
+
+        NOTE: This method should probably be refectorred to give more control on what kind
+        of restart is needed
+        """
+        # Check first if the calling workchain wants a restart in the same folder
+        if 'restart_folder' in self.inputs:
+            self.ctx.inputs.restart_folder = self.inputs.restart_folder
+
+        # Then check if the workchain wants a restart
+        if self.ctx.restart_calc and isinstance(self.ctx.restart_calc.process_class, self._process_class):
+            self.ctx.inputs.restart_folder = self.ctx.restart_calc.outputs.remote_folder
+            old_parameters = AttributeDict(self.ctx.inputs.parameters).copy()
+            parameters = old_parameters.copy()
+            # Make sure ISTART and ICHARG is set to read the relevant files - if they exists
+            if 'istart' in parameters and 'WAVECAR' in self.ctx.last_calc_remote_files:
+                # Correct in case of istart = 0
+                if parameters.istart == 0 and self.ctx.use_wavecar:
+                    parameters.istart = 1
+            # Not using the WAVECAR - we make sure ISTART is 0
+            if not self.ctx.use_wavecar:
+                parameters.istart = 0
+            if 'icharg' in parameters and 'CHGCAR' in self.ctx.last_calc_remote_files:
+                parameters.icharg = 1
+            if parameters != old_parameters:
+                self.ctx.inputs.parameters = parameters
+                self.report('Enforced ISTART=1 and ICHARG=1 for restarting the calculation.')
+
+            # Check if the site_magnetization should be carried over
+            if 'site_magnetization' in self.ctx.restart_calc.outputs:
+                self.ctx.inputs.parameters['magmom'] = site_magnetization_to_magmom(self.ctx.restart_calc.outputs.site_magnetization)
+
+        # Reset the list of valid remote files and the restart calculation
+        self.ctx.last_calc_remote_files = []
+        self.ctx.restart_calc = None
 
     def init_inputs(self):
         """Make sure all the required inputs are there and valid, create input dictionary for calculation."""
@@ -230,6 +272,12 @@ class VaspWorkChain(VanillaVaspWorkChain):
                 self.ctx.inputs.metadata = {}
             self.ctx.inputs.metadata['label'] = label
             self.ctx.inputs.metadata['description'] = description
+
+        # Carry on site magnetization for initialization
+        if 'site_magnetization' in self.inputs:
+            magmom = site_magnetization_to_magmom(self.inputs.site_magnetization.get_dict())
+            assert len(magmom) == len(self.inputs.structure.sites)
+            self.ctx.inputs.parameters['magmom'] = magmom
 
         # Verify and set potentials (potcar)
         if not self.inputs.potential_family.value:

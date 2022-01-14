@@ -39,7 +39,7 @@ from sqlalchemy.sql.sqltypes import Float
 
 from .mixins import WithVaspInputSet
 from ..common.opthold import BoolOption, OptionHolder, typed_field, OptionContainer, IntOption, FloatOption, ChoiceOption, StringOption
-from .common import OVERRIDE_NAMESPACE
+from .common import OVERRIDE_NAMESPACE, site_magnetization_to_magmom
 
 __version__ = '0.4.0'
 
@@ -81,9 +81,9 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
                    """)
         spec.input('relax_settings',
                    valid_type=get_data_class('dict'),
-                   validator=RelaxOptions.validate_dict,
+                   validator=RelaxOptionsNew.validate_dict,
                    serializer=to_aiida_type,
-                   help=RelaxOptions.get_description())
+                   help=RelaxOptionsNew.get_description())
         spec.input('verbose', required=False, help='Increased verbosity.', valid_type=orm.Bool, serializer=to_aiida_type)
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
         spec.exit_code(300,
@@ -135,6 +135,7 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
         self.ctx.workchains = []
         self.ctx.inputs = AttributeDict()  # This may not be necessary anymore
         self.ctx.relax_settings = AttributeDict(self.inputs.relax_settings.get_dict())  # relax_settings controls the logic of the workchain
+        self.ctx.current_magmom = None
 
         # Check potential issues in the the input parameters
         self._check_input_parameters()
@@ -301,6 +302,10 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             if wallclock:
                 inputs.options = nested_update_dict_node(inputs.options, {'max_wallclock_seconds': wallclock})
 
+        # Update the MAGMOM
+        if self.ctx.current_magmom is not None:
+            inputs.parameters = nested_update_dict_node(inputs.parameters, {OVERRIDE_NAMESPACE: {'magmom': self.ctx.current_magmom}})
+
         # Label the calculation and links by iteration number
         inputs.metadata.label += ' ITER {:02d}'.format(self.ctx.iteration)
         inputs.metadata.call_link_label = 'relax_{:02d}'.format(self.ctx.iteration)
@@ -324,6 +329,10 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
                 if self.ctx.get('verbose'):
                     self.report('Using previous remote folder <{}> for restart'.format(restart_folder))
                 inputs.restart_folder = restart_folder
+
+        # Update the MAGMOM if information is present
+        if self.ctx.current_magmom is not None:
+            inputs.parameters = nested_update_dict_node(inputs.parameters, {OVERRIDE_NAMESPACE: {'magmom': self.ctx.current_magmom}})
 
         if 'label' not in inputs.metadata:
             inputs.metadata.label = self.inputs.metadata.get('label', '') + ' SP'
@@ -482,6 +491,10 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             if self.is_verbose():
                 self.report('Convergence checking is not enabled - finishing with a final static calculation.')
         self.ctx.current_restart_folder = workchain.outputs.remote_folder
+
+        # Update the magmom to be used
+        if 'site_magnetization' in workchain.outputs and self.ctx.relax_settings.get('keep_magnetization', True):
+            self.ctx.current_magmom = site_magnetization_to_magmom(workchain.outputs.site_magnetization)
 
         self.ctx.is_converged = converged
         return self.exit_codes.NO_ERROR  # pylint: disable=no-member
@@ -657,7 +670,7 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
     @classproperty
     def relax_option_class(cls):  # pylint: disable=no-self-argument
         """Class for relax options"""
-        return RelaxOptions
+        return RelaxOptionsNew
 
 
 def compare_structures(structure_a, structure_b):
@@ -731,6 +744,7 @@ class RelaxOptionsNew(OptionContainer):
     perform = BoolOption('Do not perform any relaxation if set to \'False\'', True)
     hybrid_calc_bootstrap = BoolOption('Wether to bootstrap hybrid calculation by perfroming standard DFT first', None)
     hybrid_calc_bootstrap_wallclock = IntOption('Wallclock limit in second for the bootstrap calculation', None)
+    keep_magnetization = BoolOption('Wether to keep magnetization from the previous calculation if possible', False)
 
     @classmethod
     def validate_dict(cls, input_dict, port=None):
@@ -749,6 +763,8 @@ class RelaxOptionsNew(OptionContainer):
 class RelaxOptions(OptionHolder):
     """
     Options for relaxations
+
+    DEPRECATED
     """
     _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps', 'positions', 'shape', 'volume', 'convergence_on',
                         'convergence_mode', 'convergence_volume', 'convergence_absolute', 'convergence_max_iterations',

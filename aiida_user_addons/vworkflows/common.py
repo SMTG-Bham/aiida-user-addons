@@ -23,3 +23,23 @@ def parameters_validator(node, port=None):
         massager = ParametersMassage(new_dict)
     except Exception as e:
         raise InputValidationError(f'Cannot validate the input parameters - error from massasager: {e}')
+
+
+def site_magnetization_to_magmom(site_dict):
+    """Convert site mangetization to MAGMOM used for restart"""
+    if 'site_magnetization' in site_dict:
+        site_dict = site_dict['site_magnetization']
+
+    site_dict = site_dict['sphere']
+    to_use = None
+    for symbol in 'xyz':
+        if site_dict.get(symbol) and site_dict.get(symbol, {}).get('site_moment'):
+            to_use = symbol
+            break
+    # No avaliable site magnetization for setting MAGMOM, something is wrong
+    if to_use is None:
+        raise RuntimeError('No valid site-projected magnetization avaliable')
+    # Ensure sorted list
+    tmp = list(site_dict[symbol]['site_moment'].items())
+    tmp.sort(key=lambda x: int(x[0]))
+    return [entry[1]['tot'] for entry in tmp]
