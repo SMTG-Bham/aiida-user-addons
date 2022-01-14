@@ -120,13 +120,13 @@ class VaspConvergenceWorkChain(WorkChain):
 
         # Launch cut off energy tests
         inputs = self.exposed_inputs(self._sub_workchain)
+        original_label = inputs.metadata.get('label', '')
         for cut in self.ctx.cutoff_list:
             new_param = nested_update_dict_node(inputs.parameters, {'incar': {'encut': cut}})
             inputs.parameters = new_param
             inputs.kpoints_spacing = kspacing_for_cutoffconv
-
-            if 'label' in inputs.metadata:
-                inputs.metadata.label += f' CUTCONV {cut:.2f}'
+            if original_label:
+                inputs.metadata.label = original_label + f' CUTCONV {cut:.2f}'
             else:
                 inputs.metadata.label = f'CUTCONV {cut:.2f}'
 
@@ -137,10 +137,13 @@ class VaspConvergenceWorkChain(WorkChain):
         # Launch kpoints convergence tests
         new_param = nested_update_dict_node(inputs.parameters, {'incar': {'encut': cutoff_for_kconv}})
         for kspacing in self.ctx.kspacing_list:
-            inputs = self.exposed_inputs(self._sub_workchain)
             inputs.parameters = new_param
             inputs.kpoints_spacing = kspacing
-            inputs.metadata.label += f' KCONV {kspacing:.3f}'
+            if original_label:
+                inputs.metadata.label = original_label + f' KCONV {kspacing:.3f}'
+            else:
+                inputs.metadata.label = f'KCONV {kspacing:.3f}'
+
             running = self.submit(self._sub_workchain, **inputs)
             self.report(f'Submitted {running} with kpoints spacing {kspacing:.3f}.')
             self.to_context(kpoints_conv_workchains=append_(running))
