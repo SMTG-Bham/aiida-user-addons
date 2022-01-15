@@ -38,7 +38,7 @@ class VaspConvergenceWorkChain(WorkChain):
       - kspacing_stop
       - kspacing_step
       - cutoff_kconv : cut-off energy for the kpoints convergence tests.
-      - kspcaing_cutconv : the kpoint spacing to be used for cut-off energy convergence tests.
+      - kspacing_cutconv : the kpoint spacing to be used for cut-off energy convergence tests.
 
     The the output data are collected and stored in two ``Dict`` output nodes.
     """
