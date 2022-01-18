@@ -1,10 +1,40 @@
 # Name of the override name space
 # This is the namespace where raw VASP INCAR tags should reside for VaspWorkChain
+from functools import wraps
+from importlib.metadata import entry_points
+from readline import insert_text
+
 from aiida.common.exceptions import InputValidationError
 from aiida.common.extendeddicts import AttributeDict
 import aiida.orm as orm
-
 OVERRIDE_NAMESPACE = 'incar'
+
+
+def aiida_to_python(entity):
+    """
+    Convert AiiDA entity to plain python objects
+    """
+    if not isinstance(entity, orm.Data):
+        return entity
+    if isinstance(entity, orm.Dict):
+        return entity.get_dict()
+    if isinstance(entity, orm.List):
+        return entity.get_list()
+    if isinstance(entity, (orm.Float, orm.Str, orm.Int)):
+        return entity.value
+    raise ValueError(f'{entity} cannot be converted to plain python object')
+
+
+def plain_python_args(func):
+    """Ensure that the first argument is a plain dictionary"""
+
+    @wraps(func)
+    def wrapped(*args, **kwargs):
+        new_args = list(args)
+        new_args[0] = aiida_to_python(args[0])
+        return func(*new_args, **kwargs)
+
+    return wrapped
 
 
 def parameters_validator(node, port=None):
@@ -27,6 +57,7 @@ def parameters_validator(node, port=None):
         raise InputValidationError(f'Cannot validate the input parameters - error from massasager: {e}')
 
 
+@plain_python_args
 def site_magnetization_to_magmom(site_dict):
     """
     Convert site mangetization to MAGMOM used for restart
