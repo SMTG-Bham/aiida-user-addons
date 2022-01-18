@@ -28,7 +28,10 @@ def parameters_validator(node, port=None):
 
 
 def site_magnetization_to_magmom(site_dict):
-    """Convert site mangetization to MAGMOM used for restart"""
+    """
+    Convert site mangetization to MAGMOM used for restart
+    NOTE: to be replaced by stock function in aiida_vasp.utils.workchains
+    """
     if 'site_magnetization' in site_dict:
         site_dict = site_dict['site_magnetization']
 
