@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import os
 import re
+import lzma
 import gzip
 
 import aiida.orm as orm
@@ -115,8 +116,12 @@ def open_compressed(node, name, mode='r'):
         with node.open(name, mode=mode) as fhandle:
             yield fhandle
     elif name + '.gz' in stored:
-        with node.open(name, mode='rb') as fhandle:
+        with node.open(name + '.gz', mode='rb') as fhandle:
             with gzip.GzipFile(fileobj=fhandle, mode=mode) as zhandle:
+                yield zhandle
+    elif name + '.xz' in stored:
+        with node.open(name + '.xz', mode='rb') as fhandle:
+            with lzma.LZMAFile(fhandle, mode=mode) as zhandle:
                 yield zhandle
     else:
         raise ValueError(f'File {name} is not found.')
