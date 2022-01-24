@@ -117,10 +117,12 @@ def open_compressed(node, name, mode='r'):
             yield fhandle
     elif name + '.gz' in stored:
         with node.open(name + '.gz', mode='rb') as fhandle:
+            mode = 'rt' if mode == 'r' else 'rb'
             with gzip.GzipFile(fileobj=fhandle, mode=mode) as zhandle:
                 yield zhandle
     elif name + '.xz' in stored:
         with node.open(name + '.xz', mode='rb') as fhandle:
+            mode = 'rt' if mode == 'r' else 'rb'
             with lzma.LZMAFile(fhandle, mode=mode) as zhandle:
                 yield zhandle
     else:
