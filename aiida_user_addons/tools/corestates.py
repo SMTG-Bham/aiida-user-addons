@@ -13,6 +13,7 @@ def parse_corestates(fh):
     capture = False
     data = {}
     all_data = {}
+    last_blank = False
     for line in fh:
         if 'the core state eigenenergies are' in line:
             capture = True
@@ -22,8 +23,13 @@ def parse_corestates(fh):
             if not line.split():
                 if data:
                     all_data[atom_number] = data
-                break
+                last_blank = True
+                continue
+            last_blank = False
             match = re.match(r'^ *(\d+)-', line)
+            # Last line was blank and no match this time - signal the end of the block
+            if not match and last_blank:
+                break
             if match:
                 if data:
                     all_data[atom_number] = data
