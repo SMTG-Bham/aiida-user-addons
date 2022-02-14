@@ -1,8 +1,6 @@
 # Name of the override name space
 # This is the namespace where raw VASP INCAR tags should reside for VaspWorkChain
 from functools import wraps
-from importlib.metadata import entry_points
-from readline import insert_text
 
 from aiida.common.exceptions import InputValidationError
 from aiida.common.extendeddicts import AttributeDict
