@@ -25,7 +25,6 @@ def parse_corestates(fh):
                     all_data[atom_number] = data
                 last_blank = True
                 continue
-            last_blank = False
             match = re.match(r'^ *(\d+)-', line)
             # Last line was blank and no match this time - signal the end of the block
             if not match and last_blank:
@@ -40,6 +39,7 @@ def parse_corestates(fh):
                 tokens = line.split()
             for i in range(0, len(tokens), 2):
                 data[tokens[i]] = float(tokens[i + 1])
+            last_blank = False
 
     return all_data
 
