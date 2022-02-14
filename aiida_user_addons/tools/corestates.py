@@ -20,6 +20,7 @@ def parse_corestates(fh):
             continue
         if capture:
             # Blank line - end of block
+            #print(line)
             if not line.split():
                 if data:
                     all_data[atom_number] = data
@@ -28,6 +29,7 @@ def parse_corestates(fh):
             match = re.match(r'^ *(\d+)-', line)
             # Last line was blank and no match this time - signal the end of the block
             if not match and last_blank:
+                all_data[atom_number] = data
                 break
             if match:
                 if data:
