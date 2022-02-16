@@ -494,7 +494,11 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
 
         # Update the magmom to be used
         if 'site_magnetization' in workchain.outputs and self.ctx.relax_settings.get('keep_magnetization', True):
-            self.ctx.current_magmom = site_magnetization_to_magmom(workchain.outputs.site_magnetization)
+            try:
+                self.ctx.current_magmom = site_magnetization_to_magmom(workchain.outputs.site_magnetization)
+            # Some times the site magnetisation can be empty - do nothing
+            except ValueError:
+                pass
 
         self.ctx.is_converged = converged
         return self.exit_codes.NO_ERROR  # pylint: disable=no-member
