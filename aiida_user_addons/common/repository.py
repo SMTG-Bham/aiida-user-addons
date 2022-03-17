@@ -127,3 +127,38 @@ def open_compressed(node, name, mode='r'):
                 yield zhandle
     else:
         raise ValueError(f'File {name} is not found.')
+
+
+class LocalStashRepo:
+    """A local mirror of the remote stash folder"""
+
+    def __init__(self, base_path):
+        """A local copy of the stash folder, probably from multiple sources"""
+
+        self.base_path = base_path
+
+    def get_local_path(self, stash_node, fname=None):
+        """Get a local path from a remote one"""
+        rpath = Path(stash_node.target_basepath)
+        # Remote base path
+        fbase = rpath.parent.parent.parent
+        # Remote relative path of the folder
+        relative = rpath.relative_to(fbase)
+        if fname is None:
+            return self.base_path / relative
+        return self.base_path / relative / fname
+
+    def ensure_avaliable(self, stash_node, fname, remote=None):
+        """Ensure that the file is downloaded"""
+        lpath = self.get_local_path(stash_node)
+        if not (lpath / fname).is_file():
+            remote = orm.RemoteData(computer=stash_node.computer, remote_path=stash_node.target_basepath) if remote is None else remote
+            # Download the file to the local repository
+            remote.getfile(Path(stash_node.target_basepath) / fname, (Path(lpath) / fname).resolve())
+
+    def create_symlink(self, stash_node, fname, dst, remote=None):
+        """Create a symlink from the local repository"""
+        assert Path(dst).is_dir()
+
+        self.ensure_avaliable(stash_node, fname, remote=remote)
+        os.symlink(self.get_local_path(stash_node, fname), Path(dst) / fname)
