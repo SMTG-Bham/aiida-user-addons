@@ -25,7 +25,11 @@ from aiida_user_addons.process.transform import magnetic_structure_decorate, mag
 from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE, nested_update_dict_node, nested_update
 from aiida_vasp.utils.aiida_utils import get_data_class
-from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser
+try:
+    from aiida_vasp.parsers.content_parsers.vasprun import VasprunParser
+except ImportError:
+    from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser
+
 
 
 class VaspBandsWorkChain(WorkChain, WithVaspInputSet):

@@ -9,7 +9,11 @@ from pymatgen.entries.computed_entries import ComputedStructureEntry
 from pymatgen.core.composition import get_el_sp, gcd, formula_double_format, Composition
 
 import aiida.orm as orm
-from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
+try:
+    from aiida_vasp.parsers.content_parsers.potcar import MultiPotcarIo
+except ImportError:
+    from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
+
 
 from aiida_user_addons.common.misc import get_energy_from_misc
 
