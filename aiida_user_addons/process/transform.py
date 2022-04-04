@@ -236,6 +236,25 @@ def get_primitive(structure):
 
 
 @calcfunction
+def get_standard_primitive(structure):
+    """Create the standard primitive structure via seekpath"""
+    from aiida.tools.data.array.kpoints import get_kpoints_path
+
+    out = get_kpoints_path(structure)['primitive_structure']
+    out.label = structure.label + ' PRIMITIVE'
+    return out
+
+@calcfunction
+def get_standard_conventional(structure):
+    """Create the standard primitive structure via seekpath"""
+    from aiida.tools.data.array.kpoints import get_kpoints_path
+
+    out = get_kpoints_path(structure)['conv_structure']
+    out.label = structure.label + ' PRIMITIVE'
+    return out
+
+
+@calcfunction
 def get_refined_structure(structure, symprec, angle_tolerance):
     """Create refined structure use pymatgen's interface"""
     from aiida.orm import StructureData
