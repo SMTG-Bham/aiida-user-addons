@@ -137,7 +137,10 @@ def parse_outcar(outcar_path):
             output_dict['EX NGY'] = int(tokens[tokens.index('NGY') + 2])
             output_dict['EX NGZ'] = int(tokens[tokens.index('NGZ') + 2])
         elif 'NPLWV' in line:
-            output_dict['num_plane_waves'] = int(line.split()[-1])
+            try:
+                output_dict['num_plane_waves'] = int(line.split()[-1])
+            except ValueError:
+                pass
         elif 'k-points in reciprocal lattice and weights:' in line:
             kblock = lines[il + 1:il + 1 + output_dict['num_kpoints']]
             k_list = [[float(token) for token in subline.strip().split()] for subline in kblock]

@@ -15,9 +15,6 @@ from aiida.orm import StructureData
 from aiida_vasp.utils.fixtures import *
 from aiida_vasp.utils.fixtures.data import POTCAR_FAMILY_NAME, POTCAR_MAP
 from aiida_vasp.utils.aiida_utils import get_data_node, create_authinfo
-from aiida_vasp.parsers.file_parsers.kpoints import KpointsParser
-from aiida_vasp.parsers.file_parsers.poscar import PoscarParser
-from aiida_vasp.parsers.file_parsers.incar import IncarParser
 
 from aiida_user_addons.vworkflows.tests.common import data_path
 

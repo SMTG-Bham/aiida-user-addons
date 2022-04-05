@@ -14,8 +14,14 @@ import numpy as np
 
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase import Atoms
-from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
-from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser, BaseFileParser, SingleFile, Xml
+try:
+    from aiida_vasp.parsers.content_parsers.potcar import MultiPotcarIo
+    from aiida_vasp.parsers.content_parsers.vasprun import VasprunParser, BaseFileParser, SingleFile, Xml
+    from aiida_vasp.parsers.content_parsers.poscar import PoscarParser
+except ImportError:
+    from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
+    from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser, BaseFileParser, SingleFile, Xml
+    from aiida_vasp.parsers.file_parsers.poscar import PoscarParser
 
 from aiida_user_addons.common.repository import open_compressed, save_all_repository_objects
 
@@ -152,7 +158,6 @@ def export_relax(work, dst, include_potcar=False, decompress=False):
     This function exports a series of relaxation calculations in sub-folders
     """
     from aiida.orm import Node, QueryBuilder, StructureData, CalcFunctionNode, WorkChainNode
-    from aiida_vasp.parsers.file_parsers.poscar import PoscarParser
 
     dst = Path(dst)
     dst.mkdir(exist_ok=True)

@@ -15,8 +15,10 @@ from aiida.orm import StructureData, Dict
 import aiida.orm as orm
 from aiida.engine import calcfunction
 from ase import Atoms
-
-from aiida_vasp.parsers.file_parsers.poscar import PoscarParser
+try:
+    from aiida_vasp.parsers.content_parsers.poscar import PoscarParser
+except ImportError:
+    from aiida_vasp.parsers.file_parsers.poscar import PoscarParser
 from aiida.common.exceptions import NotExistent
 from aiida_phonopy.common.utils import get_phonopy_instance
 
