@@ -9,7 +9,12 @@ import logging
 from pymatgen.electronic_structure.bandstructure import BandStructureSymmLine, Spin
 from pymatgen.phonon.bandstructure import PhononBandStructureSymmLine
 from pymatgen.core import Lattice
+from pymatgen.electronic_structure.core import Spin
 
+from sumo.electronic_structure.effective_mass import (
+    fit_effective_mass,
+    get_fitting_data,
+)
 from sumo.plotting.bs_plotter import SBSPlotter
 from sumo.electronic_structure.dos import load_dos
 from sumo.plotting import dos_plotter
@@ -351,3 +356,92 @@ def _get_vbm(eigenvalues, efermi):
     from itertools import chain
     occupied_states_by_band = (band[band < efermi] for band in chain(*eigenvalues.values()))
     return max(chain(*occupied_states_by_band))
+
+
+def band_tats(
+    bs,
+    num_sample_points=3,
+    temperature=None,
+    degeneracy_tol=1e-4,
+    parabolic=True,
+):
+    """Extract fitting data for band extrema based on spin, kpoint and band.
+
+    NOTE: This function is modified based on sumo.cli.bandstats.band_stats
+
+    Searches forward and backward from the extrema point, but will only sample
+    there data if there are enough points in that direction.
+
+    Args:
+        bs (:obj:`~pymatgen.electronic_structure.bandstructure.BandStructureSymmLine`):
+            The band structure.
+        spin (:obj:`~pymatgen.electronic_structure.core.Spin`): Which spin
+            channel to sample.
+        band_id (int): Index of the band to sample.
+        kpoint_id (int): Index of the kpoint to sample.
+
+    Returns:
+        list: The data necessary to calculate the effective mass, along with
+        some metadata. Formatted as a :obj:`list` of :obj:`dict`, each with the
+        keys:
+
+        'energies' (:obj:`numpy.ndarray`)
+            Band eigenvalues in eV.
+
+        'distances' (:obj:`numpy.ndarray`)
+            Distances of the k-points in reciprocal space.
+
+        'band_id' (:obj:`int`)
+            The index of the band,
+
+        'spin' (:obj:`~pymatgen.electronic_structure.core.Spin`)
+            The spin channel
+
+        'start_kpoint' (:obj:`int`)
+            The index of the k-point at which the band extrema occurs
+
+        'end_kpoint' (:obj:`int`)
+            The k-point towards which the data has been sampled.
+    """
+
+    if bs.is_metal():
+        raise RuntimeError('ERROR: System is metallic!')
+
+    vbm_data = bs.get_vbm()
+    cbm_data = bs.get_cbm()
+
+    if temperature:
+        raise RuntimeError('ERROR: This feature is not yet supported!')
+
+    else:
+        # Work out where the hole and electron band edges are.
+        # Fortunately, pymatgen does this for us. Points at which to calculate
+        # the effective mass are identified as a tuple of:
+        # (spin, band_index, kpoint_index)
+        hole_extrema = []
+        for spin, bands in vbm_data['band_index'].items():
+            hole_extrema.extend([(spin, band, kpoint) for band in bands for kpoint in vbm_data['kpoint_index']])
+
+        elec_extrema = []
+        for spin, bands in cbm_data['band_index'].items():
+            elec_extrema.extend([(spin, band, kpoint) for band in bands for kpoint in cbm_data['kpoint_index']])
+
+        # extract the data we need for fitting from the band structure
+        hole_data = []
+        for extrema in hole_extrema:
+            hole_data.extend(get_fitting_data(bs, *extrema, num_sample_points=num_sample_points))
+
+        elec_data = []
+        for extrema in elec_extrema:
+            elec_data.extend(get_fitting_data(bs, *extrema, num_sample_points=num_sample_points))
+
+    # calculate the effective masses and log the information
+    for data in hole_data:
+        eff_mass = fit_effective_mass(data['distances'], data['energies'], parabolic=parabolic)
+        data['effective_mass'] = eff_mass
+
+    for data in elec_data:
+        eff_mass = fit_effective_mass(data['distances'], data['energies'], parabolic=parabolic)
+        data['effective_mass'] = eff_mass
+
+    return {'hole_data': hole_data, 'electron_data': elec_data}
