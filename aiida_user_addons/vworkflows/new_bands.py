@@ -86,11 +86,11 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
                    help='Density of the point along the path, used by sumo interface.',
                    valid_type=orm.Float,
                    required=False)
-        spec.inputs('band_mode',
-                    help='Mode for generating the band path. Choose from: bradcrack, pymatgen, seekpath, seekpath-aiida and latimer-munro.',
-                    required=False,
-                    type=orm.Dict)
-        spec.inputs('symprec', help='Precision of the symmetry determination', valid_type=orm.Float, required=True)
+        spec.input('band_mode',
+                   help='Mode for generating the band path. Choose from: bradcrack, pymatgen, seekpath, seekpath-aiida and latimer-munro.',
+                   required=False,
+                   type=orm.Dict)
+        spec.input('symprec', help='Precision of the symmetry determination', valid_type=orm.Float, required=True)
         spec.input(
             'dos_kpoints_density',
             help='Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.',
