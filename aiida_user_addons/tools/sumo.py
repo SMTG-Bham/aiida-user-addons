@@ -358,7 +358,7 @@ def _get_vbm(eigenvalues, efermi):
     return max(chain(*occupied_states_by_band))
 
 
-def band_tats(
+def bandstats(
     bs,
     num_sample_points=3,
     temperature=None,
