@@ -89,7 +89,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         spec.input('band_mode',
                    help='Mode for generating the band path. Choose from: bradcrack, pymatgen, seekpath, seekpath-aiida and latimer-munro.',
                    required=False,
-                   type=orm.Dict)
+                   valid_type=orm.Dict)
         spec.input('symprec', help='Precision of the symmetry determination', valid_type=orm.Float, required=True)
         spec.input(
             'dos_kpoints_density',
