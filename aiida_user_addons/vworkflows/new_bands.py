@@ -157,7 +157,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
                 cls.run_relax,
                 cls.verify_relax,
             ),
-            if_(cls.should_run_seekpath)(cls.run_seekpath),
+            if_(cls.should_generate_path)(cls.generate_path),
             if_(cls.should_run_scf)(
                 cls.run_scf,
                 cls.verify_scf,
@@ -235,14 +235,14 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         # Only need to run SCF calculation when no explicity CHGCAR or folder set
         return not (self.ctx.chgcar or self.ctx.restart_folder)
 
-    def should_run_seekpath(self):
+    def should_generate_path(self):
         """
         Seekpath should only run if no explicit bands is provided or we are just
         running for DOS, in which case the original structure is used.
         """
         return 'bs_kpoints' not in self.inputs and (not self.inputs.get('only_dos', False))
 
-    def seekpath(self):
+    def generate_path(self):
         """
         Run seekpath to obtain the primitive structure and bands
         """
@@ -651,7 +651,7 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
                 cls.run_relax,
                 cls.verify_relax,
             ),
-            if_(cls.should_run_seekpath)(cls.run_seekpath),
+            if_(cls.should_generate_path)(cls.generate_path),
             cls.make_splitted_kpoints,  # Split the kpoints
             cls.run_scf_multi,  # Launch split calculation
             cls.inspect_and_combine_bands,  # Combined the band structure
