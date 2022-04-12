@@ -102,7 +102,8 @@ def get_pmg_bandstructure(bands_node, structure=None, efermi=None, **kwargs):
     # get the efermi
     if efermi_raw is None:
         if occupations is not None:
-            efermi = find_vbm(bands, occupations)
+            # Use the middle of the CBM and VBM as the fermi energy....
+            efermi = (find_vbm(bands, occupations) + find_cbm(bands, occupations)) / 2
         else:
             efermi = 0
             warnings.warn('Cannot find fermi energy - setting it to 0, this is probably wrong!')
@@ -142,6 +143,15 @@ def find_vbm(bands, occupations, tol=1e-4):
     electronic smearing.
     """
     return bands[occupations > tol].max()
+
+
+def find_cbm(bands, occupations, tol=1e-4):
+    """
+    Find the fermi energy, put it at the top of VBM
+    NOTE: this differs from the fermi energy reported in VASP when there is any
+    electronic smearing.
+    """
+    return bands[occupations < tol].min()
 
 
 def make_latex_labels(labels: list) -> list:
