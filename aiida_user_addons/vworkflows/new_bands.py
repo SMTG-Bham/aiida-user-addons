@@ -31,7 +31,6 @@ except ImportError:
     from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser
 
 
-
 class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
     """
     Workchain for running bands calculations.
@@ -586,13 +585,6 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
                    help='Spacing for band distances for automatic kpoints generation.',
                    valid_type=orm.Float,
                    required=False)
-        spec.input(
-            'dos_kpoints_density',
-            help='Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.',
-            serializer=to_aiida_type,
-            required=False,
-            valid_type=orm.Float,
-        )
         spec.expose_inputs(relax_work,
                            namespace='relax',
                            exclude=('structure',),
@@ -640,7 +632,9 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
 
     def make_splitted_kpoints(self):
         """Split the kpoints"""
+        # Fully specified band structure kpoints
         full_kpoints = self.ctx.bs_kpoints
+
         if 'kpoints' in self.inputs.scf:
             scf_kpoints = self.inputs.scf.kpoints
         # Relaxation workchain has kpoints output

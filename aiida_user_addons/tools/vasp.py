@@ -16,11 +16,9 @@ from ase.calculators.singlepoint import SinglePointCalculator
 from ase import Atoms
 try:
     from aiida_vasp.parsers.content_parsers.potcar import MultiPotcarIo
-    from aiida_vasp.parsers.content_parsers.vasprun import VasprunParser, BaseFileParser, SingleFile, Xml
     from aiida_vasp.parsers.content_parsers.poscar import PoscarParser
 except ImportError:
     from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
-    from aiida_vasp.parsers.file_parsers.vasprun import VasprunParser, BaseFileParser, SingleFile, Xml
     from aiida_vasp.parsers.file_parsers.poscar import PoscarParser
 
 from aiida_user_addons.common.repository import open_compressed, save_all_repository_objects
@@ -430,69 +428,6 @@ def traj_to_atoms(node):
             else:
                 eng = None
             return _traj_node_to_atoms(traj, eng)
-
-
-class VasprunParserWithHandler(VasprunParser):
-    """
-    A vasprun parser that support file handler inputs
-    """
-
-    def __init__(self, *args, **kwargs):
-        """
-        Initialize vasprun.xml parser
-
-        file_path : str
-            File path.
-        file_object : str
-            An opened file object handler for the vapsrun.xml file.
-        data : SingleFileData
-            AiiDA Data class install to store a single file.
-        settings : ParserSettings
-        exit_codes : CalcJobNode.process_class.exit_codes
-
-        """
-
-        BaseFileParser.__init__(self, *args, **kwargs)
-        self._xml = None
-        self._xml_truncated = False
-        self._settings = kwargs.get('settings', None)
-        self._exit_codes = kwargs.get('exit_codes', None)
-        if 'file_path' in kwargs:
-            self._init_xml(file_path=kwargs['file_path'])
-        if 'file_obj' in kwargs:
-            self._init_xml(file_obj=kwargs['file_obj'])
-        if 'data' in kwargs:
-            self._init_xml(file_path=kwargs['data'].get_file_abs_path())
-
-    def _init_xml(self, file_path=None, file_obj=None):
-        """Create parsevasp Xml instance"""
-
-        if file_path:
-            self._data_obj = SingleFile(path=file_path)
-
-            # Since vasprun.xml can be fairly large, we will parse it only
-            # once and store the parsevasp Xml object.
-            try:
-                self._xml = Xml(file_path=file_path, k_before_band=True, logger=self._logger)
-                # Let us also check if the xml was truncated as the parser uses lxml and its
-                # recovery mode in case we can use some of the results.
-                self._xml_truncated = self._xml.truncated
-            except SystemExit:
-                self._logger.warning('Parsevasp exited abruptly. Returning None.')
-                self._xml = None
-        else:
-            self._data_obj = SingleFile(path='.')
-
-            # Since vasprun.xml can be fairly large, we will parse it only
-            # once and store the parsevasp Xml object.
-            try:
-                self._xml = Xml(file_obj=file_obj, k_before_band=True, logger=self._logger)
-                # Let us also check if the xml was truncated as the parser uses lxml and its
-                # recovery mode in case we can use some of the results.
-                self._xml_truncated = self._xml.truncated
-            except SystemExit:
-                self._logger.warning('Parsevasp exited abruptly. Returning None.')
-                self._xml = None
 
 
 def parse_core_state_eigenenergies(fh):
