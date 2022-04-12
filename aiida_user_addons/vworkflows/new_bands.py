@@ -22,6 +22,8 @@ from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_user_addons.process.transform import magnetic_structure_decorate, magnetic_structure_dedecorate
 
+from tools.sumo_kpath import kpath_from_sumo
+
 from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE, nested_update_dict_node, nested_update
 from aiida_vasp.utils.aiida_utils import get_data_class
@@ -74,9 +76,17 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
                    valid_type=orm.KpointsData,
                    required=False)
         spec.input('bands_kpoints_distance',
-                   help='Spacing for band distances for automatic kpoints generation.',
+                   help='Spacing for band distances for automatic kpoints generation, used by seekpath-aiida mode.',
                    valid_type=orm.Float,
                    required=False)
+        spec.input('line_density',
+                   help='Density of the point along the path, used by sumo interface.',
+                   valid_type=orm.Float,
+                   required=False)
+        spec.inputs('band_mode',
+                    help='Mode for generating the band path. Choose from: bradcrack, pymatgen, seekpath, seekpath-aiida and latimer-munro.',
+                    type=orm.Dict)
+        spec.inputs('symprec', help='Precision of the symmetry determination', valid_type=orm.Float, required=True)
         spec.input(
             'dos_kpoints_density',
             help='Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.',
@@ -228,29 +238,45 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         """
         return 'bs_kpoints' not in self.inputs and (not self.inputs.get('only_dos', False))
 
-    def run_seekpath(self):
+    def seekpath(self):
         """
         Run seekpath to obtain the primitive structure and bands
         """
 
         current_structure_backup = self.ctx.current_structure
-        inputs = {'reference_distance': self.inputs.get('bands_kpoints_distance', None), 'metadata': {'call_link_label': 'seekpath'}}
+        mode = self.inputs['band_mode'].value
+        if mode == 'seekpath-aiida':
+            inputs = {'reference_distance': self.inputs.get('bands_kpoints_distance', None), 'metadata': {'call_link_label': 'seekpath'}}
+            func = seekpath_structure_analysis
+        else:
+            # Using sumo interface
+            inputs = {
+                'line_density': self.inputs.get('line_density', orm.Float(20)),
+                'symprec': self.inputs.get('symprec', orm.Float(1e-2)),
+                'mode': self.inputs['band_mode'],
+                'metadata': {
+                    'call_link_label': 'sumo_kpath'
+                }
+            }
+            func = kpath_from_sumo
+
         magmom = self.ctx.get('magmom', None)
+
         # For magnetic structures, create different kinds for the analysis in case that the
         # symmetry should be lowered. This also makes sure that the magnetic moments are consistent
         if magmom:
             decorate_result = magnetic_structure_decorate(self.ctx.current_structure, orm.List(list=magmom))
             decorated = decorate_result['structure']
             # Run seekpath on the decorated structure
-            seekpath_results = seekpath_structure_analysis(decorated, **inputs)
-            decorated_primitive = seekpath_results['primitive_structure']
+            kpath_results = func(decorated, **inputs)
+            decorated_primitive = kpath_results['primitive_structure']
             # Convert back to undecorated structures and add consistent magmom input
             dedecorate_result = magnetic_structure_dedecorate(decorated_primitive, decorate_result['mapping'])
             self.ctx.magmom = dedecorate_result['magmom'].get_list()
             self.ctx.current_structure = dedecorate_result['structure']
         else:
-            seekpath_results = seekpath_structure_analysis(self.ctx.current_structure, **inputs)
-            self.ctx.current_structure = seekpath_results['primitive_structure']
+            kpath_results = func(self.ctx.current_structure, **inputs)
+            self.ctx.current_structure = kpath_results['primitive_structure']
 
         if not np.allclose(self.ctx.current_structure.cell, current_structure_backup.cell):
             if self.inputs.scf.get('kpoints'):
@@ -259,9 +285,9 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
                 )
                 return self.exit_codes.ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE  # pylint: disable=no-member
             self.report('The primitive structure is not the same as the input structure - using the former for all calculations from now.')
-        self.ctx.bs_kpoints = seekpath_results['explicit_kpoints']
+        self.ctx.bs_kpoints = kpath_results['explicit_kpoints']
         self.out('primitive_structure', self.ctx.current_structure)
-        self.out('seekpath_parameters', seekpath_results['parameters'])
+        self.out('seekpath_parameters', kpath_results['parameters'])
 
     def run_scf(self):
         """
@@ -562,6 +588,8 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
 
     If a relaxation workchain is run as part of the process, the ``kpoints`` output returned can
     be used for this purpose automatically.
+
+    Only the `scf` namespace will be used for performing the calculation
 
     TODO:
      - Warn if the calculation is not actually a hybrid one
