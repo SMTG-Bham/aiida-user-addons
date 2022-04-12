@@ -22,7 +22,7 @@ from aiida.orm.nodes.data.base import to_aiida_type
 
 from aiida_user_addons.process.transform import magnetic_structure_decorate, magnetic_structure_dedecorate
 
-from tools.sumo_kpath import kpath_from_sumo
+from aiida_user_addons.tools.sumo_kpath import kpath_from_sumo
 
 from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE, nested_update_dict_node, nested_update
