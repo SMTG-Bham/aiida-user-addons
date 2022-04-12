@@ -62,6 +62,9 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
     """
     _base_wk_string = 'vaspu.vasp'
     _relax_wk_string = 'vaspu.relax'
+    DEFAULT_BAND_MODE = 'bradcrack'
+    DEFAULT_LINE_DENSITY = 20
+    DEFAULT_SYMPREC = 0.01
 
     @classmethod
     def define(cls, spec):
@@ -85,6 +88,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
                    required=False)
         spec.inputs('band_mode',
                     help='Mode for generating the band path. Choose from: bradcrack, pymatgen, seekpath, seekpath-aiida and latimer-munro.',
+                    required=False,
                     type=orm.Dict)
         spec.inputs('symprec', help='Precision of the symmetry determination', valid_type=orm.Float, required=True)
         spec.input(
@@ -244,15 +248,21 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         """
 
         current_structure_backup = self.ctx.current_structure
-        mode = self.inputs['band_mode'].value
+
+        mode = self.inputs.get('band_mode')
+        if mode is None:
+            mode = self.DEFAULT_BAND_MODE
+        else:
+            mode = mode.value
+
         if mode == 'seekpath-aiida':
             inputs = {'reference_distance': self.inputs.get('bands_kpoints_distance', None), 'metadata': {'call_link_label': 'seekpath'}}
             func = seekpath_structure_analysis
         else:
             # Using sumo interface
             inputs = {
-                'line_density': self.inputs.get('line_density', orm.Float(20)),
-                'symprec': self.inputs.get('symprec', orm.Float(1e-2)),
+                'line_density': self.inputs.get('line_density', orm.Float(self.DEFAULT_LINE_DENSITY)),
+                'symprec': self.inputs.get('symprec', orm.Float(self.DEFAULT_SYMPREC)),
                 'mode': self.inputs['band_mode'],
                 'metadata': {
                     'call_link_label': 'sumo_kpath'
