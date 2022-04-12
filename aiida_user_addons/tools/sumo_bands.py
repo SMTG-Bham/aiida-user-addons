@@ -19,7 +19,7 @@ def kpath_from_sumo(structure: orm.StructureData, mode: orm.Str, symprec: orm.Fl
     if line_density:
         line_density = line_density.value
 
-    path, kpoints, labels = get_path_data(
+    path, kpoints_raw, labels = get_path_data(
         struct,
         mode.value,
         symprec.value,
@@ -30,7 +30,7 @@ def kpath_from_sumo(structure: orm.StructureData, mode: orm.Str, symprec: orm.Fl
 
     # kpoints
     kpoints = orm.KpointsData()
-    kpoints.set_kpoints(kpoints)
+    kpoints.set_kpoints(kpoints_raw)
 
     actual_labels = []
     for idx, label in enumerate(labels):
