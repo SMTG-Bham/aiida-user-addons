@@ -10,6 +10,8 @@ from aiida.engine import calcfunction
 
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from pymatgen import Structure
+from pytest import param
+from sympy import refine
 
 
 @calcfunction
@@ -236,14 +238,33 @@ def get_primitive(structure):
 
 
 @calcfunction
-def get_standard_primitive(structure):
+def get_standard_primitive(structure, **kwargs):
     """Create the standard primitive structure via seekpath"""
     from aiida.tools.data.array.kpoints import get_kpoints_path
 
-    out = get_kpoints_path(structure)['primitive_structure']
+    parameters = kwargs.get('parameters', {'symprec': 1e-5})
+    if isinstance(parameters, Dict):
+        parameters = parameters.get_dict()
+    
+
+    out = get_kpoints_path(structure, **parameters)['primitive_structure']
     out.label = structure.label + ' PRIMITIVE'
     return out
 
+@calcfunction
+def spglib_refine_cell(structure, symprec):
+    """Create the standard primitive structure via seekpath"""
+    from aiida.tools.data.structure import spglib_tuple_to_structure, structure_to_spglib_tuple
+    from spglib import refine_cell
+
+    structure_tuple, kind_info, kinds = structure_to_spglib_tuple(structure)
+
+    lattice, positions, types = refine_cell(structure_tuple, symprec.value)
+
+    refined = spglib_tuple_to_structure((lattice, positions, types), kind_info, kinds)
+
+    return refined
+    
 @calcfunction
 def get_standard_conventional(structure):
     """Create the standard primitive structure via seekpath"""

@@ -7,7 +7,7 @@ from sumo.symmetry.kpoints import get_path_data
 
 
 @calcfunction
-def kpath_from_sumo(structure: orm.StructureData, mode: orm.Str, symprec: orm.Float, **kwargs):
+def kpath_from_sumo(structure: orm.StructureData, mode: orm.Str, symprec: orm.Float, line_density):
     """
     Obtain kpoint path from sumo
 
@@ -15,9 +15,7 @@ def kpath_from_sumo(structure: orm.StructureData, mode: orm.Str, symprec: orm.Fl
     """
 
     struct = structure.get_pymatgen()
-    line_density = kwargs.get('line_density')
-    if line_density:
-        line_density = line_density.value
+    line_density = line_density.value
 
     path, kpoints_raw, labels = get_path_data(
         struct,

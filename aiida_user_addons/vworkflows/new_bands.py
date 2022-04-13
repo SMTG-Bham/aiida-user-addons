@@ -9,6 +9,7 @@ TODO:
 from copy import deepcopy
 from typing import List
 from tempfile import mkdtemp
+from pathlib import Path
 import shutil
 from gzip import GzipFile
 
@@ -90,7 +91,8 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
                    help='Mode for generating the band path. Choose from: bradcrack, pymatgen, seekpath, seekpath-aiida and latimer-munro.',
                    required=False,
                    valid_type=orm.Dict)
-        spec.input('symprec', help='Precision of the symmetry determination', valid_type=orm.Float, required=True)
+        spec.input('symprec', help='Precision of the symmetry determination', 
+                    valid_type=orm.Float, required=False)
         spec.input(
             'dos_kpoints_density',
             help='Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.',
@@ -263,7 +265,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
             inputs = {
                 'line_density': self.inputs.get('line_density', orm.Float(self.DEFAULT_LINE_DENSITY)),
                 'symprec': self.inputs.get('symprec', orm.Float(self.DEFAULT_SYMPREC)),
-                'mode': self.inputs['band_mode'],
+                'mode': orm.Str(mode),
                 'metadata': {
                     'call_link_label': 'sumo_kpath'
                 }
@@ -297,7 +299,8 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
             self.report('The primitive structure is not the same as the input structure - using the former for all calculations from now.')
         self.ctx.bs_kpoints = kpath_results['explicit_kpoints']
         self.out('primitive_structure', self.ctx.current_structure)
-        self.out('seekpath_parameters', kpath_results['parameters'])
+        if 'parameters' in kpath_results:
+            self.out('seekpath_parameters', kpath_results['parameters'])
 
     def run_scf(self):
         """
@@ -904,26 +907,40 @@ def _extract_kpoints_from_retrieved(retrieved):
     """
     Extract explicity kpoints from a finished calculation
     """
-    tmpdir = mkdtemp()
+    tmpdir = Path(mkdtemp())
     if 'vasprun.xml' in retrieved.list_object_names():
         with retrieved.open('vasprun.xml', mode='r') as fsrc:
-            with open(tmpdir + 'vasprun.xml', mode='w') as fdst:
+            with open(tmpdir / 'vasprun.xml', mode='w') as fdst:
                 shutil.copyfileobj(fsrc, fdst)
     elif 'vasprun.xml.gz' in retrieved.list_object_names():
         with retrieved.open('vasprun.xml.gz', mode='rb') as fsrc:
             with GzipFile(fileobj=fsrc, mode='rb') as gobj:
-                with open(tmpdir + 'vasprun.xml', mode='wb') as fdst:
+                with open(tmpdir / 'vasprun.xml', mode='wb') as fdst:
                     shutil.copyfileobj(gobj, fdst)
     else:
         raise RuntimeError('No valid vasprun.xml file to use!!')
 
-    parser = VasprunParser(file_path=tmpdir + 'vasprun.xml')
+    new_format = False
+
+    try:
+        # NOTE should be deprecated!!!
+        parser = VasprunParser(file_path=str(tmpdir / 'vasprun.xml'))
+    except TypeError:
+        # Use newer version - use file_obj instead
+        new_format = True
+        with open(tmpdir / 'vasprun.xml') as fh:
+            parser = VasprunParser(handler=fh)
+
     vkpoints = parser.kpoints
     if vkpoints['mode'] != 'explicit':
         raise ValueError('Only explicity kpoints is supported!')
 
-    kpoints_array = np.stack([kpt.get_point() for kpt in vkpoints['points']], axis=0)
-    weights_array = np.array([kpt.get_weight() for kpt in vkpoints['points']])
+    if new_format:
+        kpoints_array = vkpoints['points']
+        weights_array = vkpoints['weights']
+    else:
+        kpoints_array = np.stack([kpt.get_point() for kpt in vkpoints['points']], axis=0)
+        weights_array = np.array([kpt.get_weight() for kpt in vkpoints['points']])
 
     kpoints_data = orm.KpointsData()
     kpoints_data.set_kpoints(kpoints=kpoints_array, weights=weights_array)
