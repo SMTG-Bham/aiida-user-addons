@@ -1,7 +1,10 @@
 """
 Collection of process functions for AiiDA, used for structure transformation
 """
+from enum import unique
+from itertools import count
 import re
+from ase import Atoms
 import numpy as np
 from ase.build import sort
 from ase.neb import NEB
