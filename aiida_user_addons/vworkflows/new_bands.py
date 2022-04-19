@@ -89,7 +89,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         spec.input('band_mode',
                    help='Mode for generating the band path. Choose from: bradcrack, pymatgen, seekpath, seekpath-aiida and latimer-munro.',
                    required=False,
-                   valid_type=orm.Dict)
+                   valid_type=orm.Str)
         spec.input('symprec', help='Precision of the symmetry determination', valid_type=orm.Float, required=True)
         spec.input(
             'dos_kpoints_density',
@@ -613,16 +613,11 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
         relax_work = WorkflowFactory(cls._relax_wk_string)
         base_work = WorkflowFactory(cls._base_wk_string)
 
-        spec.input('kpoints_per_split', valid_type=orm.Int, help='Number of kpoints per split.', required=True)
+        spec.input('kpoints_per_split',
+                   valid_type=orm.Int,
+                   help='Number of kpoints per split, INCLUDING the weighted SCF kpoints.',
+                   required=True)
         spec.input('structure', help='The input structure', valid_type=orm.StructureData)
-        spec.input('bs_kpoints',
-                   help='Explicit kpoints for the bands. Will not generate kpoints if supplied.',
-                   valid_type=orm.KpointsData,
-                   required=False)
-        spec.input('bands_kpoints_distance',
-                   help='Spacing for band distances for automatic kpoints generation.',
-                   valid_type=orm.Float,
-                   required=False)
         spec.expose_inputs(relax_work,
                            namespace='relax',
                            exclude=('structure',),
@@ -688,7 +683,9 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
             self.report('No valid SCF kpoints is avaliable to use. Please define scf.kpoints explicitly!')
             return self.exit_codes.ERROR_NO_VALID_SCF_KPOINTS_INPUT  # pylint: disable=no-member
 
-        kpoints_for_calc = split_kpoints(scf_kpoints, full_kpoints, self.inputs.kpoints_per_split)
+        # Number of kpoints per split, NOT including the SCF kpoints
+        per_split = orm.Int(self.inputs.kpoints_per_split.value - scf_kpoints.get_kpoints().shape[0])
+        kpoints_for_calc = split_kpoints(scf_kpoints, full_kpoints, per_split)
         self.ctx.kpoints_for_calc = kpoints_for_calc
 
     def run_scf_multi(self):
