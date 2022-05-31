@@ -32,8 +32,7 @@ class RepositoryMapper:
 
     def to_folder(self, target_path: Path, exclude=None):
         """Write the content of a folder data onto the disk"""
-        for ifile in self.node.list_objects():
-            name, _ = ifile
+        for name in self.node.list_object_names():
             copy_from_aiida(name, self.node, target_path, self.decompress, exclude=exclude)
 
     @contextmanager
@@ -101,8 +100,7 @@ def copy_from_aiida(name: str, node, dst: Path, decompress=False, exclude=None):
 
 def save_all_repository_objects(node: orm.Node, target_path: Path, decompress=False, exclude=None):
     """Copy all objects of a node saved in the repository to the disc"""
-    for ifile in node.list_objects():
-        name, _ = ifile
+    for name in node.list_object_names():
         copy_from_aiida(name, node, target_path, decompress, exclude=exclude)
 
 
