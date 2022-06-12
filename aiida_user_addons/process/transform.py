@@ -9,7 +9,7 @@ from aiida.orm import StructureData, List, ArrayData, Node, QueryBuilder, CalcFu
 from aiida.engine import calcfunction
 
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from pymatgen import Structure
+from pymatgen.core import Structure
 
 
 @calcfunction
@@ -84,7 +84,7 @@ def make_vac_at_o(cell, excluded_sites, nsub, supercell):
     later removed. Excluded sites are subsituted with S and later
     converted back to O.
     """
-    from pymatgen import Composition
+    from pymatgen.core import Composition
     from bsym.interface.pymatgen import unique_structure_substitutions
     nsub = nsub.value
     struc = cell.get_pymatgen()
@@ -131,7 +131,7 @@ def make_vac_at_o_and_shake(cell, excluded_sites, nsub, supercell, shake_amp):
 
     In addition, we shake the nearest neighbours with that given by shake_amp.
     """
-    from pymatgen import Composition
+    from pymatgen.core import Composition
     from pymatgen.transformations.standard_transformations import PerturbStructureTransformation
     from bsym.interface.pymatgen import unique_structure_substitutions
     nsub = nsub.value
@@ -480,7 +480,7 @@ def _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False, l
     Returns:
         A dictionary of structures and corresponding site mappings
     """
-    from pymatgen import Composition
+    from pymatgen.core import Composition
     from bsym.interface.pymatgen import unique_structure_substitutions
     exclude_dummy = 'Ar'
     vacancy_dummy = 'He'
