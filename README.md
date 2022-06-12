@@ -80,13 +80,9 @@ Recommend to install in the editable mode to allow any changes to be applied imm
 pip install -e .
 ```
 
-Don't forget to do:
+## Required package version
 
-```
-reentry scan -r aiida
-```
-
-in case entrypoints changes
+Development version of `aiida-vasp` should be used. 
 
 ## Usage
 
