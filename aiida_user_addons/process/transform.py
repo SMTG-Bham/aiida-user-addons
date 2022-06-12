@@ -3,6 +3,8 @@ Collection of process functions for AiiDA, used for structure transformation
 """
 import re
 import numpy as np
+from typing import Tuple, List
+from ase import Atoms
 from ase.build import sort
 from ase.neb import NEB
 from aiida.orm import StructureData, List, ArrayData, Node, QueryBuilder, CalcFunctionNode, Dict
@@ -634,3 +636,26 @@ def fix_atom_order(reference, to_fix):
     fixed_structure = StructureData(ase=afixed)
     fixed_structure.label = to_fix.label + ' UPDATED ORDER'
     return fixed_structure
+
+
+def match_atomic_order_(atoms: Atoms, atoms_ref: Atoms) -> Tuple[Atoms, List[int]]:
+    """
+    Reorder the atoms to that of the reference.
+
+    Only works for identical or nearly identical structures that are ordered differently.
+    Returns a new `Atoms` object with order similar to that of `atoms_ref` as well as the sorting indices.
+    """
+
+    # Find distances
+    acombined = atoms_ref.copy()
+    acombined.extend(atoms)
+    new_index = []
+    # Get piece-wise MIC distances
+    jidx = list(range(len(atoms), len(atoms) * 2))
+    for i in range(len(atoms)):
+        dists = acombined.get_distances(i, jidx, mic=True)
+        # Find the index of the atom with the smallest distance
+        min_idx = np.where(dists == dists.min())[0][0]
+        new_index.append(min_idx)
+    assert len(set(new_index)) == len(atoms), 'The detected mapping is not unique!'
+    return atoms[new_index], new_index
