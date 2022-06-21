@@ -14,7 +14,8 @@
         "aiida-core>=1.5.2",
         "aiida-castep>=1.2.0a5,<3",
         "bsym==1.1.1",
-        "sumo"
+        "sumo",
+        "adjustText"
     ],
     "entry_points": {
         "console_scripts":
