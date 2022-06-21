@@ -328,7 +328,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             ensure_parse_objs(nac_inputs, ['dielectrics', 'born_charges'])
 
             running = self.submit(self._singlepoint_chain, **nac_inputs)
-            self.report('Submissted calculation for nac: {}'.format(running))
+            self.report('Submitted calculation for nac: {}'.format(running))
             self.to_context(**{'born_and_epsilon_calc': running})
 
     def check_wavecar_chgcar(self):

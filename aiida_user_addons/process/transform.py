@@ -7,7 +7,8 @@ from typing import Tuple, List
 from ase import Atoms
 from ase.build import sort
 from ase.neb import NEB
-from aiida.orm import StructureData, List, ArrayData, Node, QueryBuilder, CalcFunctionNode, Dict
+from aiida.orm import StructureData, ArrayData, Node, QueryBuilder, CalcFunctionNode
+from aiida import orm
 from aiida.engine import calcfunction
 
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
@@ -35,7 +36,7 @@ def magnetic_structure_decorate(structure, magmom):
 
     # Keep the label
     new_structure.label = structure.label
-    return {'structure': new_structure, 'mapping': Dict(dict=magmom_mapping)}
+    return {'structure': new_structure, 'mapping': orm.Dict(dict=magmom_mapping)}
 
 
 @calcfunction
@@ -59,7 +60,7 @@ def magnetic_structure_dedecorate(structure, mapping):
         this_symbol = structure.get_kind(site.kind_name).symbol
         new_structure.append_atom(position=site.position, symbols=this_symbol, name=name)
     new_structure.label = structure.label
-    return {'structure': new_structure, 'magmom': List(list=magmom)}
+    return {'structure': new_structure, 'magmom': orm.List(list=magmom)}
 
 
 @calcfunction
@@ -243,7 +244,7 @@ def get_standard_primitive(structure, **kwargs):
     from aiida.tools.data.array.kpoints import get_kpoints_path
 
     parameters = kwargs.get('parameters', {'symprec': 1e-5})
-    if isinstance(parameters, Dict):
+    if isinstance(parameters, orm.Dict):
         parameters = parameters.get_dict()
 
     out = get_kpoints_path(structure, **parameters)['primitive_structure']
@@ -330,7 +331,7 @@ def make_supercell(structure, supercell, **kwargs):
     out.label = structure.label + ' SUPER {} {} {}'.format(*slist)
 
     if tags:
-        return {'structure': out, 'tags': List(list=stags)}
+        return {'structure': out, 'tags': orm.List(list=stags)}
     else:
         return {'structure': out}
 
@@ -371,7 +372,7 @@ def delithiate_by_wyckoff(structure, wyckoff):
             mask.append(False)
         else:
             mask.append(True)
-    outdict = {'structure': out, 'mask': List(list=mask)}
+    outdict = {'structure': out, 'mask': orm.List(list=mask)}
     return outdict
 
 
@@ -403,7 +404,7 @@ def delithiate_full(structure):
             mask.append(False)
         else:
             mask.append(True)
-    outdict = {'structure': out, 'mask': List(list=mask)}
+    outdict = {'structure': out, 'mask': orm.List(list=mask)}
     return outdict
 
 
@@ -441,7 +442,7 @@ def delithiate_one(structure):
                 mask.append(False)
             else:
                 mask.append(True)
-        outdict.update({f'structure_{idx}': out, f'mask_{idx}': List(list=mask)})
+        outdict.update({f'structure_{idx}': out, f'mask_{idx}': orm.List(list=mask)})
     return outdict
 
 
