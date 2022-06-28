@@ -59,13 +59,24 @@ Commands:
 ## Additional VASP workflows
 
 - `vaspu.relax`: `RelaxWorkChain` with additional check and bug fixes.
-- `vaspu.converge`: A convergence testing workchain that runs tests in parallel as much as possbile (NOT WORKING AT THE MOMENT).
+- `vaspu.converge`: A simpler convergence testing workchain that runs tests in parallel.
 - `vaspu.vasp`: Almost as the original one, used by other workcahins.
 - `vaspu.bands`: Includes pre-relaxation of the input structure with more functionalities such as dealing with AFM spin arrangement. Based on `castep.bands`.
+- `vaspu.hybrid_bands`: Run band structure calculations normal calculations with *zero-weighted kpoints*. Useful if hybrid functional is used.
 - `vaspu.phonopy`: Fully automated Phonon workflow from initial relaxation to final bandstructure/thermal properties.
 - `vaspu.magnetic`: Magnetic enumeration workflow for finding lowest energy magnetic states.
 - `vaspu.delithiate`: Workchain for delithiate structures and performing relaxation.
-- `vaspu.master`: Same as the original, not used.
+- `vaspu.voltage`: Workchain for constructing voltage curve upon delithiation of certain lithiated structure.
+
+## Related codes
+
+This package also provide some convenient routine for the following packages:
+
+- [pymatgen](https://pymatgen.org/): Routines for acquiring structures from Materials Project.
+- [sumo](https://github.com/SMTG-UCL/sumo): Used for plotting band structures and density of states.
+- [hiphive](https://hiphive.materialsmodeling.org/): Minimum wrapper for generating MC rattled structures.
+- [clease](https://gitlab.com/computationalmaterials/clease): For depositing/extracting structures stored in its database.
+- [phonopy](https://phonopy.github.io/phonopy/): Used for phonon calculations (vasp). Existing phonon workchains can be exported as files.
 
 ## Additional Scheduler plugins
 
@@ -82,8 +93,9 @@ pip install -e .
 
 ## Required package version
 
-Development version of `aiida-vasp` should be used. 
+Development version of `aiida-vasp` should be used.
 
 ## Usage
 
 Custom workflows are registered as entry points, so `WorkflowFactory('vaspu.relax')` will load the relaxation workflow.
+Check the outputs of `verdi plugin list aiida.workflows` to see the workflows avaliable.
