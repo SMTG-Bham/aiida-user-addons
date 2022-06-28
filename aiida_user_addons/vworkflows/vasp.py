@@ -120,7 +120,12 @@ class VaspWorkChain(VanillaVaspWorkChain):
                    valid_type=get_data_class('dict'),
                    required=False,
                    serializer=to_aiida_type,
-                   help="Mappings, see the doc string of 'get_ldau_keys'")
+                   help="""Settings for assign LDA+U related settings according to the input structure.
+
+    mapping: a dictionary in the format of  {"Mn": [d, 4]...} for U
+    utype: the type of LDA+U, default to 2, which is the one with only one parameter
+    jmapping: a dictionary in the format of  {"Mn": [d, 4]...} but for J
+    felec: Wether we are dealing with f electrons, will increase lmaxmix if we are.""")
         spec.input('kpoints_spacing',
                    valid_type=get_data_class('float'),
                    required=False,

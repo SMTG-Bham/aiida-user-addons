@@ -31,6 +31,7 @@ from aiida_user_addons.common.opthold import OptionContainer, IntOption, Option
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 from aiida_user_addons.common.misc import get_energy_from_misc
 from aiida_user_addons.tools.pymatgen import get_entry_from_calc
+from aiida_user_addons.process.battery import create_delithiated_multiple_level
 
 from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE
@@ -44,8 +45,17 @@ class EwaldFilterOptions(OptionContainer):
     pick_ewald_n_lowest = IntOption('Number of lowest energy structures to be picked', default_value=10)
 
 
-class VoltageCurveWorkChain(WorkChain):
-    """Workchain for compute voltage curves (or the necessary information to assemble one"""
+class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
+    """
+    Workchain for compute voltage curves (or the necessary information to assemble one)
+
+    This workchain generated delithiated structures at allow lithiation level, and then relax each single one of them.
+    The energies of the relaxed structures are then used to assemble the voltage curve.
+    Note that the input structure is used *as it is*, one many want to manually create supercells and use them as the input structure,
+    should more level of lithiation is needed.
+    The input (lithiated) structure is optimised first, and then delithiated structures are created and submitted for calculation.
+    Optionally, this can be skipped by directly passing the `misc` output of the relaxed lithiated structure.
+    """
     ALLOWED_OK_EXIT_CODES = [601]
 
     @classmethod
@@ -58,12 +68,16 @@ class VoltageCurveWorkChain(WorkChain):
                    valid_type=orm.Dict,
                    serializer=EwaldFilterOptions.serialise,
                    required=False,
-                   help=f'Parameters for controlling filtering structure using Ewald summation\n{EwaldFilterOptions.get_description()}')
+                   help=f'Parameters for controlling filtering structure using Ewald summation:\n{EwaldFilterOptions.get_description()}')
         spec.input('structure', valid_type=orm.StructureData)
         spec.input('rattle', valid_type=orm.Float, help='Amplitude of rattling', default=lambda: orm.Float(0.05))
-        spec.input('final_li_level',
-                   valid_type=orm.Float,
-                   help='Final lithiation level with respect to the reduced formula of the non-Li part of the composition.')
+        spec.input(
+            'final_li_level',
+            valid_type=orm.Float,
+            help=
+            ('Final lithiation level with respect to the reduced formula of the non-Li part of the composition. '
+             'For example, if the formula is Li3O2, then the non-Li part is O2, whose reduced formula is O, hence this composition has a Li level of 3.'
+            ))
         spec.input(
             'lithiated_calc_misc',
             valid_type=orm.Dict,
@@ -75,15 +89,23 @@ class VoltageCurveWorkChain(WorkChain):
             'li_metal_calc_misc',
             valid_type=orm.Dict,
             required=True,
-            help='The misc output of a reference calculation for Li metal',
+            help='The `misc` output of a reference calculation for Li metal',
         )
-        spec.input('atol', required=False, valid_type=orm.Float, help='Symmetry torlerance for generating unique structures.')
+        spec.input('atol', required=False, valid_type=orm.Float, help='Symmetry tolerance for generating unique structures.')
         spec.input(
             'ldau_mapping',
             required=True,  # I set it to be mandatory here as in most cases we will need a U
-            help='Mapping for LDA+U, see `get_ldau_keys` function for details',
+            help="""Settings for assign LDA+U related settings according to the input structure.
+
+    mapping: a dictionary in the format of  {"Mn": [d, 4]...} for U
+    utype: the type of LDA+U, default to 2, which is the one with only one parameter
+    jmapping: a dictionary in the format of  {"Mn": [d, 4]...} but for J
+    felec: Wether we are dealing with f electrons, will increase lmaxmix if we are.""",
             valid_type=orm.Dict)
-        spec.input('deli_magmom_mapping', required=True, help='Mapping for MAGMOM for the delithiated state', valid_type=orm.Dict)
+        spec.input('deli_magmom_mapping',
+                   required=True,
+                   help='Mapping for MAGMOM for the delithiated state. For example: {"Fe": 5.0, "Co": 3.0}.',
+                   valid_type=orm.Dict)
         spec.outline(
             cls.setup,
             if_(cls.should_run_initial_relax)(
@@ -163,7 +185,6 @@ class VoltageCurveWorkChain(WorkChain):
 
     def generate_delithiated_structures(self):
         """Delithiate the structure at a range of Li concentrations"""
-        from aiida_user_addons.process.battery import create_delithiated_multiple_level
         structure = self.ctx.current_structure
         params = {}
         if 'atol' in self.inputs:
