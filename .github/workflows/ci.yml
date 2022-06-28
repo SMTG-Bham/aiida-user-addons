@@ -50,7 +50,7 @@ jobs:
       - name: Install AiiDA
         run: pip install 'aiida-core~=2.0'
       - name: Install aiida-vasp develop
-        run: pip install -e git+https://github.com/aiida-vasp/aiida-vasp@develop
+        run: pip install -e git+https://github.com/aiida-vasp/aiida-vasp@develop#egg=aiida-vasp
       - name: Install package
         run: |
           pip install -e .
