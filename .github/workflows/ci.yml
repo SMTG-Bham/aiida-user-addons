@@ -11,9 +11,22 @@ jobs:
         image: rabbitmq:latest
         ports:
           - 5672:5672
+      postgres:
+        image: postgres:10
+        env:
+          POSTGRES_DB: test_aiida
+          POSTGRES_PASSWORD: ''
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     strategy:
       matrix:
-        python: ['3.7', '3.8', '3.9']
+        python: ['3.8', '3.9', '3.10']
     steps:
       - uses: actions/checkout@v2
 
@@ -30,24 +43,17 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python }}
-      - name: Install system dependencies
-        run: |
-          sudo apt update
-          sudo apt install postgresql
       - name: Upgrade pip
         run: |
           pip install --upgrade pip
           pip --version
-      - name: Install wheel
-        run: pip install wheel
       - name: Install AiiDA
-        run: pip install 'aiida-core>=1.6.1,<2'
-      - name: Install aiida-vasp
-        run: pip install -e git+https://github.com/zhubonan/aiida-vasp@bz-changes#egg=aiida-vasp[tests]
+        run: pip install 'aiida-core~=2.0'
+      - name: Install aiida-vasp develop
+        run: pip install -e git+https://github.com/aiida-vasp/aiida-vasp@develop
       - name: Install package
         run: |
           pip install -e .
-          reentry scan -r aiida
       - name: Record python dependencies
         run: pip freeze
       - name: Run pytest
