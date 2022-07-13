@@ -366,13 +366,17 @@ class VoltageCurve:
         all_comps.sort(key=lambda x: x[self.working_ion] / x.num_atoms, reverse=True)
         return all_comps
 
+    @property
+    def average_voltage(self):
+        """Return the average voltage between most lithiated and delithiated phases."""
+        return voltage_between_pair(self.stable_entries[0], self.stable_entries[-1], self.ref_entry, self.working_ion)
+
     def __repr__(self):
 
         formula = self.entries[0].composition.reduced_formula
         nentry = len(self.entries)
         output = f'VoltageCurve for {formula} with {nentry} entries'
-        avgvol = voltage_between_pair(self.entries[0], self.entries[-1], self.ref_entry, self.working_ion)
-        output += f'\nAverage voltage: {avgvol:.3f}\nCompositions: (* stable)'
+        output += f'\nAverage voltage: {self.average_voltage:.3f}\nCompositions: (* stable)'
         # Find the compositions
         all_comps = self.included_compositions
         stable_comps = self.stable_compositions

@@ -32,7 +32,7 @@ class TheoreticalCathode:
         Instantiate a theoretical cathode.
         Args:
             comp (Composition, str): Composition of the lithiated cathode
-            nli (float): Number of Li that can be extracted per composition
+            nli (float): Number of Li that can be extracted per composition.
         """
         self._label = label
         self.structure = structure
