@@ -119,7 +119,7 @@ def read_stream(stream):
 
 
 @calcfunction
-def structure_from_res(resfile):
+def structure_from_res(resfile: SinglefileData) -> StructureData:
     """Return a structure from a given SHRELX file"""
     lines = resfile.get_object_content(resfile.filename).split('\n')
     title, atoms = read_res(lines)
@@ -130,7 +130,7 @@ def structure_from_res(resfile):
     return out
 
 
-def import_res(fname: Union[str, Path]):
+def import_res(fname: Union[str, Path]) -> StructureData:
     """Import and SHELX file into the database - store the original data"""
 
     data = SinglefileData(Path(fname).resolve())

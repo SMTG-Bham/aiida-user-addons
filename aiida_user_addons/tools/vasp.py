@@ -1,6 +1,7 @@
 """
 Module for VASP related stuff
 """
+from multiprocessing.sharedctypes import Value
 import shutil
 import tempfile
 import re
@@ -151,14 +152,19 @@ def pmg_vasprun(node, parse_xml=True, parse_potcar_file=False, parse_outcar=True
 
 def export_relax(work, dst, include_potcar=False, decompress=False):
     """
-    Export a relaxation workflow
+    Export a relaxation workflow (e.g. VaspRelaxWorkChain)
 
     This function exports a series of relaxation calculations in sub-folders
     """
     from aiida.orm import Node, QueryBuilder, StructureData, CalcFunctionNode, WorkChainNode
+    from aiida_vasp.workchains.relax import RelaxWorkChain
+    from aiida_user_addons.vworkflows.relax import VaspRelaxWorkChain
 
     dst = Path(dst)
     dst.mkdir(exist_ok=True)
+    if not isinstance(work, (VaspRelaxWorkChain, RelaxWorkChain)):
+        raise ValueError(f'Error {work} should be `VaspRelaxWorkChain` or `RelaxWorkChain`, but it is {work.process_class}')
+
     q = QueryBuilder()
     q.append(Node, filters={'id': work.pk})
     q.append(WorkChainNode, tag='vaspwork', project=['id', '*'])
@@ -182,7 +188,7 @@ def export_relax(work, dst, include_potcar=False, decompress=False):
         try:
             out_structure = work.inputs.outputs.relax.structure
         except AttributeError:
-            print('Cannot find the output structure - skipping.')
+            print('Cannot find the output structure - skipping. This usually means that the relaxation did not finish without error.')
             out_structure = None
     if out_structure:
         poscar_parser = PoscarParser(data=out_structure, precision=10)

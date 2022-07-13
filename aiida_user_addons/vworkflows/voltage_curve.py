@@ -300,22 +300,21 @@ def compose_voltage_curve_data(li_ref_misc, **miscs):
     The supplied misc nodes should includes those of all the lithiated and the delithiated
     structures.
     """
-
     entries = []
     for _, misc in miscs.items():
 
         # Locate the workchain node it is the relaxation that returned this MISC
         q = orm.QueryBuilder()
-        q.append(VaspRelaxWorkChain, project=['*'])
+        q.append(orm.CalcJobNode, project=['*'])
         q.append(orm.Node, filters={'id': misc.pk})
-        workchain = q.one()[0]
+        calc = q.one()[0]
 
-        entry = get_entry_from_calc(workchain)
+        entry = get_entry_from_calc(calc)
         entries.append(entry)
 
     # Locate the reference calculations
     q = orm.QueryBuilder()
-    q.append(orm.CalculationNode, project=['*'])
+    q.append(orm.CalcJobNode, project=['*'])
     q.append(orm.Node, filters={'id': li_ref_misc.pk})
     ref_calc = q.one()[0]
     ref_entry = get_entry_from_calc(ref_calc)
