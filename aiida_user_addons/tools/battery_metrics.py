@@ -75,8 +75,8 @@ class TheoreticalCathode:
         return self._label if self._label else self.formula
 
     def __repr__(self):
-        string = 'Cathode:{}, with maximum {} Li extaction ({} possible in practice)'.format(self.comp.reduced_formula, self.nli,
-                                                                                             self.cycle_factor)
+        string = 'Cathode:{}, with maximum {} Li extaction (out of which {} can be extracted)'.format(
+            self.comp.reduced_formula, self.nli, self.cycle_factor * self.nli)
         return string
 
 
