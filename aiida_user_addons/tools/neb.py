@@ -1,7 +1,7 @@
 """
 Some tools for parsing data from NEB calculations
 """
-from typing import Union, TextIO
+from typing import Tuple, Union, TextIO
 from pathlib import Path
 from typing import Union
 import numpy as np
@@ -160,3 +160,31 @@ def get_neb_trajectory(poscar: Union[str, Path, TextIO], outcar: Union[str, Path
         frames.append(new_atoms)
         tangents.append(tangent_atoms)
     return frames, tangents
+
+
+def fix_going_through_pbc_(atoms: Atoms, atoms_ref: Atoms) -> Tuple[Atoms, np.ndarray]:
+    """
+    Reorder the atoms to that of the reference.
+
+    Only works for identical or nearly identical structures that are ordered differently.
+    Returns a new `Atoms` object with order similar to that of `atoms_ref` as well as the sorting indices.
+    """
+
+    # Find distances
+    acombined = atoms_ref.copy()
+    acombined.extend(atoms)
+    new_index = []
+    # Get piece-wise MIC distances
+    jidx = list(range(len(atoms), len(atoms) * 2))  # Through the structure to be fixed
+    for i in range(len(atoms)):
+        dists = acombined.get_distances(i, jidx, mic=True)
+        # Find the index of the atom with the smallest distance
+        min_idx = np.where(dists == dists.min())[0][0]
+        new_index.append(min_idx)
+        # Fix the displacement - ensure that it is reference to the reference atom
+        # Distance from the match site in the input atoms to that of the reference atom
+        disp = acombined.get_distance(i, min_idx + len(atoms), mic=True, vector=True)
+        # Position of the atom using the displacement vector and the original structure in the reference atoms
+        acombined.positions[min_idx] = acombined.positions[i] + disp
+    assert len(set(new_index)) == len(atoms), 'The detected mapping is not unique!'
+    return acombined[new_index], new_index
