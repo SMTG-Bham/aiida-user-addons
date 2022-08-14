@@ -13,8 +13,19 @@ class DictWrapper(UserDict):
     Wraps around an Dict node, saved or not, to allow python dict-like in place modifications.
     """
 
-    def __init__(self, node, namespace=None, port=None, target_namespace=None):
-        """Wrapper around a Dict node"""
+    def __init__(self, node, namespace=None, port=None):
+        """
+        Wrapper around a ``Dict`` node. Optionally also include a namespace and a port that the
+        underlying Node should be assigned to.
+        The wrapped ``Dict`` node is never update in practice and only used as an initial reference data.
+        If there is no change, the same Dict node will be passed as it is under the ``node`` property.
+
+        :param node: The node to be wrapped.
+        :param namespace: The namespace that the node should be assigned to.
+        :param port: The port under the namespace.
+
+        A new node is created whenever necessary.
+        """
         super().__init__()
 
         self._stored_node = node
