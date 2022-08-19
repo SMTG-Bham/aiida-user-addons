@@ -439,6 +439,7 @@ class VaspConvUpdater(VaspBuilderUpdater):
     WF_ENTRYPOINT = 'vaspu.converge'
 
     def update_from_config(self, structure: orm.StructureData, config: dict):
+        """Update from a configuration dictionary"""
         super().update_from_config(structure, config)
         self.use_conv_settings(**config.get('conv_settings', {}))
         return self

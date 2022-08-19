@@ -4,7 +4,7 @@ hiphive related tools
 from aiida.engine import calcfunction
 from aiida import orm
 
-from ase.build.supercell import make_supercell
+from ase.build.supercells import make_supercell
 from hiphive.structure_generation import generate_mc_rattled_structures
 
 
