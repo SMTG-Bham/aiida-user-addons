@@ -361,7 +361,7 @@ class VaspBuilderUpdater(BuilderUpdater):
         self.update_resources(**config.get('resources', {}))
         if 'settings' in config:
             self.update_settings(**config['settings'])
-        self.set_label(f'{structure.label} CONV')
+        self.set_label(f'{structure.label}')
         return self
 
     @classmethod
@@ -437,6 +437,19 @@ def builder_to_dict(builder, unpack=True):
 class VaspConvUpdater(VaspBuilderUpdater):
     """Update for VaspConvergenceWorkChain"""
     WF_ENTRYPOINT = 'vaspu.converge'
+
+    def update_from_config(self, structure: orm.StructureData, config: dict):
+        super().update_from_config(structure, config)
+        self.use_conv_settings(**config.get('conv_settings', {}))
+        return self
+
+    def use_conv_settings(self, **kwargs):
+        """
+        Use the supplied convergence settings
+        """
+        from aiida_user_addons.vworkflows.new_conv import ConvOptions
+        opts = ConvOptions(**kwargs)
+        self.builder.conv_settings = opts.to_aiida_dict()
 
 
 class VaspBandUpdater(VaspBuilderUpdater):
