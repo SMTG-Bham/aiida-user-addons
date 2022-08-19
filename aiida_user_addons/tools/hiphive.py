@@ -5,13 +5,14 @@ from aiida.engine import calcfunction
 from aiida import orm
 
 from ase.build.supercells import make_supercell
+from ase.build import sort
 from hiphive.structure_generation import generate_mc_rattled_structures
 
 
 @calcfunction
 def generate_rattle(prim, n_structures, cell_size, rattle_std, min_dist, **kwargs):
     """Generate rattled structure using MC"""
-    atoms_ideal = make_supercell(prim.get_ase(), cell_size.get_list())  # supercell reference structure
+    atoms_ideal = sort(make_supercell(prim.get_ase(), cell_size.get_list()))  # supercell reference structure
     if 'seed' in kwargs:
         seed = kwargs['seed'].value
     else:
