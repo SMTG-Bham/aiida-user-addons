@@ -12,6 +12,7 @@ Inputs
 No added wrapper etc.
 """
 
+from unittest.mock import DEFAULT
 import aiida.orm as orm
 from aiida.engine import WorkChain, append_, calcfunction
 from aiida.plugins import WorkflowFactory
@@ -335,3 +336,30 @@ def plot_conv_data(cdf, kdf, **kwargs):
         fig.tight_layout()
 
     return figs
+
+
+def get_convergence_builder(structure, config):
+    """
+    Short cut for getting an VaspBuilderUpdater ready to use
+
+    :structure StructureData: The input structure node.
+    :config dict: Configuration dictionary specifying the protocol.
+
+    The following files are used from the configuration: ``code``, ``inputset``, ``conv``, ``options``, ``resources``.
+    """
+    from aiida_user_addons.common.builder_updater import VaspBuilderUpdater
+    from aiida.orm import Code
+    conv_builder = VaspConvergenceWorkChain.get_builder()
+
+    upd = VaspBuilderUpdater(conv_builder)
+    upd.use_inputset(structure, config.get('inputset', VaspBuilderUpdater.DEFAULT_SET), overrides=config.get('overrides', {}))
+    upd.set_code(Code.get_from_string(config['code']))
+
+    upd.set_default_options(**config.get('options', {}))
+    upd.update_resources(**config.get('resources', {}))
+    upd.set_label(f'{structure.label} CONV')
+
+    # Convergence specific options
+    conv = ConvOptions(**config.get('conv', {}))
+    upd.builder.conv_settings = conv.to_aiida_dict()
+    return upd

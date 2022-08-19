@@ -85,6 +85,8 @@ class RelaxationAnalyser:
         traj = []
         for work in sorted(self.node.called, key=lambda x: x.mtime):
             for calc in sorted(work.called, key=lambda x: x.mtime):
+                if not calc.is_finished:
+                    break
                 with open_compressed(calc.outputs.retrieved, 'vasprun.xml', mode='rb') as handle_source:
                     with open(tempdir / 'vasprun.xml', 'wb') as handle_destination:
                         shutil.copyfileobj(handle_source, handle_destination)
