@@ -16,7 +16,7 @@ from aiida.orm.nodes.data.base import to_aiida_type
 from aiida.plugins import WorkflowFactory
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import InputValidationError
-from aiida_user_addons.common.opthold import OptionHolder, typed_field, required_field
+from aiida_user_addons.common.opthold import IntOption, ListOption, OptionContainer, OptionHolder, ListOrStringOption, FloatOption
 from aiida.engine import calcfunction
 from aiida_phonopy.common.utils import (
     get_force_constants,
@@ -473,18 +473,13 @@ def collect_castep_forces_and_energies(ctx, ctx_supercells, prefix='force_calc',
     return forces_dict
 
 
-class PhononSettings(OptionHolder):
+class PhononSettings(OptionContainer):
     """Options for phonon_settings input"""
-    _allowed_options = ('supercell_matrix', 'mesh', 'distance', 'primitive_matrix', 'magmom')
-    _allowed_empty_fields = ('magmom', 'distance')
-    supercell_matrix = required_field('supercell_matrix', (list,), 'Supercell matrix for phonons')
-    primitive_matrix = typed_field('primitive_matrix', (list, str), 'primitive matrix for phonons', 'auto')
-    mesh = required_field('mesh', (int,), 'Mesh for phonon calculation')
-    magmom = typed_field('magmom', (list,), 'Starting magnetic moments', None)
-    distance = typed_field('distance', (
-        float,
-        int,
-    ), 'Distance for band structure', None)
+    supercell_matrix = ListOption('Supercell matrix for phonons', required=True)
+    primitive_matrix = ListOrStringOption('Primitive matrix for phonons, can be set to "auto"', required=True, enforce_type=True)
+    mesh = IntOption('Mesh for phonon calculation', required=True)
+    magmom = ListOption('Starting magnetic moments for phonopy', required=False)
+    distance = FloatOption('Distance for band structure', required=False)
 
 
 def nested_update(dict_in, update_dict):

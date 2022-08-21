@@ -34,7 +34,7 @@ from typing import Union, List
 from pprint import pprint
 from warnings import warn
 from aiida_user_addons.common.inputset.vaspsets import VASPInputSet
-from aiida_user_addons.vworkflows.relax import RelaxOptionsNew
+from aiida_user_addons.vworkflows.relax import RelaxOptions
 from aiida.engine.processes.builder import ProcessBuilder
 import aiida.orm as orm
 
@@ -394,9 +394,9 @@ class VaspRelaxUpdater(VaspBuilderUpdater):
     def update_relax_settings(self, **kwargs):
         """Set/update RelaxOptions controlling the operation of the workchain"""
         if self.namespace_relax.relax_settings is None:
-            current_options = RelaxOptionsNew()
+            current_options = RelaxOptions()
         else:
-            current_options = RelaxOptionsNew(**self.namespace_relax.relax_settings.get_dict())
+            current_options = RelaxOptions(**self.namespace_relax.relax_settings.get_dict())
         for key, value in kwargs.items():
             setattr(current_options, key, value)
         self.namespace_relax.relax_settings = current_options.to_aiida_dict()
@@ -404,7 +404,7 @@ class VaspRelaxUpdater(VaspBuilderUpdater):
 
     def clear_relax_settings(self):
         """Reset any existing relax options"""
-        self.root_namespace.relax_settings = RelaxOptionsNew().to_aiida_dict()
+        self.root_namespace.relax_settings = RelaxOptions().to_aiida_dict()
         return self
 
     def update_from_config(self, structure: orm.StructureData, config: dict):

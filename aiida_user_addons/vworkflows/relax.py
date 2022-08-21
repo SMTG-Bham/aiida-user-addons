@@ -38,7 +38,7 @@ from aiida_vasp.utils.workchains import compose_exit_code
 from sqlalchemy.sql.sqltypes import Float
 
 from .mixins import WithVaspInputSet
-from ..common.opthold import BoolOption, OptionHolder, typed_field, OptionContainer, IntOption, FloatOption, ChoiceOption, StringOption
+from ..common.opthold import BoolOption, OptionContainer, IntOption, FloatOption, ChoiceOption, StringOption
 from .common import OVERRIDE_NAMESPACE, site_magnetization_to_magmom, nested_update_dict_node, nested_update
 
 __version__ = '0.4.0'
@@ -81,9 +81,9 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
                    """)
         spec.input('relax_settings',
                    valid_type=get_data_class('dict'),
-                   validator=RelaxOptionsNew.validate_dict,
+                   validator=RelaxOptions.validate_dict,
                    serializer=to_aiida_type,
-                   help=RelaxOptionsNew.get_description())
+                   help=RelaxOptions.get_description())
         spec.input('verbose', required=False, help='Increased verbosity.', valid_type=orm.Bool, serializer=to_aiida_type)
         spec.exit_code(0, 'NO_ERROR', message='the sun is shining')
         spec.exit_code(300,
@@ -674,7 +674,7 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
     @classproperty
     def relax_option_class(cls):  # pylint: disable=no-self-argument
         """Class for relax options"""
-        return RelaxOptionsNew
+        return RelaxOptions
 
 
 def compare_structures(structure_a, structure_b):
@@ -720,7 +720,7 @@ def compare_structures(structure_a, structure_b):
     return delta
 
 
-class RelaxOptionsNew(OptionContainer):
+class RelaxOptions(OptionContainer):
 
     algo = ChoiceOption('The algorithm to use for relaxation', ['cg', 'rd'], default_value='cg')
     energy_cutoff = FloatOption('The cut off energy difference when the relaxation is stopped (e.g. EDIFF)',
@@ -764,77 +764,77 @@ class RelaxOptionsNew(OptionContainer):
             raise InputValidationError("Cannot set both 'force_cutoff' and 'energy_cutoff'")
 
 
-class RelaxOptions(OptionHolder):
-    """
-    Options for relaxations
+# class RelaxOptions(OptionHolder):
+#     """
+#     Options for relaxations
 
-    DEPRECATED
-    """
-    _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps', 'positions', 'shape', 'volume', 'convergence_on',
-                        'convergence_mode', 'convergence_volume', 'convergence_absolute', 'convergence_max_iterations',
-                        'convergence_positions', 'convergence_shape_lengths', 'convergence_shape_angles', 'perform', 'reuse',
-                        'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock', 'clean_reuse', 'keep_sp_workdir')
-    _allowed_empty_fields = ('energy_cutoff', 'force_cutoff', 'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock'
-                            )  # Either one of them should be set if convergence is on
+#     DEPRECATED
+#     """
+#     _allowed_options = ('algo', 'energy_cutoff', 'force_cutoff', 'steps', 'positions', 'shape', 'volume', 'convergence_on',
+#                         'convergence_mode', 'convergence_volume', 'convergence_absolute', 'convergence_max_iterations',
+#                         'convergence_positions', 'convergence_shape_lengths', 'convergence_shape_angles', 'perform', 'reuse',
+#                         'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock', 'clean_reuse', 'keep_sp_workdir')
+#     _allowed_empty_fields = ('energy_cutoff', 'force_cutoff', 'hybrid_calc_bootstrap', 'hybrid_calc_bootstrap_wallclock'
+#                             )  # Either one of them should be set if convergence is on
 
-    algo = typed_field('algo', (str,), 'The algorithm to use for relaxation.', 'cg')
-    energy_cutoff = typed_field('energy_cutoff', (float,), """
-    The cutoff that determines when the relaxation is stopped (eg. EDIFF)
-    """, None)
-    force_cutoff = typed_field(
-        'force_cutoff', (float,), """
-            The cutoff that determines when the relaxation procedure is stopped. In this
-            case it stops when all forces are smaller than than the
-            supplied value.
-    """, 0.03)
-    steps = typed_field('steps', (int,), 'Number of relaxation steps to perform (eg. NSW)', 60)
-    positions = typed_field('positions', (bool,), 'If True, perform relaxation of the atomic positions', True)
-    shape = typed_field('shape', (bool,), 'If True, perform relaxation of the cell shape', True)
-    volume = typed_field('volume', (bool,), 'If True, perform relaxation of the cell volume', True)
+#     algo = typed_field('algo', (str,), 'The algorithm to use for relaxation.', 'cg')
+#     energy_cutoff = typed_field('energy_cutoff', (float,), """
+#     The cutoff that determines when the relaxation is stopped (eg. EDIFF)
+#     """, None)
+#     force_cutoff = typed_field(
+#         'force_cutoff', (float,), """
+#             The cutoff that determines when the relaxation procedure is stopped. In this
+#             case it stops when all forces are smaller than than the
+#             supplied value.
+#     """, 0.03)
+#     steps = typed_field('steps', (int,), 'Number of relaxation steps to perform (eg. NSW)', 60)
+#     positions = typed_field('positions', (bool,), 'If True, perform relaxation of the atomic positions', True)
+#     shape = typed_field('shape', (bool,), 'If True, perform relaxation of the cell shape', True)
+#     volume = typed_field('volume', (bool,), 'If True, perform relaxation of the cell volume', True)
 
-    convergence_on = typed_field('convergence_on', (bool,), 'If True, perform convergence checks within the workchain', True)
-    convergence_absolute = typed_field('convergence_absolute', (bool,), 'If True, use absolute value for convergence checks where possible',
-                                       False)
-    convergence_max_iterations = typed_field('convergence_max_iterations', (int,), 'Maximum iterations for convergence checking', 5)
-    convergence_volume = typed_field('convergence_volume', (float,),
-                                     'The cutoff value for the convergence check on volume, between input and output structure', 0.01)
-    convergence_positions = typed_field('convergence_positions', (float,),
-                                        ('The cutoff value for the convergence check on positions, in AA regardless'
-                                         'of the value of ``convergence_absolute``.'
-                                         'NOTE: This check is done between input and output structure.'), 0.1)
-    convergence_shape_lengths = typed_field(
-        'convergence_shape_lengths', (float,),
-        'The cut off value for the convergence check on the lengths of the unit cell vectors, between input and output structure.', 0.1)
-    convergence_shape_angles = typed_field(
-        'convergence_shape_angles', (float,),
-        'The cut off value for the convergence check on the angles of the unit cell vectors, between input and output structure.', 0.1)
-    convergence_mode = typed_field('convergence_mode', (str,), 'Mode of the convergence - select from \'inout\' and \'last\'', 'inout')
-    reuse = typed_field('reuse', (bool,), 'Whether reuse the previous calculation by copying over the remote folder.', False)
-    clean_reuse = typed_field('clean_reuse', (bool,), 'Whether to perform a final cleaning of the reused calculations.', True)
-    keep_sp_workdir = typed_field('keep_sp_workdir', (bool,), 'Whether to keep the workdir of the final singlepoint calculation', False)
-    perform = typed_field(
-        'perform',
-        (bool,),
-        'Wether to perform the relaxation or not',
-        True,
-    )
-    hybrid_calc_bootstrap = typed_field('hybrid_calc_bootstrap', (bool,),
-                                        'Wether to bootstrap hybrid calculation by performing standard DFT first', None)
-    hybrid_calc_bootstrap_wallclock = typed_field('hybrid_calc_bootstrap_wallclock', (int,),
-                                                  'Wallclock limit in second for the bootstrap calculation', None)
+#     convergence_on = typed_field('convergence_on', (bool,), 'If True, perform convergence checks within the workchain', True)
+#     convergence_absolute = typed_field('convergence_absolute', (bool,), 'If True, use absolute value for convergence checks where possible',
+#                                        False)
+#     convergence_max_iterations = typed_field('convergence_max_iterations', (int,), 'Maximum iterations for convergence checking', 5)
+#     convergence_volume = typed_field('convergence_volume', (float,),
+#                                      'The cutoff value for the convergence check on volume, between input and output structure', 0.01)
+#     convergence_positions = typed_field('convergence_positions', (float,),
+#                                         ('The cutoff value for the convergence check on positions, in AA regardless'
+#                                          'of the value of ``convergence_absolute``.'
+#                                          'NOTE: This check is done between input and output structure.'), 0.1)
+#     convergence_shape_lengths = typed_field(
+#         'convergence_shape_lengths', (float,),
+#         'The cut off value for the convergence check on the lengths of the unit cell vectors, between input and output structure.', 0.1)
+#     convergence_shape_angles = typed_field(
+#         'convergence_shape_angles', (float,),
+#         'The cut off value for the convergence check on the angles of the unit cell vectors, between input and output structure.', 0.1)
+#     convergence_mode = typed_field('convergence_mode', (str,), 'Mode of the convergence - select from \'inout\' and \'last\'', 'inout')
+#     reuse = typed_field('reuse', (bool,), 'Whether reuse the previous calculation by copying over the remote folder.', False)
+#     clean_reuse = typed_field('clean_reuse', (bool,), 'Whether to perform a final cleaning of the reused calculations.', True)
+#     keep_sp_workdir = typed_field('keep_sp_workdir', (bool,), 'Whether to keep the workdir of the final singlepoint calculation', False)
+#     perform = typed_field(
+#         'perform',
+#         (bool,),
+#         'Wether to perform the relaxation or not',
+#         True,
+#     )
+#     hybrid_calc_bootstrap = typed_field('hybrid_calc_bootstrap', (bool,),
+#                                         'Wether to bootstrap hybrid calculation by performing standard DFT first', None)
+#     hybrid_calc_bootstrap_wallclock = typed_field('hybrid_calc_bootstrap_wallclock', (int,),
+#                                                   'Wallclock limit in second for the bootstrap calculation', None)
 
-    @classmethod
-    def validate_dict(cls, input_dict, port=None):
-        """Validate the input dictionary"""
-        super().validate_dict(input_dict, port)
-        if isinstance(input_dict, orm.Dict):
-            input_dict = input_dict.get_dict()
-        force_cut = input_dict.get('force_cutoff')
-        energy_cut = input_dict.get('energy_cutoff')
-        if force_cut is None and energy_cut is None:
-            raise InputValidationError("Either 'force_cutoff' or 'energy_cutoff' should be supplied")
-        if (force_cut is not None) and (energy_cut is not None):
-            raise InputValidationError("Cannot set both 'force_cutoff' and 'energy_cutoff'")
+#     @classmethod
+#     def validate_dict(cls, input_dict, port=None):
+#         """Validate the input dictionary"""
+#         super().validate_dict(input_dict, port)
+#         if isinstance(input_dict, orm.Dict):
+#             input_dict = input_dict.get_dict()
+#         force_cut = input_dict.get('force_cutoff')
+#         energy_cut = input_dict.get('energy_cutoff')
+#         if force_cut is None and energy_cut is None:
+#             raise InputValidationError("Either 'force_cutoff' or 'energy_cutoff' should be supplied")
+#         if (force_cut is not None) and (energy_cut is not None):
+#             raise InputValidationError("Cannot set both 'force_cutoff' and 'energy_cutoff'")
 
 
 def get_step_structure(traj, step):

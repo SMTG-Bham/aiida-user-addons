@@ -2,6 +2,7 @@
 Module containing the OptionHolder class
 """
 from typing import Tuple, List
+from warnings import warn
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.exceptions import InputValidationError
 
@@ -60,7 +61,12 @@ class TypedOption(Option):
     target_type = bool
 
     def __init__(self, docstring, default_value=None, required=False, enforce_type=False):
-        """Instantiate an TypedOption field"""
+        """
+        Instantiate an TypedOption field
+
+        If ``enforce_type`` is True, will strictly check the type of the passed value.
+        Otherwise, the value will be converted into the target type using the default constructor.
+        """
         super().__init__(docstring, default_value, required)
         self.enforce_type = enforce_type
 
@@ -122,6 +128,11 @@ class DictOption(TypedOption):
 class ListOption(TypedOption):
     """Class for an option that accepts a list"""
     target_type = list
+
+
+class ListOrStringOption(TypedOption):
+    """Class for an option that accepts a list"""
+    target_type = (list, str)
 
 
 class StringOption(TypedOption):
@@ -361,6 +372,7 @@ def required_field(name, types, doc):
 
 class OptionHolder(object):
     """
+    DEPRECATED.
     A container for holding a dictionary of options.
 
     Valid options can be set using the standard `obj.<option> = <value>` syntax.
@@ -400,6 +412,8 @@ class OptionHolder(object):
         # Set the attributes
         for key, value in kwargs.items():
             setattr(self, key, value)
+
+        warn('OptionHolder is deprecated and superseeded by OptionContainer', DeprecationWarning, stacklevel=2)
 
     def _get_opt_dict(self):
         return self._opt_data

@@ -19,23 +19,17 @@ Note that VASP does not seems to allow having the `self-consistent` response, as
 `LDAUTYPE` tags is used for both the `alpha` term and the `U/J` terms.
 In principles this should be possible, by altering the source code?
 """
-from typing import Dict
-from aiida.orm.nodes.process import calculation
-from ase.atoms import default
 import numpy as np
 
 from ase.build import make_supercell
 from ase.build import sort
 
 import aiida.orm as orm
-from aiida.common.links import LinkType
-from aiida.engine import WorkChain, if_, append_, calcfunction
+from aiida.engine import WorkChain, append_, calcfunction
 from aiida.plugins import WorkflowFactory
-from numpy.core.fromnumeric import nonzero
-from reentry.config import make_config_parser
 
 from ..common.repository import open_compressed
-from ..common.opthold import BoolOption, OptionHolder, DictOption, ListOption, typed_field, OptionContainer, IntOption, FloatOption, ChoiceOption, StringOption
+from ..common.opthold import DictOption, ListOption, OptionContainer, IntOption
 
 
 class LinearResponseUOptions(OptionContainer):
