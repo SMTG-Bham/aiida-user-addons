@@ -149,13 +149,19 @@ def get_neb_trajectory(poscar: Union[str, Path, TextIO], outcar: Union[str, Path
     tangents = []
     excluded = ['tangents', 'stress_matrix']
     for frame in outcar_data['frames']:
-        new_atoms = Atoms(symbols=species, scaled_positions=frame['outcar-positions'], cell=frame['outcar-cell'], pbc=True)
+        new_atoms = Atoms(symbols=species, positions=frame['outcar-positions'], cell=frame.get('outcar-cell', cell), pbc=True)
         new_atoms.info.update({key: value for key, value in frame.items() if not key.startswith('outcar') and key not in excluded})
-        calc = SinglePointCalculator(energy=frame['energy_extrapolated'], forces=frame['outcar-forces'], stress=frame['stress_matrix'])
+        calc = SinglePointCalculator(atoms=new_atoms,
+                                     energy=frame['energy_extrapolated'],
+                                     forces=frame['outcar-forces'],
+                                     stress=frame['stress_matrix'])
         new_atoms.calc = calc
 
         tangent_atoms = new_atoms.copy()
-        calc = SinglePointCalculator(energy=frame['energy_extrapolated'], forces=frame['tangents'], stress=frame['stress_matrix'])
+        calc = SinglePointCalculator(atoms=tangent_atoms,
+                                     energy=frame['energy_extrapolated'],
+                                     forces=frame['tangents'],
+                                     stress=frame['stress_matrix'])
         tangent_atoms.calc = calc
         frames.append(new_atoms)
         tangents.append(tangent_atoms)
