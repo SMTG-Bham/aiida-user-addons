@@ -36,6 +36,7 @@ from warnings import warn
 from aiida_user_addons.common.inputset.vaspsets import VASPInputSet
 from aiida_user_addons.vworkflows.relax import RelaxOptions
 from aiida.engine.processes.builder import ProcessBuilder
+from aiida.common.extendeddicts import AttributeDict
 import aiida.orm as orm
 
 from toolchest.aiidautils.dictwrap import DictWrapper
@@ -123,6 +124,11 @@ class VaspBuilderUpdater(BuilderUpdater):
         self.parameters_wrapped = None
         self.options_wrapped = None
         self.settings_wrapped = None
+
+    @property
+    def reference_structure(self):
+        """Reference structure used for setting kpoints and other stuff"""
+        return self.root_namespace.structure
 
     @property
     def builder(self):
@@ -269,7 +275,7 @@ class VaspBuilderUpdater(BuilderUpdater):
     def set_kpoints_mesh(self, mesh: List[int], offset: List[float]):
         """Use mesh for kpoints"""
         kpoints = orm.KpointsData()
-        kpoints.set_cell_from_structure(self.root_namespace.structure)
+        kpoints.set_cell_from_structure(self.reference_structure)
         kpoints.set_kpoints_mesh(mesh, offset)
         self.namespace_vasp.kpoints = kpoints
         try:
@@ -370,6 +376,63 @@ class VaspBuilderUpdater(BuilderUpdater):
         from aiida.plugins import WorkflowFactory
         upd = cls(WorkflowFactory(cls.WF_ENTRYPOINT).get_builder())
         return upd.update_from_config(structure, config)
+
+
+class VaspNEBUpdater(VaspBuilderUpdater):
+
+    WF_ENTRYPOINT = 'vasp.neb'
+
+    def __init__(self, builder):
+        """Initialise the builder updater"""
+        super().__init__(builder)
+
+    @property
+    def reference_structure(self):
+        """Return the reference structure"""
+        return self.namespace_vasp.initial_structure
+
+    def use_inputset(self, initial_structure, set_name='UCLRelaxSet', overrides=None):
+
+        inset = VASPInputSet(set_name, initial_structure, overrides=overrides)
+        self.namespace_vasp.parameters = orm.Dict(dict={'incar': inset.get_input_dict()})
+        self.namespace_vasp.potential_family = orm.Str('PBE.54')
+        self.namespace_vasp.potential_mapping = orm.Dict(dict=inset.get_pp_mapping())
+        self.namespace_vasp.kpoints_spacing = orm.Float(0.05)
+        self.namespace_vasp.initial_structure = initial_structure
+        return self
+
+    def set_final_structure(self, final_structure):
+        self.namespace_vasp.final_structure = final_structure
+        return self
+
+    def set_neb_images(self, images):
+        """Set the NEB images"""
+
+        if isinstance(images, list):
+            output = {'image_{i:02d}': image for i, image in enumerate(images)}
+        elif isinstance(images, (dict, AttributeDict)):
+            output = images
+        self.namespace_vasp.neb_images = output
+        return self
+
+    def set_interpolated_images(self, nimages):
+        """
+        Interpolate images and set as inputs structures
+
+        This requires the initial and final structure to be set already.
+        This function also update the final image with PBC issue fixed.
+        """
+        from aiida_user_addons.process.transform import neb_interpolate
+        initial = self.namespace_vasp.initial_structure
+        final = self.namespace_vasp.final_structure
+        assert initial
+        assert final
+        # Generate interpolated images and fix PBC issues if applicable
+        interpolated = neb_interpolate(initial, final, orm.Int(nimages))
+        images = {key: value for key, value in interpolated.items() if not ('init' in key or 'final' in key)}
+        self.namespace_vasp.neb_images = images
+        # Update the final image
+        self.set_final_structure = interpolated['image_final']
 
 
 class VaspRelaxUpdater(VaspBuilderUpdater):
@@ -560,7 +623,7 @@ class VaspAutoPhononUpdater(VaspBuilderUpdater):
         """Use mesh for kpoints"""
         kpoints = orm.KpointsData()
         # Use the reference supercell structure
-        kpoints.set_cell_from_structure(self.root_namespace.structure)
+        kpoints.set_cell_from_structure(self.reference_structure)
         kpoints.set_kpoints_mesh(mesh, offset)
         self.namespace_vasp.kpoints = kpoints
         if self.namespace_vasp.kpoints_spacing:
