@@ -9,4 +9,3 @@ Multiply plugin
 
 .. automodule:: aiida_plugin_template.calculations.multiply
    :members:
-

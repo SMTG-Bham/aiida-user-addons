@@ -30,52 +30,50 @@ config_relax = {
 upd = VaspRelaxWorkChain.init_from_config(structure, config_relax)
 ```
 """
-from typing import Union, List
 from pprint import pprint
+from typing import List, Union
 from warnings import warn
+
+import aiida.orm as orm
+from aiida.common.extendeddicts import AttributeDict
+from aiida.engine.processes.builder import ProcessBuilder
+from toolchest.aiidautils.dictwrap import DictWrapper
+
 from aiida_user_addons.common.inputset.vaspsets import VASPInputSet
 from aiida_user_addons.vworkflows.relax import RelaxOptions
-from aiida.engine.processes.builder import ProcessBuilder
-from aiida.common.extendeddicts import AttributeDict
-import aiida.orm as orm
-
-from toolchest.aiidautils.dictwrap import DictWrapper
 
 # Template for setting options
 OPTIONS_TEMPLATES = {
-    'SGE': {
-        'resources': {
-            'tot_num_mpiprocs': 1,
-            'parallel_env': 'mpi'
-        },
-        'max_wallclock_seconds': 3600,
-        'import_sys_environment': False,
+    "SGE": {
+        "resources": {"tot_num_mpiprocs": 1, "parallel_env": "mpi"},
+        "max_wallclock_seconds": 3600,
+        "import_sys_environment": False,
     },
-    'FW': {
-        'resources': {
-            'tot_num_mpiprocs': 1,
+    "FW": {
+        "resources": {
+            "tot_num_mpiprocs": 1,
         },
-        'max_wallclock_seconds': 3600,
+        "max_wallclock_seconds": 3600,
     },
-    'SLURM': {
-        'resources': {
-            'num_machines': 1,
+    "SLURM": {
+        "resources": {
+            "num_machines": 1,
         },
-        'max_wallclock_seconds': 3600,
-        'import_sys_environment': False,
+        "max_wallclock_seconds": 3600,
+        "import_sys_environment": False,
     },
-    'ARCHER2': {
-        'resources': {
-            'tot_num_mpiprocs': 128,
-            'num_machines': 1,
+    "ARCHER2": {
+        "resources": {
+            "tot_num_mpiprocs": 128,
+            "num_machines": 1,
         },
-        'max_wallclock_seconds': 3600,
-        'import_sys_environment': False,
-        'mpirun_extra_params': ['--distribution=block:block', '--hint=nomultithread'],
-        'account': 'e05-power-dos',
-        'queue_name': 'standard',
-        'qos': 'standard',
-    }
+        "max_wallclock_seconds": 3600,
+        "import_sys_environment": False,
+        "mpirun_extra_params": ["--distribution=block:block", "--hint=nomultithread"],
+        "account": "e05-power-dos",
+        "queue_name": "standard",
+        "qos": "standard",
+    },
 }
 
 
@@ -96,12 +94,12 @@ class BuilderUpdater:
         pprint(builder_to_dict(self.builder, unpack=True))
 
 
-DEFAULT_SET = 'UCLRelaxSet'
+DEFAULT_SET = "UCLRelaxSet"
 
 
 class VaspBuilderUpdater(BuilderUpdater):
 
-    WF_ENTRYPOINT = 'vaspu.vasp'
+    WF_ENTRYPOINT = "vaspu.vasp"
     DEFAULT_SET = DEFAULT_SET
 
     def __init__(self, builder, root_namespace=None):
@@ -135,11 +133,13 @@ class VaspBuilderUpdater(BuilderUpdater):
         """The builder to be used for launching the calculation"""
         return self.root_namespace
 
-    def use_inputset(self, structure, set_name='UCLRelaxSet', overrides=None):
+    def use_inputset(self, structure, set_name="UCLRelaxSet", overrides=None):
 
         inset = VASPInputSet(set_name, structure, overrides=overrides)
-        self.namespace_vasp.parameters = orm.Dict(dict={'incar': inset.get_input_dict()})
-        self.namespace_vasp.potential_family = orm.Str('PBE.54')
+        self.namespace_vasp.parameters = orm.Dict(
+            dict={"incar": inset.get_input_dict()}
+        )
+        self.namespace_vasp.potential_family = orm.Str("PBE.54")
         self.namespace_vasp.potential_mapping = orm.Dict(dict=inset.get_pp_mapping())
         self.namespace_vasp.kpoints_spacing = orm.Float(0.05)
         self.root_namespace.structure = structure
@@ -149,17 +149,23 @@ class VaspBuilderUpdater(BuilderUpdater):
     def _initialise_parameters_wrapper(self, force=False):
         """Initialise DictWrapper for tracking INCAR tags"""
         if self.parameters_wrapped is None or force:
-            self.parameters_wrapped = DictWrapper(self.namespace_vasp.parameters, self.namespace_vasp, 'parameters')
+            self.parameters_wrapped = DictWrapper(
+                self.namespace_vasp.parameters, self.namespace_vasp, "parameters"
+            )
 
     def _initialise_options_wrapper(self, force=False):
         """Initialise DictWrapper for tracking INCAR tags"""
         if self.options_wrapped is None or force:
-            self.options_wrapped = DictWrapper(self.namespace_vasp.options, self.namespace_vasp, 'options')
+            self.options_wrapped = DictWrapper(
+                self.namespace_vasp.options, self.namespace_vasp, "options"
+            )
 
     def _initialise_settings_wrapper(self, force=False):
         """Initialise DictWrapper for tracking INCAR tags"""
         if self.settings_wrapped is None or force:
-            self.settings_wrapped = DictWrapper(self.namespace_vasp.settings, self.namespace_vasp, 'settings')
+            self.settings_wrapped = DictWrapper(
+                self.namespace_vasp.settings, self.namespace_vasp, "settings"
+            )
 
     def set_kspacing(self, kspacing: float):
         self.namespace_vasp.kpoints_spacing = orm.Float(kspacing)
@@ -172,7 +178,7 @@ class VaspBuilderUpdater(BuilderUpdater):
     @property
     def incar(self):
         """Return the INCAR dictionary"""
-        return dict(self.namespace_vasp.parameters['incar'])
+        return dict(self.namespace_vasp.parameters["incar"])
 
     @property
     def settings(self):
@@ -203,9 +209,9 @@ class VaspBuilderUpdater(BuilderUpdater):
         """Update incar tags"""
         self._initialise_parameters_wrapper()
         # Make a copy of the incar for modification
-        incar = dict(self.parameters_wrapped['incar'])
+        incar = dict(self.parameters_wrapped["incar"])
         incar.update(*args, **kwargs)
-        self.parameters_wrapped['incar'] = incar
+        self.parameters_wrapped["incar"] = incar
         return self
 
     def set_code(self, code: Union[str, orm.Code]):
@@ -227,13 +233,13 @@ class VaspBuilderUpdater(BuilderUpdater):
     def update_incar(self, *args, **kwargs):
         """Update incar tags"""
         if self.namespace_vasp.parameters is None:
-            self.namespace_vasp.parameters = orm.Dict(dict={'incar': {}})
+            self.namespace_vasp.parameters = orm.Dict(dict={"incar": {}})
 
         self._initialise_parameters_wrapper()
         # Make a copy of the incar for modification
-        incar = dict(self.parameters_wrapped['incar'])
+        incar = dict(self.parameters_wrapped["incar"])
         incar.update(*args, **kwargs)
-        self.parameters_wrapped['incar'] = incar
+        self.parameters_wrapped["incar"] = incar
         return self
 
     def set_default_options(self, **override):
@@ -258,15 +264,19 @@ class VaspBuilderUpdater(BuilderUpdater):
 
         # Use the very default settings
         if options is None:
-            warn('Using default options template - adjustment needed for the target computer')
-            options = orm.Dict(dict={
-                'resources': {
-                    'tot_num_mpiprocs': 1,
-                },
-                'max_wallclock_seconds': 3600,
-                'import_sys_environment': False,
-                **override
-            })
+            warn(
+                "Using default options template - adjustment needed for the target computer"
+            )
+            options = orm.Dict(
+                dict={
+                    "resources": {
+                        "tot_num_mpiprocs": 1,
+                    },
+                    "max_wallclock_seconds": 3600,
+                    "import_sys_environment": False,
+                    **override,
+                }
+            )
 
         self.namespace_vasp.options = options
         self._initialise_options_wrapper()
@@ -327,9 +337,9 @@ class VaspBuilderUpdater(BuilderUpdater):
         """Update resources"""
         if self.options_wrapped is None:
             self.set_default_options()
-        resources = dict(self.options_wrapped['resources'])
+        resources = dict(self.options_wrapped["resources"])
         resources.update(*args, **kwargs)
-        self.options_wrapped['resources'] = resources
+        self.options_wrapped["resources"] = resources
         return self
 
     set_resources = update_resources
@@ -350,37 +360,42 @@ class VaspBuilderUpdater(BuilderUpdater):
           - potential_mapping
         """
 
-        self.use_inputset(structure, config.get('inputset', self.DEFAULT_SET), overrides=config.get('overrides', {}))
-        self.set_code(orm.Code.get_from_string(config['code']))
+        self.use_inputset(
+            structure,
+            config.get("inputset", self.DEFAULT_SET),
+            overrides=config.get("overrides", {}),
+        )
+        self.set_code(orm.Code.get_from_string(config["code"]))
 
         # Kpoint spacing/mesh
-        if 'kspacing' in config:
-            self.set_kspacing(config['kspacing'])
-        if 'kmesh' in config:
-            self.set_kpoints_mesh(*config['kmesh'])
+        if "kspacing" in config:
+            self.set_kspacing(config["kspacing"])
+        if "kmesh" in config:
+            self.set_kpoints_mesh(*config["kmesh"])
 
         # Potential mapping
-        if 'potential_mapping' in config:
-            self.builder.potential_mapping = orm.Dict(dict=config['potential_mapping'])
+        if "potential_mapping" in config:
+            self.builder.potential_mapping = orm.Dict(dict=config["potential_mapping"])
 
-        self.set_default_options(**config.get('options', {}))
-        self.update_resources(**config.get('resources', {}))
-        if 'settings' in config:
-            self.update_settings(**config['settings'])
-        self.set_label(f'{structure.label}')
+        self.set_default_options(**config.get("options", {}))
+        self.update_resources(**config.get("resources", {}))
+        if "settings" in config:
+            self.update_settings(**config["settings"])
+        self.set_label(f"{structure.label}")
         return self
 
     @classmethod
     def init_from_config(cls, structure, config):
         """Initialise from a configuration dictionary"""
         from aiida.plugins import WorkflowFactory
+
         upd = cls(WorkflowFactory(cls.WF_ENTRYPOINT).get_builder())
         return upd.update_from_config(structure, config)
 
 
 class VaspNEBUpdater(VaspBuilderUpdater):
 
-    WF_ENTRYPOINT = 'vasp.neb'
+    WF_ENTRYPOINT = "vasp.neb"
 
     def __init__(self, builder):
         """Initialise the builder updater"""
@@ -391,11 +406,13 @@ class VaspNEBUpdater(VaspBuilderUpdater):
         """Return the reference structure"""
         return self.namespace_vasp.initial_structure
 
-    def use_inputset(self, initial_structure, set_name='UCLRelaxSet', overrides=None):
+    def use_inputset(self, initial_structure, set_name="UCLRelaxSet", overrides=None):
 
         inset = VASPInputSet(set_name, initial_structure, overrides=overrides)
-        self.namespace_vasp.parameters = orm.Dict(dict={'incar': inset.get_input_dict()})
-        self.namespace_vasp.potential_family = orm.Str('PBE.54')
+        self.namespace_vasp.parameters = orm.Dict(
+            dict={"incar": inset.get_input_dict()}
+        )
+        self.namespace_vasp.potential_family = orm.Str("PBE.54")
         self.namespace_vasp.potential_mapping = orm.Dict(dict=inset.get_pp_mapping())
         self.namespace_vasp.kpoints_spacing = orm.Float(0.05)
         self.namespace_vasp.initial_structure = initial_structure
@@ -409,7 +426,7 @@ class VaspNEBUpdater(VaspBuilderUpdater):
         """Set the NEB images"""
 
         if isinstance(images, list):
-            output = {'image_{i:02d}': image for i, image in enumerate(images)}
+            output = {"image_{i:02d}": image for i, image in enumerate(images)}
         elif isinstance(images, (dict, AttributeDict)):
             output = images
         self.namespace_vasp.neb_images = output
@@ -423,23 +440,29 @@ class VaspNEBUpdater(VaspBuilderUpdater):
         This function also update the final image with PBC issue fixed.
         """
         from aiida_user_addons.process.transform import neb_interpolate
+
         initial = self.namespace_vasp.initial_structure
         final = self.namespace_vasp.final_structure
         assert initial
         assert final
         # Generate interpolated images and fix PBC issues if applicable
         interpolated = neb_interpolate(initial, final, orm.Int(nimages))
-        images = {key: value for key, value in interpolated.items() if not ('init' in key or 'final' in key)}
+        images = {
+            key: value
+            for key, value in interpolated.items()
+            if not ("init" in key or "final" in key)
+        }
         self.namespace_vasp.neb_images = images
         # Update the final image
-        self.set_final_structure = interpolated['image_final']
+        self.set_final_structure = interpolated["image_final"]
 
 
 class VaspRelaxUpdater(VaspBuilderUpdater):
     """
     An updater for VaspRelaxWorkChain
     """
-    WF_ENTRYPOINT = 'vaspu.relax'
+
+    WF_ENTRYPOINT = "vaspu.relax"
 
     def __init__(self, builder, override_vasp_namespace=None, namespace_relax=None):
         super().__init__(builder)
@@ -459,7 +482,9 @@ class VaspRelaxUpdater(VaspBuilderUpdater):
         if self.namespace_relax.relax_settings is None:
             current_options = RelaxOptions()
         else:
-            current_options = RelaxOptions(**self.namespace_relax.relax_settings.get_dict())
+            current_options = RelaxOptions(
+                **self.namespace_relax.relax_settings.get_dict()
+            )
         for key, value in kwargs.items():
             setattr(current_options, key, value)
         self.namespace_relax.relax_settings = current_options.to_aiida_dict()
@@ -472,7 +497,7 @@ class VaspRelaxUpdater(VaspBuilderUpdater):
 
     def update_from_config(self, structure: orm.StructureData, config: dict):
         super().update_from_config(structure, config)
-        self.update_relax_settings(**config.get('relax_settings', {}))
+        self.update_relax_settings(**config.get("relax_settings", {}))
         return self
 
 
@@ -486,7 +511,7 @@ def builder_to_dict(builder, unpack=True):
     """
     data = {}
     for key, value in builder._data.items():
-        if hasattr(value, '_data'):
+        if hasattr(value, "_data"):
             value = builder_to_dict(builder[key])
         if unpack:
             if isinstance(value, orm.Dict):
@@ -499,12 +524,13 @@ def builder_to_dict(builder, unpack=True):
 
 class VaspConvUpdater(VaspBuilderUpdater):
     """Update for VaspConvergenceWorkChain"""
-    WF_ENTRYPOINT = 'vaspu.converge'
+
+    WF_ENTRYPOINT = "vaspu.converge"
 
     def update_from_config(self, structure: orm.StructureData, config: dict):
         """Update from a configuration dictionary"""
         super().update_from_config(structure, config)
-        self.use_conv_settings(**config.get('conv_settings', {}))
+        self.use_conv_settings(**config.get("conv_settings", {}))
         return self
 
     def use_conv_settings(self, **kwargs):
@@ -512,13 +538,15 @@ class VaspConvUpdater(VaspBuilderUpdater):
         Use the supplied convergence settings
         """
         from aiida_user_addons.vworkflows.new_conv import ConvOptions
+
         opts = ConvOptions(**kwargs)
         self.builder.conv_settings = opts.to_aiida_dict()
 
 
 class VaspBandUpdater(VaspBuilderUpdater):
     """Updater for VaspBandsWorkChain"""
-    WF_ENTRYPOINT = 'vaspu.bands'
+
+    WF_ENTRYPOINT = "vaspu.bands"
 
     def __init__(self, builder, namespace_vasp=None):
         # The primary VASP namespace is under builder.vasp
@@ -535,14 +563,16 @@ class VaspBandUpdater(VaspBuilderUpdater):
         calculations.
         The ``relax`` key is optional.
         """
-        super().update_from_config(structure, config['scf'])
+        super().update_from_config(structure, config["scf"])
 
         # Specify the relaxation and NAC namespace
-        if 'relax' in config:
-            relax_upd = VaspRelaxUpdater(self.root_namespace,
-                                         namespace_relax=self.root_namespace.relax,
-                                         override_vasp_namespace=self.root_namespace.relax.vasp)
-            relax_upd.update_from_config(structure, config['relax'])
+        if "relax" in config:
+            relax_upd = VaspRelaxUpdater(
+                self.root_namespace,
+                namespace_relax=self.root_namespace.relax,
+                override_vasp_namespace=self.root_namespace.relax.vasp,
+            )
+            relax_upd.update_from_config(structure, config["relax"])
         return self
 
     def set_label(self, label=None):
@@ -558,19 +588,21 @@ class VaspBandUpdater(VaspBuilderUpdater):
 
 class VaspHybridBandUpdater(VaspBandUpdater):
     """Updater for VaspHybridBandsWorkChain"""
-    WF_ENTRYPOINT = 'vaspu.hybrid_bands'
+
+    WF_ENTRYPOINT = "vaspu.hybrid_bands"
 
     def update_from_config(self, structure: orm.StructureData, config: dict):
         super().update_from_config(structure, config)
 
-        self.builder.symprec = orm.Float(config['symprec'])
-        self.builder.kpoints_per_split = orm.Int(config['kpoints_per_split'])
+        self.builder.symprec = orm.Float(config["symprec"])
+        self.builder.kpoints_per_split = orm.Int(config["kpoints_per_split"])
         return self
 
 
 class VaspAutoPhononUpdater(VaspBuilderUpdater):
     """Updater for VaspAutoPhononWorkChain"""
-    WF_ENTRYPOINT = 'vaspu.phonopy'
+
+    WF_ENTRYPOINT = "vaspu.phonopy"
 
     def __init__(self, builder: ProcessBuilder):
         """Initialise with an existing ProcessBuilder for VaspAutoPhononWorkChain"""
@@ -602,21 +634,25 @@ class VaspAutoPhononUpdater(VaspBuilderUpdater):
         The ``relax`` and ``nac`` keys are optional.
         """
 
-        super().update_from_config(structure, config['singlepoint'])
+        super().update_from_config(structure, config["singlepoint"])
 
         # Specify the relaxation and NAC namespace
-        if 'relax' in config:
-            relax_upd = VaspRelaxUpdater(self.root_namespace,
-                                         namespace_relax=self.root_namespace.relax,
-                                         override_vasp_namespace=self.root_namespace.relax.vasp)
-            relax_upd.update_from_config(structure, config['relax'])
+        if "relax" in config:
+            relax_upd = VaspRelaxUpdater(
+                self.root_namespace,
+                namespace_relax=self.root_namespace.relax,
+                override_vasp_namespace=self.root_namespace.relax.vasp,
+            )
+            relax_upd.update_from_config(structure, config["relax"])
 
-        if 'nac' in config:
-            nac_upd = VaspBuilderUpdater(self.root_namespace.nac, root_namespace=self.root_namespace)
-            nac_upd.update_from_config(structure, config['nac'])
+        if "nac" in config:
+            nac_upd = VaspBuilderUpdater(
+                self.root_namespace.nac, root_namespace=self.root_namespace
+            )
+            nac_upd.update_from_config(structure, config["nac"])
 
         # Update the phonon settings
-        self.set_phonon_settings(config['phonon_settings'])
+        self.set_phonon_settings(config["phonon_settings"])
         return self
 
     def set_kpoints_mesh(self, mesh, offset) -> None:
@@ -632,12 +668,13 @@ class VaspAutoPhononUpdater(VaspBuilderUpdater):
 
     def _get_singlepoint_supercell(self) -> orm.StructureData:
         """Obtain the supercell for the singlepoint calculation"""
-        from ase.build import make_supercell
         import numpy as np
+        from ase.build import make_supercell
+
         ref = self.root_namespace.structure.get_ase()
 
         # The sueprcell matrix should be a vector or a matrix
-        mat = np.array(self.root_namespace.phonon_settings['supercell_matrix'])
+        mat = np.array(self.root_namespace.phonon_settings["supercell_matrix"])
         if mat.size == 3:
             mat = np.diag(mat)
 

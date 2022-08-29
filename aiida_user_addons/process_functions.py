@@ -1,11 +1,11 @@
 """
 Module containing process functions
 """
-# pylint: disable=import-outside-toplevel
-from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-
 from aiida.engine import calcfunction, workfunction
 from aiida.orm import StructureData
+
+# pylint: disable=import-outside-toplevel
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
 
 @calcfunction
@@ -15,7 +15,7 @@ def refine_symmetry(struct, symprec):
     ana = SpacegroupAnalyzer(pstruc, symprec=symprec.value)
     ostruc = ana.get_refined_structure()
     ostruc = StructureData(pymatgen=ostruc)
-    ostruc.label = struct.label + ' REFINED'
+    ostruc.label = struct.label + " REFINED"
     return ostruc
 
 
@@ -29,6 +29,7 @@ def extend_magnetic_orderings(struct, moment_map):
     for the per-site magnetisations.
     """
     from pymatgen.analysis.magnetism import MagneticStructureEnumerator
+
     moment_map = moment_map.get_dict()
     pstruc = struct.get_pymatgen()
     enum = MagneticStructureEnumerator(pstruc, moment_map)
@@ -40,8 +41,8 @@ def extend_magnetic_orderings(struct, moment_map):
             # This avoids AiiDA added addition Kind to reflect the spins
             site.species = site.species.elements[0].name
         astruc = StructureData(pymatgen=ptemp)
-        astruc.set_attribute('MAGMOM', magmom)
-        structs[f'out_structure_{idx:03d}'] = astruc
+        astruc.set_attribute("MAGMOM", magmom)
+        structs[f"out_structure_{idx:03d}"] = astruc
     return structs
 
 
@@ -52,5 +53,5 @@ def _get_all_spins(pstruc):
         if isinstance(site.specie, pmg.core.Element):
             out_dict.append(0.0)
             continue
-        out_dict.append(site.specie._properties.get('spin', 0.0))
+        out_dict.append(site.specie._properties.get("spin", 0.0))
     return out_dict

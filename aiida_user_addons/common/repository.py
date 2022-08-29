@@ -1,14 +1,14 @@
 """
 Convenient routine for handling repository related operations
 """
-from contextlib import contextmanager
-import tempfile
-from pathlib import Path
-import shutil
+import gzip
+import lzma
 import os
 import re
-import lzma
-import gzip
+import shutil
+import tempfile
+from contextlib import contextmanager
+from pathlib import Path
 
 import aiida.orm as orm
 from aiida.repository import FileType
@@ -33,7 +33,9 @@ class RepositoryMapper:
     def to_folder(self, target_path: Path, exclude=None):
         """Write the content of a folder data onto the disk"""
         for name in self.node.list_object_names():
-            copy_from_aiida(name, self.node, target_path, self.decompress, exclude=exclude)
+            copy_from_aiida(
+                name, self.node, target_path, self.decompress, exclude=exclude
+            )
 
     @contextmanager
     def temporary_folder(self, exclude=None):
@@ -74,15 +76,17 @@ def copy_from_aiida(name: str, node, dst: Path, decompress=False, exclude=None):
     # If it is a directory, copy the contents one by one
     if obj.file_type == FileType.DIRECTORY:
         for sub_obj in node.list_objects(name):
-            copy_from_aiida(os.path.join(name, sub_obj.name), node, dst, exclude=exclude)
+            copy_from_aiida(
+                os.path.join(name, sub_obj.name), node, dst, exclude=exclude
+            )
     else:
         # It is a file
-        with node.open(name, mode='rb') as fsource:
+        with node.open(name, mode="rb") as fsource:
             # Make parent directory if needed
             frepo_path = dst / name
             Path(frepo_path.parent).mkdir(exist_ok=True, parents=True)
             # Write the file
-            if name.endswith('.gz') and decompress:
+            if name.endswith(".gz") and decompress:
                 out_path = str(frepo_path)[:-3]
                 out_decompress = True
             else:
@@ -90,22 +94,24 @@ def copy_from_aiida(name: str, node, dst: Path, decompress=False, exclude=None):
                 out_path = str(frepo_path)
 
             if not out_decompress:
-                with open(out_path, 'wb') as fdst:
+                with open(out_path, "wb") as fdst:
                     shutil.copyfileobj(fsource, fdst)
             else:
-                gobj = gzip.GzipFile(fileobj=fsource, mode='rb')
-                with open(out_path, 'wb') as fdst:
+                gobj = gzip.GzipFile(fileobj=fsource, mode="rb")
+                with open(out_path, "wb") as fdst:
                     shutil.copyfileobj(gobj, fdst)
 
 
-def save_all_repository_objects(node: orm.Node, target_path: Path, decompress=False, exclude=None):
+def save_all_repository_objects(
+    node: orm.Node, target_path: Path, decompress=False, exclude=None
+):
     """Copy all objects of a node saved in the repository to the disc"""
     for name in node.list_object_names():
         copy_from_aiida(name, node, target_path, decompress, exclude=exclude)
 
 
 @contextmanager
-def open_compressed(node, name, mode='r'):
+def open_compressed(node, name, mode="r"):
     """
     Open compressed text file
     """
@@ -113,18 +119,18 @@ def open_compressed(node, name, mode='r'):
     if name in stored:
         with node.open(name, mode=mode) as fhandle:
             yield fhandle
-    elif name + '.gz' in stored:
-        with node.open(name + '.gz', mode='rb') as fhandle:
-            mode = 'rt' if mode == 'r' else 'rb'
+    elif name + ".gz" in stored:
+        with node.open(name + ".gz", mode="rb") as fhandle:
+            mode = "rt" if mode == "r" else "rb"
             with gzip.open(fhandle, mode=mode) as zhandle:
                 yield zhandle
-    elif name + '.xz' in stored:
-        with node.open(name + '.xz', mode='rb') as fhandle:
-            mode = 'rt' if mode == 'r' else 'rb'
+    elif name + ".xz" in stored:
+        with node.open(name + ".xz", mode="rb") as fhandle:
+            mode = "rt" if mode == "r" else "rb"
             with lzma.open(fhandle, mode=mode) as zhandle:
                 yield zhandle
     else:
-        raise ValueError(f'File {name} is not found.')
+        raise ValueError(f"File {name} is not found.")
 
 
 class LocalStashRepo:
@@ -150,9 +156,18 @@ class LocalStashRepo:
         """Ensure that the file is downloaded"""
         lpath = self.get_local_path(stash_node)
         if not (lpath / fname).is_file():
-            remote = orm.RemoteData(computer=stash_node.computer, remote_path=stash_node.target_basepath) if remote is None else remote
+            remote = (
+                orm.RemoteData(
+                    computer=stash_node.computer, remote_path=stash_node.target_basepath
+                )
+                if remote is None
+                else remote
+            )
             # Download the file to the local repository
-            remote.getfile(Path(stash_node.target_basepath) / fname, (Path(lpath) / fname).resolve())
+            remote.getfile(
+                Path(stash_node.target_basepath) / fname,
+                (Path(lpath) / fname).resolve(),
+            )
 
     def create_symlink(self, stash_node, fname, dst, remote=None):
         """Create a symlink from the local repository"""

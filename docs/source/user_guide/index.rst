@@ -7,5 +7,3 @@ User's guide
 
     get_started
     tutorial
-
-

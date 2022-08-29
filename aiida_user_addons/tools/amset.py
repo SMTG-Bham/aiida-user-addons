@@ -2,13 +2,13 @@
 AMSET related tools
 """
 from functools import wraps
-import numpy as np
-from aiida.orm import Node
-from aiida_user_addons.common.repository import open_compressed
 
-from aiida.engine import calcfunction
-from aiida_user_addons.common.repository import open_compressed
 import aiida.orm as orm
+import numpy as np
+from aiida.engine import calcfunction
+from aiida.orm import Node
+
+from aiida_user_addons.common.repository import open_compressed
 
 
 def outcar_lines(func):
@@ -17,7 +17,7 @@ def outcar_lines(func):
     @wraps(func)
     def _inner(*args, **kwargs):
         if isinstance(args[0], Node):
-            with open_compressed(args[0].outputs.retrieved, 'OUTCAR') as fh:
+            with open_compressed(args[0].outputs.retrieved, "OUTCAR") as fh:
                 lines = fh.readlines()
             new_args = list(args)
             new_args[0] = lines
@@ -31,9 +31,9 @@ def outcar_lines(func):
 def elastic_tensor(lines):
     """Read the dielectric tensor in GPa"""
     for i, line in enumerate(lines):
-        if 'TOTAL ELASTIC MODULI' in line:
+        if "TOTAL ELASTIC MODULI" in line:
             break
-    tensor_lines = lines[i + 3:i + 9]
+    tensor_lines = lines[i + 3 : i + 9]
     tensor = np.zeros((6, 6))
     for i, line in enumerate(tensor_lines):
         tensor[i, :] = [float(token) for token in line.split()[1:]]
@@ -44,7 +44,10 @@ def elastic_tensor(lines):
 def high_freq_dielectric(data):
     """Get the high frequency dielectric constant tensor"""
     for i, line in enumerate(data):
-        if 'frequency dependent      REAL DIELECTRIC FUNCTION (independent particle, no local field effects) density-density' in line:
+        if (
+            "frequency dependent      REAL DIELECTRIC FUNCTION (independent particle, no local field effects) density-density"
+            in line
+        ):
             elems = [float(x) for x in data[i + 3].split()[1:]]
     # Recover the full tensor
     tensor = np.zeros((3, 3))
@@ -69,12 +72,12 @@ def static_ionic_dielectric_tensor(lines):
     This is usually from as DFPT calculation with ISIF=2
     """
     for i, line in enumerate(lines):
-        if 'MACROSCOPIC STATIC DIELECTRIC TENSOR IONIC CONTRIBUTION' in line:
+        if "MACROSCOPIC STATIC DIELECTRIC TENSOR IONIC CONTRIBUTION" in line:
             # Use the second set
             idx = i
 
-    tensor_lines = lines[idx + 2:idx + 5]
-    #print(tensor_lines)
+    tensor_lines = lines[idx + 2 : idx + 5]
+    # print(tensor_lines)
     tensor = np.zeros((3, 3))
     for i, line in enumerate(tensor_lines):
         tensor[i, :] = [float(token) for token in line.split()]

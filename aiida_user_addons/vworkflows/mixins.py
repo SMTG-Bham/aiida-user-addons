@@ -2,6 +2,7 @@
 Some convenience mixins
 """
 from aiida.common.utils import classproperty
+
 from aiida_user_addons.common.inputset.vaspsets import VASPInputSet
 
 

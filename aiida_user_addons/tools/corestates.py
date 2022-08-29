@@ -2,9 +2,10 @@
 Code for handling the core states
 """
 
+import re
 from pathlib import Path
 from subprocess import run
-import re
+
 from aiida_user_addons.common.repository import open_compressed
 
 
@@ -15,18 +16,18 @@ def parse_corestates(fh):
     all_data = {}
     last_blank = False
     for line in fh:
-        if 'the core state eigenenergies are' in line:
+        if "the core state eigenenergies are" in line:
             capture = True
             continue
         if capture:
             # Blank line - end of block
-            #print(line)
+            # print(line)
             if not line.split():
                 if data:
                     all_data[atom_number] = data
                 last_blank = True
                 continue
-            match = re.match(r'^ *(\d+)-', line)
+            match = re.match(r"^ *(\d+)-", line)
             # Last line was blank and no match this time - signal the end of the block
             if not match and last_blank:
                 all_data[atom_number] = data
@@ -49,20 +50,24 @@ def parse_corestates(fh):
 def load_local_stash(node, rel, local_stash_base):
     """Return path to the local file"""
     rel = Path(rel)
-    remote_path = node.outputs.remote_stash.attributes['target_basepath']
+    remote_path = node.outputs.remote_stash.attributes["target_basepath"]
     remote_rel = Path(remote_path).relative_to(Path(remote_path).parent.parent.parent)
-    dst = (local_stash_base / remote_rel)
+    dst = local_stash_base / remote_rel
     if (dst / rel).is_file():
         return dst / rel
     else:
         # Need to download the
         dst.mkdir(exist_ok=True, parents=True)
-        run(f'rsync -av --progress {node.computer.label}:{remote_path/rel} {dst / rel}', shell=True, check=True)
+        run(
+            f"rsync -av --progress {node.computer.label}:{remote_path/rel} {dst / rel}",
+            shell=True,
+            check=True,
+        )
         return dst / rel
 
 
 def parse_node(node):
 
-    with open_compressed(node.outputs.retrieved, 'OUTCAR') as fh:
+    with open_compressed(node.outputs.retrieved, "OUTCAR") as fh:
         data = parse_corestates(fh)
     return data

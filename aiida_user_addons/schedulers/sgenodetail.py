@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 ###########################################################################
 # Copyright (c), The AiiDA team. All rights reserved.                     #
 # This file is part of the AiiDA code.                                    #
@@ -15,8 +14,8 @@ Plugin originally written by Marco Dorigo.
 Email: marco(DOT)dorigo(AT)rub(DOT)de
 """
 
-from aiida.schedulers.plugins.sge import SgeScheduler
 from aiida.common.exceptions import FeatureNotAvailable
+from aiida.schedulers.plugins.sge import SgeScheduler
 
 
 class SgeNoDetailScheduler(SgeScheduler):
@@ -30,4 +29,4 @@ class SgeNoDetailScheduler(SgeScheduler):
         Override superclass method
         """
         # pylint: disable=no-self-use, not-callable, unused-argument
-        raise FeatureNotAvailable('Detailed jobinfo disabled in SgeNoDetailScheduler')
+        raise FeatureNotAvailable("Detailed jobinfo disabled in SgeNoDetailScheduler")

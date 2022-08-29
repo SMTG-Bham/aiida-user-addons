@@ -33,17 +33,17 @@ def create_additional_species(species: list, magmom: list):
             if current_symbol in mapping:
                 # The other species having the same symbol has been assigned
                 counter = len(mapping) + 1
-                current_symbol = f'{symbol}{counter}'
+                current_symbol = f"{symbol}{counter}"
             mapping[current_symbol] = magmom
         new_species.append(current_symbol)
 
     # Rename symbols that has more than one species, so A becomes A1
     for symbol, mapping in current_species_mapping.items():
         if len(mapping) > 1:
-            mapping[f'{symbol}1'] = mapping[symbol]
+            mapping[f"{symbol}1"] = mapping[symbol]
             mapping.pop(symbol)
             # Refresh the new_species list
-            new_species = [f'{sym}1' if sym == symbol else sym for sym in new_species]
+            new_species = [f"{sym}1" if sym == symbol else sym for sym in new_species]
 
     all_mapping = {}
     for value in current_species_mapping.values():
@@ -64,7 +64,7 @@ def convert_to_plain_list(species: list, magmom_mapping: dict):
     symbols = []
     for symbol in species:
         magmoms.append(magmom_mapping[symbol])
-        match = re.match(r'(\w+)\d+', symbol)
+        match = re.match(r"(\w+)\d+", symbol)
         if match:
             symbol = match.group(1)
         symbols.append(symbol)

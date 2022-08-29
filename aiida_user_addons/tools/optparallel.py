@@ -1,7 +1,7 @@
 """
 Module for finding optimum parallelisation strategy
 """
-from math import gcd, ceil
+from math import ceil, gcd
 from warnings import warn
 
 
@@ -10,16 +10,18 @@ class JobScheme:
     A class representing the scheme of the jobs
     """
 
-    def __init__(self,
-                 n_kpoints,
-                 n_procs,
-                 n_nodes=None,
-                 cpus_per_node=None,
-                 npw=None,
-                 nbands=None,
-                 ncore_within_node=True,
-                 ncore_strategy='maximise',
-                 wf_size_limit=1000):
+    def __init__(
+        self,
+        n_kpoints,
+        n_procs,
+        n_nodes=None,
+        cpus_per_node=None,
+        npw=None,
+        nbands=None,
+        ncore_within_node=True,
+        ncore_strategy="maximise",
+        wf_size_limit=1000,
+    ):
         """
         Instantiate a JobScheme object
 
@@ -66,10 +68,10 @@ class JobScheme:
     @classmethod
     def from_dryrun(cls, dryrun_outcome, n_procs, **kwargs):
         """Construct from dryrun results"""
-        kwargs['n_kpoints'] = dryrun_outcome.get('num_kpoints')
-        kwargs['nbands'] = dryrun_outcome.get('num_bands')
-        kwargs['npw'] = dryrun_outcome.get('num_plane_waves')
-        kwargs['n_procs'] = n_procs
+        kwargs["n_kpoints"] = dryrun_outcome.get("num_kpoints")
+        kwargs["nbands"] = dryrun_outcome.get("num_bands")
+        kwargs["npw"] = dryrun_outcome.get("num_plane_waves")
+        kwargs["n_procs"] = n_procs
         return cls(**kwargs)
 
     def solve_kpar(self):
@@ -80,7 +82,10 @@ class JobScheme:
         self.kpar = kpar
         # If we did not set nbands or npw, we cannot adjust KAR to avoid memory issues
         if any(map(lambda x: x is None, [self.nbands, self.npw])):
-            warn('Cannot limit KAR for memory requirement without supplying both NBANDS and NPW', UserWarning)
+            warn(
+                "Cannot limit KAR for memory requirement without supplying both NBANDS and NPW",
+                UserWarning,
+            )
             return kpar
 
         # Reduce the KPAR
@@ -91,8 +96,13 @@ class JobScheme:
                     kpar = candidate
                     break
         if self.size_wavefunction_per_proc > self.wf_size_limit:
-            warn(('Expected wavefunction size per process {} MB '
-                  'is large than the limit {} MB').format(self.size_wavefunction_per_proc, self.wf_size_limit), UserWarning)
+            warn(
+                (
+                    "Expected wavefunction size per process {} MB "
+                    "is large than the limit {} MB"
+                ).format(self.size_wavefunction_per_proc, self.wf_size_limit),
+                UserWarning,
+            )
         return kpar
 
     @property
@@ -128,15 +138,17 @@ class JobScheme:
             npar = self.procs_per_kgroup // ncore
             new_nbands = ceil(self.nbands / npar) * npar
             factor = new_nbands / self.nbands  # Amplification factor for the ncore
-            combs.append((ncore, factor, abs(ncore / npar - 1), new_nbands))  # Balance factor, the smaller the better
+            combs.append(
+                (ncore, factor, abs(ncore / npar - 1), new_nbands)
+            )  # Balance factor, the smaller the better
 
         combs = list(filter(lambda x: x[1] < 1.2, combs))
-        if self.ncore_strategy == 'balance':
+        if self.ncore_strategy == "balance":
             combs.sort(key=lambda x: x[2])  # Sort by increasing balance factor
-        elif self.ncore_strategy == 'maximise':
+        elif self.ncore_strategy == "maximise":
             combs.sort(key=lambda x: x[0], reverse=True)  # Sort by decreasing NCORE
         else:
-            raise RuntimeError(f'NCORE strategy: <{self.ncore_strategy}> is invalid')
+            raise RuntimeError(f"NCORE strategy: <{self.ncore_strategy}> is invalid")
 
         # Take the maximum ncore
         ncore, factor, balance, new_nbands = combs[0]

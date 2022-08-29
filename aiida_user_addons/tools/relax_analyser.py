@@ -2,20 +2,20 @@
 Analyse the outcome of relax
 """
 
-from itertools import zip_longest
-from tempfile import mkdtemp
-from pathlib import Path
 import shutil
-from typing import Tuple, List
+from itertools import zip_longest
+from pathlib import Path
+from tempfile import mkdtemp
+from typing import List, Tuple
+
+import aiida.orm as orm
+import numpy as np
+from aiida.orm.nodes.data import StructureData
+from aiida.orm.nodes.process.calculation import CalcJobNode
+from aiida.orm.nodes.process.workflow import WorkChainNode
 from ase import Atoms
 from ase.calculators.singlepoint import SinglePointCalculator
 from ase.io import read
-import numpy as np
-
-from aiida.orm.nodes.data import StructureData
-from aiida.orm.nodes.process.workflow import WorkChainNode
-from aiida.orm.nodes.process.calculation import CalcJobNode
-import aiida.orm as orm
 
 from aiida_user_addons.common.repository import open_compressed
 
@@ -54,7 +54,7 @@ class RelaxationAnalyser:
         last_work = None
         for triple in sorted(self.node.get_outgoing().all(), key=lambda x: x.node.id):
             # Skip if last single point
-            if triple.link_label == 'singlepoint':
+            if triple.link_label == "singlepoint":
                 continue
             last_work = triple.node
         return last_work
@@ -64,7 +64,7 @@ class RelaxationAnalyser:
         """Last relaxation calculation - excluding the singlepoint"""
         last_calc = None
         for calc in sorted(self.last_relax_work.called, key=lambda x: x.id):
-            if 'structure' in calc.outputs:
+            if "structure" in calc.outputs:
                 last_calc = calc
         return last_calc
 
@@ -87,10 +87,12 @@ class RelaxationAnalyser:
             for calc in sorted(work.called, key=lambda x: x.mtime):
                 if not calc.is_finished:
                     break
-                with open_compressed(calc.outputs.retrieved, 'vasprun.xml', mode='rb') as handle_source:
-                    with open(tempdir / 'vasprun.xml', 'wb') as handle_destination:
+                with open_compressed(
+                    calc.outputs.retrieved, "vasprun.xml", mode="rb"
+                ) as handle_source:
+                    with open(tempdir / "vasprun.xml", "wb") as handle_destination:
                         shutil.copyfileobj(handle_source, handle_destination)
-                all_atoms = read(str(tempdir / 'vasprun.xml'), index=':')
+                all_atoms = read(str(tempdir / "vasprun.xml"), index=":")
                 traj.extend(all_atoms)
         self._traj = traj
         shutil.rmtree(tempdir)
@@ -127,16 +129,17 @@ class RelaxationAnalyser:
         Plot for energy/force convergence
         """
         import matplotlib.pyplot as plt
+
         fig, axs = plt.subplots(2, 1, sharex=True)
         natoms = len(self.input_structure.sites)
         axs[0].plot(self.energy_diff)
-        axs[0].set_yscale('log')
+        axs[0].set_yscale("log")
         axs[0].hlines(e_per_atom_thresh * natoms, 0, len(self.energy_diff))
         axs[1].plot(self.maximum_forces)
         axs[1].set_ylim(0, 0.1)
-        axs[1].set_xlabel('Steps')
-        axs[1].set_ylabel('Maximum force (eV/A)')
-        axs[0].set_ylabel('Energy change (eV)')
+        axs[1].set_xlabel("Steps")
+        axs[1].set_ylabel("Maximum force (eV/A)")
+        axs[0].set_ylabel("Energy change (eV)")
         return fig
 
 
@@ -147,8 +150,10 @@ def traj_node_to_atoms(traj: orm.TrajectoryData, energies=None) -> List[Atoms]:
     traj (TrajectoryData): The TrajectoryData node to be converged
     energies (np.ndarray): Energies of each frame. This needs to be supplied separately.
     """
-    symbols = traj.get_attribute('symbols')
-    cells, positions, forces = [traj.get_array(n) for n in ['cells', 'positions', 'forces']]
+    symbols = traj.get_attribute("symbols")
+    cells, positions, forces = (
+        traj.get_array(n) for n in ["cells", "positions", "forces"]
+    )
     atoms_list = []
 
     if energies is None:

@@ -2,27 +2,28 @@
 Use sumo to plot the AiiDA BandsData
 """
 
-import warnings
-import numpy as np
 import logging
+import warnings
 
-from pymatgen.electronic_structure.bandstructure import BandStructureSymmLine, Spin
-from pymatgen.phonon.bandstructure import PhononBandStructureSymmLine
+import numpy as np
+from aiida.orm import BandsData, StructureData
+from castepxbin import compute_pdos
 from pymatgen.core import Lattice
+from pymatgen.electronic_structure.bandstructure import (
+    BandStructureSymmLine,
+    Spin,
+)
 from pymatgen.electronic_structure.core import Spin
-
+from pymatgen.electronic_structure.dos import CompleteDos, Dos
+from pymatgen.phonon.bandstructure import PhononBandStructureSymmLine
+from sumo.electronic_structure.dos import load_dos
 from sumo.electronic_structure.effective_mass import (
     fit_effective_mass,
     get_fitting_data,
 )
-from sumo.plotting.bs_plotter import SBSPlotter
-from sumo.electronic_structure.dos import load_dos
 from sumo.plotting import dos_plotter
+from sumo.plotting.bs_plotter import SBSPlotter
 from sumo.plotting.phonon_bs_plotter import SPhononBSPlotter
-from castepxbin import compute_pdos
-from pymatgen.electronic_structure.dos import Dos, CompleteDos
-
-from aiida.orm import BandsData, StructureData
 
 from aiida_user_addons.tools.vasp import pmg_vasprun
 
@@ -58,25 +59,27 @@ def get_pmg_bandstructure(bands_node, structure=None, efermi=None, **kwargs):
         A `BandStructureSymmLine` object
     """
     if not isinstance(bands_node, BandsData):
-        raise ValueError('The input argument must be a BandsData')
+        raise ValueError("The input argument must be a BandsData")
     # Load the data
-    bands = bands_node.get_array('bands')  # In (num_spin, kpoints, bands) or just (kpoints, bands)
-    kpoints = bands_node.get_array('kpoints')  # in (num_kpoints, 3)
+    bands = bands_node.get_array(
+        "bands"
+    )  # In (num_spin, kpoints, bands) or just (kpoints, bands)
+    kpoints = bands_node.get_array("kpoints")  # in (num_kpoints, 3)
     try:
-        occupations = bands_node.get_array('occupations')
+        occupations = bands_node.get_array("occupations")
     except (KeyError, AttributeError):
         occupations = None
 
     try:
-        efermi_raw = bands_node.get_attribute('efermi')
+        efermi_raw = bands_node.get_attribute("efermi")
     except (KeyError, AttributeError):
         efermi_raw = None
 
     if efermi:
         efermi_raw = efermi
 
-    labels = bands_node.get_attribute('labels')
-    label_numbers = bands_node.get_attribute('label_numbers')
+    labels = bands_node.get_attribute("labels")
+    label_numbers = bands_node.get_attribute("label_numbers")
 
     # Construct the band_dict
     bands_shape = bands.shape
@@ -84,8 +87,7 @@ def get_pmg_bandstructure(bands_node, structure=None, efermi=None, **kwargs):
         if bands_shape[0] == 2:
             bands_dict = {
                 Spin.up: bands[0].T,  # Have to be (bands, kpoints)
-                Spin.down:
-                    bands[1].T  # Have to be (bands, kpoints)
+                Spin.down: bands[1].T,  # Have to be (bands, kpoints)
             }
         else:
             bands_dict = {
@@ -94,8 +96,8 @@ def get_pmg_bandstructure(bands_node, structure=None, efermi=None, **kwargs):
     else:
         bands_dict = {Spin.up: bands.T}
 
-    if 'cell' in bands_node.attributes_keys():
-        lattice = Lattice(bands_node.get_attribute('cell'))
+    if "cell" in bands_node.attributes_keys():
+        lattice = Lattice(bands_node.get_attribute("cell"))
     else:
         lattice = Lattice(structure.cell)
 
@@ -111,16 +113,20 @@ def get_pmg_bandstructure(bands_node, structure=None, efermi=None, **kwargs):
             efermi = (find_vbm(bands, occupations) + find_cbm(bands, occupations)) / 2
         else:
             efermi = 0
-            warnings.warn('Cannot find fermi energy - setting it to 0, this is probably wrong!')
+            warnings.warn(
+                "Cannot find fermi energy - setting it to 0, this is probably wrong!"
+            )
     else:
         efermi = efermi_raw
 
-    bands_structure = BandStructureSymmLine(kpoints,
-                                            bands_dict,
-                                            lattice.reciprocal_lattice,
-                                            efermi=efermi,
-                                            labels_dict=labels_dict,
-                                            **kwargs)
+    bands_structure = BandStructureSymmLine(
+        kpoints,
+        bands_dict,
+        lattice.reciprocal_lattice,
+        efermi=efermi,
+        labels_dict=labels_dict,
+        **kwargs,
+    )
     return bands_structure
 
 
@@ -137,7 +143,9 @@ def get_sumo_bands_plotter(bands, efermi=None, structure=None, **kwargs):
     Returns:
         A `SBSPlotter` object
     """
-    bands_structure = get_pmg_bandstructure(bands, efermi=efermi, structure=structure, **kwargs)
+    bands_structure = get_pmg_bandstructure(
+        bands, efermi=efermi, structure=structure, **kwargs
+    )
     return SBSPlotter(bands_structure)
 
 
@@ -162,9 +170,9 @@ def find_cbm(bands, occupations, tol=1e-4):
 def make_latex_labels(labels: list) -> list:
     """Convert labels to laxtex style"""
     label_mapping = {
-        'GAMMA': r'\Gamma',
-        'LAMBDA': r'\Lambda',
-        'SIGMA': r'\Sigma',
+        "GAMMA": r"\Gamma",
+        "LAMBDA": r"\Lambda",
+        "SIGMA": r"\Sigma",
     }
     out_labels = []
     for label in labels:
@@ -172,26 +180,42 @@ def make_latex_labels(labels: list) -> list:
             if tag in label:
                 label = label.replace(tag, replace)
                 break
-        out_labels.append(f'{label}')
+        out_labels.append(f"{label}")
     return out_labels
 
 
-def get_pymatgen_phonon_bands(band_structure: BandsData, input_structure: StructureData, has_nac=False) -> PhononBandStructureSymmLine:
+def get_pymatgen_phonon_bands(
+    band_structure: BandsData, input_structure: StructureData, has_nac=False
+) -> PhononBandStructureSymmLine:
     """
     Obtain a pymatgen phonon bandstructure plotter
     """
     qpoints = band_structure.get_kpoints()
-    freq = np.transpose(band_structure.get_bands())  # Pymatgen uses (3 * natoms, number qpoints) for frequency
+    freq = np.transpose(
+        band_structure.get_bands()
+    )  # Pymatgen uses (3 * natoms, number qpoints) for frequency
     structure = input_structure.get_pymatgen()
     lattice = structure.lattice.reciprocal_lattice
     idx, labels = zip(*band_structure.labels)
     labels = make_latex_labels(labels)
     labels_dict = {label: qpoints[idx] for idx, label in zip(idx, labels)}
-    pbs = PhononBandStructureSymmLine(qpoints, freq, lattice, labels_dict=labels_dict, structure=structure, has_nac=has_nac)
+    pbs = PhononBandStructureSymmLine(
+        qpoints,
+        freq,
+        lattice,
+        labels_dict=labels_dict,
+        structure=structure,
+        has_nac=has_nac,
+    )
     return pbs
 
 
-def get_sumo_phonon_plotter(band_structure: BandsData, input_structure: StructureData, has_nac=False, imag_tol=-5e-2) -> SPhononBSPlotter:
+def get_sumo_phonon_plotter(
+    band_structure: BandsData,
+    input_structure: StructureData,
+    has_nac=False,
+    imag_tol=-5e-2,
+) -> SPhononBSPlotter:
     """
     Obtain a sumo phonon plotter object
     """
@@ -202,17 +226,19 @@ def get_sumo_phonon_plotter(band_structure: BandsData, input_structure: Structur
 ####### Routines for CASTEP  ########
 
 
-def read_dos_castep(calculation_node,
-                    bin_width=0.01,
-                    gaussian=None,
-                    padding=None,
-                    emin=None,
-                    emax=None,
-                    efermi_to_vbm=True,
-                    lm_orbitals=None,
-                    elements=None,
-                    atoms=None,
-                    total_only=False):
+def read_dos_castep(
+    calculation_node,
+    bin_width=0.01,
+    gaussian=None,
+    padding=None,
+    emin=None,
+    emax=None,
+    efermi_to_vbm=True,
+    lm_orbitals=None,
+    elements=None,
+    atoms=None,
+    total_only=False,
+):
     """Convert DOS data from CASTEP .bands file to Pymatgen/Sumo format
 
     The data is binned into a regular series using np.histogram
@@ -233,19 +259,22 @@ def read_dos_castep(calculation_node,
     Returns:
         :obj:`pymatgen.electronic_structure.dos.Dos`
     """
-    from sumo.io.castep import get_pdos
     import logging
 
+    from sumo.io.castep import get_pdos
+
     bands = calculation_node.outputs.output_bands
-    calc_efermi = bands.get_attribute('efermi')
-    eigenvalues = bands_array_to_dict(bands.get_bands())  # Eigenvalues array in (spin, kpoints, bands)
+    calc_efermi = bands.get_attribute("efermi")
+    eigenvalues = bands_array_to_dict(
+        bands.get_bands()
+    )  # Eigenvalues array in (spin, kpoints, bands)
     kpoints, weights = bands.get_kpoints(also_weights=True)
 
     if efermi_to_vbm and not _is_metal(eigenvalues, calc_efermi):
-        logging.info('Setting energy zero to VBM')
+        logging.info("Setting energy zero to VBM")
         efermi = _get_vbm(eigenvalues, calc_efermi)
     else:
-        logging.info('Setting energy zero to Fermi energy')
+        logging.info("Setting energy zero to Fermi energy")
         efermi = calc_efermi
 
     emin_data = min(eigenvalues[Spin.up].flatten())
@@ -274,7 +303,10 @@ def read_dos_castep(calculation_node,
     # Add rows to weights for each band so they are aligned with eigenval data
     weights = weights * np.ones([eigenvalues[Spin.up].shape[0], 1])
 
-    dos_data = {spin: np.histogram(eigenvalue_set, bins=bins, weights=weights)[0] for spin, eigenvalue_set in eigenvalues.items()}
+    dos_data = {
+        spin: np.histogram(eigenvalue_set, bins=bins, weights=weights)[0]
+        for spin, eigenvalue_set in eigenvalues.items()
+    }
 
     dos = Dos(efermi, energies, dos_data)
 
@@ -283,25 +315,32 @@ def read_dos_castep(calculation_node,
     obj_names = retrieved.list_object_names()
     pdos_bin = None
     for name in obj_names:
-        if name.endswith('pdos_bin'):
+        if name.endswith("pdos_bin"):
             pdos_bin = name
 
     if pdos_bin is not None and not total_only:
-        with calculation_node.outputs.retrieved.open(pdos_bin, mode='rb') as pdos_file:
+        with calculation_node.outputs.retrieved.open(pdos_bin, mode="rb") as pdos_file:
             pdos_raw = compute_pdos(pdos_file, eigenvalues, weights, bins)
         # Also we, need to read the structure, but have it sorted with increasing
         # atomic numbers
-        if 'structure' in calculation_node.inputs:
+        if "structure" in calculation_node.inputs:
             structure = calculation_node.inputs.structure
         else:
             structure = calculation_node.inputs.calc__structure
         # Get the PMG structure - makes sure that the structure is sorted
-        pmg_structure = structure.get_pymatgen().get_sorted_structure(key=lambda x: x.species.elements[0].Z)
+        pmg_structure = structure.get_pymatgen().get_sorted_structure(
+            key=lambda x: x.species.elements[0].Z
+        )
         pdoss = {}
         for isite, site in enumerate(pmg_structure.sites):
             pdoss[site] = pdos_raw[isite]
         # Get the pdos dictionary for potting
-        pdos = get_pdos(CompleteDos(pmg_structure, dos, pdoss), lm_orbitals=lm_orbitals, elements=elements, atoms=atoms)
+        pdos = get_pdos(
+            CompleteDos(pmg_structure, dos, pdoss),
+            lm_orbitals=lm_orbitals,
+            elements=elements,
+            atoms=atoms,
+        )
         # Smear the PDOS
         for orbs in pdos.values():
             for dtmp in orbs.values():
@@ -327,8 +366,7 @@ def bands_array_to_dict(bands_array):
         if bands_shape[0] == 2:
             bands_dict = {
                 Spin.up: bands_array[0].T,  # Have to be (bands, kpoints)
-                Spin.down:
-                    bands_array[1].T  # Have to be (bands, kpoints)
+                Spin.down: bands_array[1].T,  # Have to be (bands, kpoints)
             }
         else:
             bands_dict = {
@@ -343,18 +381,22 @@ def bands_array_to_dict(bands_array):
 def _is_metal(eigenvalues, efermi, tol=1e-5):
     # Detect if material is a metal by checking if bands cross efermi
     from itertools import chain
+
     for band in chain(*eigenvalues.values()):
         if np.any(band < (efermi - tol)) and np.any(band > (efermi + tol)):
-            logging.info('Electronic structure appears to be a metal')
+            logging.info("Electronic structure appears to be a metal")
             return True
 
-    logging.info('Electronic structure appears to have a bandgap')
+    logging.info("Electronic structure appears to have a bandgap")
     return False
 
 
 def _get_vbm(eigenvalues, efermi):
     from itertools import chain
-    occupied_states_by_band = (band[band < efermi] for band in chain(*eigenvalues.values()))
+
+    occupied_states_by_band = (
+        band[band < efermi] for band in chain(*eigenvalues.values())
+    )
     return max(chain(*occupied_states_by_band))
 
 
@@ -405,13 +447,13 @@ def bandstats(
     """
 
     if bs.is_metal():
-        raise RuntimeError('ERROR: System is metallic!')
+        raise RuntimeError("ERROR: System is metallic!")
 
     vbm_data = bs.get_vbm()
     cbm_data = bs.get_cbm()
 
     if temperature:
-        raise RuntimeError('ERROR: This feature is not yet supported!')
+        raise RuntimeError("ERROR: This feature is not yet supported!")
 
     else:
         # Work out where the hole and electron band edges are.
@@ -419,29 +461,49 @@ def bandstats(
         # the effective mass are identified as a tuple of:
         # (spin, band_index, kpoint_index)
         hole_extrema = []
-        for spin, bands in vbm_data['band_index'].items():
-            hole_extrema.extend([(spin, band, kpoint) for band in bands for kpoint in vbm_data['kpoint_index']])
+        for spin, bands in vbm_data["band_index"].items():
+            hole_extrema.extend(
+                [
+                    (spin, band, kpoint)
+                    for band in bands
+                    for kpoint in vbm_data["kpoint_index"]
+                ]
+            )
 
         elec_extrema = []
-        for spin, bands in cbm_data['band_index'].items():
-            elec_extrema.extend([(spin, band, kpoint) for band in bands for kpoint in cbm_data['kpoint_index']])
+        for spin, bands in cbm_data["band_index"].items():
+            elec_extrema.extend(
+                [
+                    (spin, band, kpoint)
+                    for band in bands
+                    for kpoint in cbm_data["kpoint_index"]
+                ]
+            )
 
         # extract the data we need for fitting from the band structure
         hole_data = []
         for extrema in hole_extrema:
-            hole_data.extend(get_fitting_data(bs, *extrema, num_sample_points=num_sample_points))
+            hole_data.extend(
+                get_fitting_data(bs, *extrema, num_sample_points=num_sample_points)
+            )
 
         elec_data = []
         for extrema in elec_extrema:
-            elec_data.extend(get_fitting_data(bs, *extrema, num_sample_points=num_sample_points))
+            elec_data.extend(
+                get_fitting_data(bs, *extrema, num_sample_points=num_sample_points)
+            )
 
     # calculate the effective masses and log the information
     for data in hole_data:
-        eff_mass = fit_effective_mass(data['distances'], data['energies'], parabolic=parabolic)
-        data['effective_mass'] = eff_mass
+        eff_mass = fit_effective_mass(
+            data["distances"], data["energies"], parabolic=parabolic
+        )
+        data["effective_mass"] = eff_mass
 
     for data in elec_data:
-        eff_mass = fit_effective_mass(data['distances'], data['energies'], parabolic=parabolic)
-        data['effective_mass'] = eff_mass
+        eff_mass = fit_effective_mass(
+            data["distances"], data["energies"], parabolic=parabolic
+        )
+        data["effective_mass"] = eff_mass
 
-    return {'hole_data': hole_data, 'electron_data': elec_data}
+    return {"hole_data": hole_data, "electron_data": elec_data}

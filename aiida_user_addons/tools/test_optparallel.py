@@ -2,13 +2,14 @@
 Tests for hte JobScheme
 """
 import warnings
+
 from .optparallel import JobScheme, factors
 
 
 def test_kpar():
     """Test setting KPAR"""
     with warnings.catch_warnings():
-        warnings.simplefilter('ignore', UserWarning)
+        warnings.simplefilter("ignore", UserWarning)
 
         scheme = JobScheme(121, 130)
         assert scheme.kpar == 1
@@ -27,15 +28,21 @@ def test_kpar():
 def test_ncore():
     """Test NCORE settings logic"""
 
-    scheme = JobScheme(42, 72, cpus_per_node=24, npw=16000, nbands=180, ncore_strategy='balance')
+    scheme = JobScheme(
+        42, 72, cpus_per_node=24, npw=16000, nbands=180, ncore_strategy="balance"
+    )
     # KGROUP has 12 processes
     assert scheme.ncore == 3
 
-    scheme = JobScheme(84, 72, cpus_per_node=24, npw=16000, nbands=180, ncore_strategy='balance')
+    scheme = JobScheme(
+        84, 72, cpus_per_node=24, npw=16000, nbands=180, ncore_strategy="balance"
+    )
     # KGROUP has 6 processes
     assert scheme.ncore == 2
 
-    scheme = JobScheme(1, 72, cpus_per_node=24, npw=16000, nbands=121, ncore_strategy='balance')
+    scheme = JobScheme(
+        1, 72, cpus_per_node=24, npw=16000, nbands=121, ncore_strategy="balance"
+    )
     # KGROUP has 72 processes
     assert scheme.ncore == 8
 

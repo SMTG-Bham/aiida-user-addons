@@ -1,8 +1,9 @@
 """
 Wrapper class to simply updating input node
 """
-from typing import Any
 from collections import UserDict
+from typing import Any
+
 from aiida.orm.nodes.data.dict import Dict
 
 

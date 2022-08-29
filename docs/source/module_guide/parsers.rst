@@ -9,4 +9,3 @@ Multiply parser plugin
 
 .. automodule:: aiida_plugin_template.parsers.multiply
    :members:
-

@@ -7,7 +7,9 @@ from sumo.symmetry.kpoints import get_path_data
 
 
 @calcfunction
-def kpath_from_sumo(structure: orm.StructureData, mode: orm.Str, symprec: orm.Float, line_density):
+def kpath_from_sumo(
+    structure: orm.StructureData, mode: orm.Str, symprec: orm.Float, line_density
+):
     """
     Obtain kpoint path from sumo
 
@@ -32,12 +34,12 @@ def kpath_from_sumo(structure: orm.StructureData, mode: orm.Str, symprec: orm.Fl
 
     actual_labels = []
     for idx, label in enumerate(labels):
-        if label != '':
+        if label != "":
             # Standarise GAMMA handling
-            if 'GAMMA' in label:
-                label = 'GAMMA'
+            if "GAMMA" in label:
+                label = "GAMMA"
             actual_labels.append([idx, label])
     # Set label locations
     kpoints.labels = actual_labels
 
-    return {'primitive_structure': prim, 'explicit_kpoints': kpoints}
+    return {"primitive_structure": prim, "explicit_kpoints": kpoints}

@@ -2,10 +2,11 @@
 # This is the namespace where raw VASP INCAR tags should reside for VaspWorkChain
 from functools import wraps
 
+import aiida.orm as orm
 from aiida.common.exceptions import InputValidationError
 from aiida.common.extendeddicts import AttributeDict
-import aiida.orm as orm
-OVERRIDE_NAMESPACE = 'incar'
+
+OVERRIDE_NAMESPACE = "incar"
 
 
 def aiida_to_python(entity):
@@ -20,7 +21,7 @@ def aiida_to_python(entity):
         return entity.get_list()
     if isinstance(entity, (orm.Float, orm.Str, orm.Int)):
         return entity.value
-    raise ValueError(f'{entity} cannot be converted to plain python object')
+    raise ValueError(f"{entity} cannot be converted to plain python object")
 
 
 def plain_python_args(func):
@@ -39,20 +40,30 @@ def parameters_validator(node, port=None):
     """
     Validate the parameters input by passing it through the massager
     """
-    from aiida_vasp.assistant.parameters import ParametersMassage, _BASE_NAMESPACES
+    from aiida_vasp.assistant.parameters import (
+        _BASE_NAMESPACES,
+        ParametersMassage,
+    )
+
     if not node:
         return
 
     pdict = node.get_dict()
     if OVERRIDE_NAMESPACE not in pdict:
-        raise InputValidationError(f'Would expect some incar tags supplied under {OVERRIDE_NAMESPACE} key!')
+        raise InputValidationError(
+            f"Would expect some incar tags supplied under {OVERRIDE_NAMESPACE} key!"
+        )
 
     accepted_namespaces = _BASE_NAMESPACES + [OVERRIDE_NAMESPACE]
-    new_dict = {key: value for key, value in pdict.items() if key in accepted_namespaces}
+    new_dict = {
+        key: value for key, value in pdict.items() if key in accepted_namespaces
+    }
     try:
         massager = ParametersMassage(new_dict)
     except Exception as e:
-        raise InputValidationError(f'Cannot validate the input parameters - error from massasager: {e}')
+        raise InputValidationError(
+            f"Cannot validate the input parameters - error from massasager: {e}"
+        )
 
 
 @plain_python_args
@@ -61,22 +72,22 @@ def site_magnetization_to_magmom(site_dict):
     Convert site mangetization to MAGMOM used for restart
     NOTE: to be replaced by stock function in aiida_vasp.utils.workchains
     """
-    if 'site_magnetization' in site_dict:
-        site_dict = site_dict['site_magnetization']
+    if "site_magnetization" in site_dict:
+        site_dict = site_dict["site_magnetization"]
 
-    site_dict = site_dict['sphere']
+    site_dict = site_dict["sphere"]
     to_use = None
-    for symbol in 'xyz':
-        if site_dict.get(symbol) and site_dict.get(symbol, {}).get('site_moment'):
+    for symbol in "xyz":
+        if site_dict.get(symbol) and site_dict.get(symbol, {}).get("site_moment"):
             to_use = symbol
             break
     # No avaliable site magnetization for setting MAGMOM, something is wrong
     if to_use is None:
-        raise ValueError('No valid site-projected magnetization avaliable')
+        raise ValueError("No valid site-projected magnetization avaliable")
     # Ensure sorted list
-    tmp = list(site_dict[to_use]['site_moment'].items())
+    tmp = list(site_dict[to_use]["site_moment"].items())
     tmp.sort(key=lambda x: int(x[0]))
-    return [entry[1]['tot'] for entry in tmp]
+    return [entry[1]["tot"] for entry in tmp]
 
 
 def nested_update(dict_in, update_dict):

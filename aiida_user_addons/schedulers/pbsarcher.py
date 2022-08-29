@@ -6,15 +6,17 @@ not included in the submission script.
 In addition, ARCHER supports a `bigmem` flag that can be used to request nodes with
 larger memory size. For this we have to tweak the `PbsJobResource`.
 """
-import os
 import logging
-
+import os
 from math import ceil
 
-from aiida.schedulers import Scheduler
 from aiida.common.escaping import escape_for_bash
 from aiida.common.extendeddicts import AttributeDict
-from aiida.schedulers.plugins.pbsbaseclasses import PbsBaseClass, PbsJobResource
+from aiida.schedulers import Scheduler
+from aiida.schedulers.plugins.pbsbaseclasses import (
+    PbsBaseClass,
+    PbsJobResource,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -23,7 +25,14 @@ class PbsArcherJobResource(PbsJobResource):
     """
     JobResource for ARCHER with bigmem flag for big memory nodes
     """
-    _default_fields = ('num_machines', 'num_mpiprocs_per_machine', 'num_cores_per_machine', 'num_cores_per_mpiproc', 'bigmem')
+
+    _default_fields = (
+        "num_machines",
+        "num_mpiprocs_per_machine",
+        "num_cores_per_machine",
+        "num_cores_per_mpiproc",
+        "bigmem",
+    )
 
     @classmethod
     def validate_resources(cls, **kwargs):
@@ -38,12 +47,12 @@ class PbsArcherJobResource(PbsJobResource):
         def is_greater_equal_one(parameter):
             value = getattr(resources, parameter, None)
             if value is not None and value < 1:
-                raise ValueError('`{}` must be greater than or equal to one.'.format(parameter))
+                raise ValueError(f"`{parameter}` must be greater than or equal to one.")
 
         # Validate that all fields are valid integers if they are specified, otherwise initialize them to `None`
-        for parameter in list(cls._default_fields) + ['tot_num_mpiprocs']:
+        for parameter in list(cls._default_fields) + ["tot_num_mpiprocs"]:
             # Special case bigmem tag is a bool type
-            if parameter == 'bigmem':
+            if parameter == "bigmem":
                 try:
                     value = kwargs.pop(parameter)
                 except KeyError:
@@ -52,38 +61,59 @@ class PbsArcherJobResource(PbsJobResource):
                     if isinstance(value, bool):
                         setattr(resources, parameter, value)
                     else:
-                        raise ValueError('`{}` must be an bool type when specified'.format(parameter))
+                        raise ValueError(
+                            f"`{parameter}` must be an bool type when specified"
+                        )
             else:
                 try:
                     setattr(resources, parameter, int(kwargs.pop(parameter)))
                 except KeyError:
                     setattr(resources, parameter, None)
                 except ValueError:
-                    raise ValueError('`{}` must be an integer when specified'.format(parameter))
+                    raise ValueError(f"`{parameter}` must be an integer when specified")
 
         if kwargs:
-            raise ValueError('these parameters were not recognized: {}'.format(', '.join(list(kwargs.keys()))))
+            raise ValueError(
+                "these parameters were not recognized: {}".format(
+                    ", ".join(list(kwargs.keys()))
+                )
+            )
 
         # At least two of the following parameters need to be defined as non-zero
-        if [resources.num_machines, resources.num_mpiprocs_per_machine, resources.tot_num_mpiprocs].count(None) > 1:
-            raise ValueError('At least two among `num_machines`, `num_mpiprocs_per_machine` or `tot_num_mpiprocs` must be specified.')
+        if [
+            resources.num_machines,
+            resources.num_mpiprocs_per_machine,
+            resources.tot_num_mpiprocs,
+        ].count(None) > 1:
+            raise ValueError(
+                "At least two among `num_machines`, `num_mpiprocs_per_machine` or `tot_num_mpiprocs` must be specified."
+            )
 
-        for parameter in ['num_machines', 'num_mpiprocs_per_machine']:
+        for parameter in ["num_machines", "num_mpiprocs_per_machine"]:
             is_greater_equal_one(parameter)
 
         # Here we now that at least two of the three required variables are defined and greater equal than one.
         if resources.num_machines is None:
-            resources.num_machines = ceil(resources.tot_num_mpiprocs / resources.num_mpiprocs_per_machine)
+            resources.num_machines = ceil(
+                resources.tot_num_mpiprocs / resources.num_mpiprocs_per_machine
+            )
         elif resources.num_mpiprocs_per_machine is None:
             resources.num_mpiprocs_per_machine = 24  # Default for ARCHER
         elif resources.tot_num_mpiprocs is None:
-            resources.tot_num_mpiprocs = resources.num_mpiprocs_per_machine * resources.num_machines
+            resources.tot_num_mpiprocs = (
+                resources.num_mpiprocs_per_machine * resources.num_machines
+            )
 
-        if resources.tot_num_mpiprocs > resources.num_mpiprocs_per_machine * resources.num_machines:
-            raise ValueError('`tot_num_mpiprocs` is more than the `num_mpiprocs_per_machine * num_machines`.')
+        if (
+            resources.tot_num_mpiprocs
+            > resources.num_mpiprocs_per_machine * resources.num_machines
+        ):
+            raise ValueError(
+                "`tot_num_mpiprocs` is more than the `num_mpiprocs_per_machine * num_machines`."
+            )
 
-        is_greater_equal_one('num_mpiprocs_per_machine')
-        is_greater_equal_one('num_machines')
+        is_greater_equal_one("num_mpiprocs_per_machine")
+        is_greater_equal_one("num_machines")
 
         return resources
 
@@ -97,14 +127,15 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
 
     I redefine only what needs to change from the base class
     """
-    _logger = Scheduler._logger.getChild('pbsarcher')
+
+    _logger = Scheduler._logger.getChild("pbsarcher")
 
     ## I change it the ARCHER resource
     _job_resource_class = PbsArcherJobResource
 
     ## For the time being I use a common dictionary, should be sufficient
     ## for the time being, but I can redefine it if needed.
-    #_map_status = _map_status_pbs_common
+    # _map_status = _map_status_pbs_common
     def _get_submit_script_header(self, job_tmpl):
         """
         Return the submit script header, using the parameters from the
@@ -118,35 +149,37 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
         import re
         import string
 
-        empty_line = ''
+        empty_line = ""
 
         lines = []
         if job_tmpl.submit_as_hold:
-            lines.append('#PBS -h')
+            lines.append("#PBS -h")
 
         if job_tmpl.rerunnable:
-            lines.append('#PBS -r y')
+            lines.append("#PBS -r y")
         else:
-            lines.append('#PBS -r n')
+            lines.append("#PBS -r n")
 
         if job_tmpl.email:
             # If not specified, but email events are set, PBSPro
             # sends the mail to the job owner by default
-            lines.append('#PBS -M {}'.format(job_tmpl.email))
+            lines.append(f"#PBS -M {job_tmpl.email}")
 
-        email_events = ''
+        email_events = ""
         if job_tmpl.email_on_started:
-            email_events += 'b'
+            email_events += "b"
         if job_tmpl.email_on_terminated:
-            email_events += 'ea'
+            email_events += "ea"
         if email_events:
-            lines.append('#PBS -m {}'.format(email_events))
+            lines.append(f"#PBS -m {email_events}")
             if not job_tmpl.email:
-                _LOGGER.info('Email triggers provided to PBSPro script for job,'
-                             'but no email field set; will send emails to '
-                             'the job owner as set in the scheduler')
+                _LOGGER.info(
+                    "Email triggers provided to PBSPro script for job,"
+                    "but no email field set; will send emails to "
+                    "the job owner as set in the scheduler"
+                )
         else:
-            lines.append('#PBS -m n')
+            lines.append("#PBS -m n")
 
         if job_tmpl.job_name:
             # From qsub man page:
@@ -159,24 +192,26 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
             #
             # I leave only letters, numbers, dots, dashes and underscores
             # Note: I don't compile the regexp, I am going to use it only once
-            job_title = re.sub(r'[^a-zA-Z0-9_.-]+', '', job_tmpl.job_name)
+            job_title = re.sub(r"[^a-zA-Z0-9_.-]+", "", job_tmpl.job_name)
 
             # prepend a 'j' (for 'job') before the string if the string
             # is now empty or does not start with a valid charachter
-            if not job_title or (job_title[0] not in string.ascii_letters + string.digits):
-                job_title = 'j' + job_title
+            if not job_title or (
+                job_title[0] not in string.ascii_letters + string.digits
+            ):
+                job_title = "j" + job_title
 
             # Truncate to the first 15 characters
             # Nothing is done if the string is shorter.
             job_title = job_title[:15]
 
-            lines.append('#PBS -N {}'.format(job_title))
+            lines.append(f"#PBS -N {job_title}")
 
         if job_tmpl.import_sys_environment:
-            lines.append('#PBS -V')
+            lines.append("#PBS -V")
 
         if job_tmpl.sched_output_path:
-            lines.append('#PBS -o {}'.format(job_tmpl.sched_output_path))
+            lines.append(f"#PBS -o {job_tmpl.sched_output_path}")
 
         if job_tmpl.sched_join_files:
             # from qsub man page:
@@ -185,22 +220,25 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
             # 'eo': Standard error and standard output are merged  into
             #       standard error
             # 'n' : Standard error and standard output are not merged (default)
-            lines.append('#PBS -j oe')
+            lines.append("#PBS -j oe")
             if job_tmpl.sched_error_path:
-                _LOGGER.info('sched_join_files is True, but sched_error_path is set in ' 'PBSPro script; ignoring sched_error_path')
+                _LOGGER.info(
+                    "sched_join_files is True, but sched_error_path is set in "
+                    "PBSPro script; ignoring sched_error_path"
+                )
         else:
             if job_tmpl.sched_error_path:
-                lines.append('#PBS -e {}'.format(job_tmpl.sched_error_path))
+                lines.append(f"#PBS -e {job_tmpl.sched_error_path}")
 
         if job_tmpl.queue_name:
-            lines.append('#PBS -q {}'.format(job_tmpl.queue_name))
+            lines.append(f"#PBS -q {job_tmpl.queue_name}")
 
-        queue_override = os.environ.get('ARCHER_QUEUE')
+        queue_override = os.environ.get("ARCHER_QUEUE")
         if queue_override:
-            lines.append('#PBS -q {}'.format(queue_override))
+            lines.append(f"#PBS -q {queue_override}")
 
         if job_tmpl.account:
-            lines.append('#PBS -A {}'.format(job_tmpl.account))
+            lines.append(f"#PBS -A {job_tmpl.account}")
 
         if job_tmpl.priority:
             # Priority of the job.  Format: host-dependent integer.  Default:
@@ -208,18 +246,22 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
             # attribute to priority.
             # TODO: Here I expect that priority is passed in the correct PBSPro
             # format. To fix.
-            lines.append('#PBS -p {}'.format(job_tmpl.priority))
+            lines.append(f"#PBS -p {job_tmpl.priority}")
 
         if not job_tmpl.job_resource:
-            raise ValueError('Job resources (as the num_machines) are required for the PBSPro scheduler plugin')
+            raise ValueError(
+                "Job resources (as the num_machines) are required for the PBSPro scheduler plugin"
+            )
 
         # NOTE HERE I Added the bigmem flag
-        resource_lines = self._get_resource_lines(num_machines=job_tmpl.job_resource.num_machines,
-                                                  num_mpiprocs_per_machine=job_tmpl.job_resource.num_mpiprocs_per_machine,
-                                                  num_cores_per_machine=job_tmpl.job_resource.num_cores_per_machine,
-                                                  max_memory_kb=job_tmpl.max_memory_kb,
-                                                  bigmem=job_tmpl.job_resource.bigmem,
-                                                  max_wallclock_seconds=job_tmpl.max_wallclock_seconds)
+        resource_lines = self._get_resource_lines(
+            num_machines=job_tmpl.job_resource.num_machines,
+            num_mpiprocs_per_machine=job_tmpl.job_resource.num_mpiprocs_per_machine,
+            num_cores_per_machine=job_tmpl.job_resource.num_cores_per_machine,
+            max_memory_kb=job_tmpl.max_memory_kb,
+            bigmem=job_tmpl.job_resource.bigmem,
+            max_wallclock_seconds=job_tmpl.max_wallclock_seconds,
+        )
 
         lines += resource_lines
 
@@ -234,12 +276,14 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
 
         if job_tmpl.job_environment:
             lines.append(empty_line)
-            lines.append('# ENVIRONMENT VARIABLES BEGIN ###')
+            lines.append("# ENVIRONMENT VARIABLES BEGIN ###")
             if not isinstance(job_tmpl.job_environment, dict):
-                raise ValueError('If you provide job_environment, it must be a dictionary')
+                raise ValueError(
+                    "If you provide job_environment, it must be a dictionary"
+                )
             for key, value in job_tmpl.job_environment.items():
-                lines.append('export {}={}'.format(key.strip(), escape_for_bash(value)))
-            lines.append('# ENVIRONMENT VARIABLES  END  ###')
+                lines.append(f"export {key.strip()}={escape_for_bash(value)}")
+            lines.append("# ENVIRONMENT VARIABLES  END  ###")
             lines.append(empty_line)
 
         # Required to change directory to the working directory, that is
@@ -247,10 +291,17 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
         lines.append('cd "$PBS_O_WORKDIR"')
         lines.append(empty_line)
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
-    def _get_resource_lines(self, num_machines, num_mpiprocs_per_machine, num_cores_per_machine, max_memory_kb, max_wallclock_seconds,
-                            bigmem):
+    def _get_resource_lines(
+        self,
+        num_machines,
+        num_mpiprocs_per_machine,
+        num_cores_per_machine,
+        max_memory_kb,
+        max_wallclock_seconds,
+        bigmem,
+    ):
         """
         Return the lines for machines, memory and wallclock relative
         to pbspro.
@@ -260,10 +311,10 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
 
         return_lines = []
 
-        select_string = 'select={}'.format(num_machines)
+        select_string = f"select={num_machines}"
 
         # Archer does not like these flag?
-        #if num_mpiprocs_per_machine:
+        # if num_mpiprocs_per_machine:
         #    select_string += ":mpiprocs={}".format(num_mpiprocs_per_machine)
 
         #        if num_cores_per_machine:
@@ -275,17 +326,21 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
                 if tot_secs <= 0:
                     raise ValueError
             except ValueError:
-                raise ValueError('max_wallclock_seconds must be '
-                                 "a positive integer (in seconds)! It is instead '{}'"
-                                 ''.format(max_wallclock_seconds))
+                raise ValueError(
+                    "max_wallclock_seconds must be "
+                    "a positive integer (in seconds)! It is instead '{}'"
+                    "".format(max_wallclock_seconds)
+                )
             hours = tot_secs // 3600
             tot_minutes = tot_secs % 3600
             minutes = tot_minutes // 60
             seconds = tot_minutes % 60
-            return_lines.append('#PBS -l walltime={:02d}:{:02d}:{:02d}'.format(hours, minutes, seconds))
+            return_lines.append(
+                f"#PBS -l walltime={hours:02d}:{minutes:02d}:{seconds:02d}"
+            )
 
         if bigmem:
-            select_string += ':bigmem=true'
+            select_string += ":bigmem=true"
 
         if max_memory_kb:
             try:
@@ -293,8 +348,12 @@ class PbsArcherScheduler(PbsBaseClass, Scheduler):
                 if virtualMemoryKb <= 0:
                     raise ValueError
             except ValueError:
-                raise ValueError('max_memory_kb must be ' "a positive integer (in kB)! It is instead '{}'" ''.format((max_memory_kb)))
-            select_string += ':mem={}kb'.format(virtualMemoryKb)
+                raise ValueError(
+                    "max_memory_kb must be "
+                    "a positive integer (in kB)! It is instead '{}'"
+                    "".format(max_memory_kb)
+                )
+            select_string += f":mem={virtualMemoryKb}kb"
 
-        return_lines.append('#PBS -l {}'.format(select_string))
+        return_lines.append(f"#PBS -l {select_string}")
         return return_lines

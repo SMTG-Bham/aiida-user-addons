@@ -2,44 +2,44 @@
 Module for preparing standardised input for calculations
 """
 
+from copy import deepcopy
 from math import pi
 from pathlib import Path
-from copy import deepcopy
 
 import yaml
 from ase import Atoms
 
 FELEMS = [
-    'La',
-    'Ce',
-    'Pr',
-    'Nd',
-    'Pm',
-    'Sm',
-    'Eu',
-    'Gd',
-    'Tb',
-    'Dy',
-    'Ho',
-    'Er',
-    'Tm',
-    'Yb',
-    'Lu',
-    'Ac',
-    'Th',
-    'Pa',
-    'U',
-    'Np',
-    'Pu',
-    'Am',
-    'Cm',
-    'Bk',
-    'Cf',
-    'Es',
-    'Fm',
-    'Md',
-    'No',
-    'Lr',
+    "La",
+    "Ce",
+    "Pr",
+    "Nd",
+    "Pm",
+    "Sm",
+    "Eu",
+    "Gd",
+    "Tb",
+    "Dy",
+    "Ho",
+    "Er",
+    "Tm",
+    "Yb",
+    "Lu",
+    "Ac",
+    "Th",
+    "Pa",
+    "U",
+    "Np",
+    "Pu",
+    "Am",
+    "Cm",
+    "Bk",
+    "Cf",
+    "Es",
+    "Fm",
+    "Md",
+    "No",
+    "Lr",
 ]
 
 
@@ -55,8 +55,9 @@ class InputSet:
     Not useful on its own, should be subclass for convenient definition of inputs
     for high-throughput calculations.
     """
+
     # path from which the set yaml files are read
-    _load_paths = (get_library_path(), Path('~/.inputsets').expanduser())
+    _load_paths = (get_library_path(), Path("~/.inputsets").expanduser())
 
     def __init__(self, set_name, structure, overrides=None, verbose=True):
         """
@@ -84,11 +85,12 @@ class InputSet:
         Get a input dictionary for VASP
         """
         from aiida.orm import Dict
-        out_dict = deepcopy(self._presets['global'])
+
+        out_dict = deepcopy(self._presets["global"])
 
         # Set-per atom properties
         natoms = self.natoms
-        for key, value in self._presets.get('per_atom', {}).items():
+        for key, value in self._presets.get("per_atom", {}).items():
             out_dict[key] = value * natoms
 
         self.apply_overrides(out_dict)
@@ -101,14 +103,14 @@ class InputSet:
         """Load stored data"""
         set_path = None
         for parent in self._load_paths:
-            set_path = parent / (self.set_name + '.yaml')
+            set_path = parent / (self.set_name + ".yaml")
             if set_path.is_file():
                 break
         if set_path is None:
-            raise RuntimeError(f'Cannot find input set definition for {self.set_name}')
+            raise RuntimeError(f"Cannot find input set definition for {self.set_name}")
 
         if self.verbose:
-            print(f'Using input set file at: {set_path}')
+            print(f"Using input set file at: {set_path}")
 
         with open(set_path) as fhd:
             self._presets = yaml.load(fhd, Loader=yaml.FullLoader)
@@ -132,7 +134,7 @@ class InputSet:
         for name, value in self.overrides.items():
             # Keys ends with '_mapping' are treated differently here
             # Those valuse should have been applied already implemented in the `get_input_dict` method.
-            if '_mapping' in name or '_list' in name:
+            if "_mapping" in name or "_list" in name:
                 continue
             # Delete the key
             if value is None:
@@ -151,6 +153,7 @@ class InputSet:
           An KpointsData object with the desired density
         """
         from aiida.orm import KpointsData
+
         kpoints = KpointsData()
         kpoints.set_cell(self.structure.cell)
         kpoints.set_kpoints_mesh_from_density(density * 2 * pi)

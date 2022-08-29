@@ -5,17 +5,31 @@ The functions are adapted from ase.io.res module
 import re
 from functools import namedtuple
 from pathlib import Path
-from typing import Union, Tuple
+from typing import Tuple, Union
 
-from ase.geometry import cellpar_to_cell
-from ase import Atoms
-from aiida.orm import SinglefileData, StructureData
 from aiida.engine import calcfunction
+from aiida.orm import SinglefileData, StructureData
+from ase import Atoms
+from ase.geometry import cellpar_to_cell
 
 # TITL 2LFP-11212-7612-5 -0.0373 309.998985 -1.21516192E+004 16.0000 16.2594 28 (P-1) n - 1
 #              0             1        2            3             4       5    6   7   8 9 10
-TitlInfo = namedtuple('TitlInfo',
-                      ['label', 'pressure', 'volume', 'enthalpy', 'spin', 'spin_abs', 'natoms', 'symm', 'flag1', 'flag2', 'flag3'])
+TitlInfo = namedtuple(
+    "TitlInfo",
+    [
+        "label",
+        "pressure",
+        "volume",
+        "enthalpy",
+        "spin",
+        "spin_abs",
+        "natoms",
+        "symm",
+        "flag1",
+        "flag2",
+        "flag3",
+    ],
+)
 
 
 def parse_titl(line):
@@ -57,24 +71,26 @@ def read_res(lines) -> Tuple[TitlInfo, Atoms]:
                                 ([0-9\-\.]+)\s+
                                 ([0-9\-\.]+)\s+
                                 ([0-9\-\.]+)\s+
-                                ([0-9\-\.]+)""", re.VERBOSE)
+                                ([0-9\-\.]+)""",
+        re.VERBOSE,
+    )
     line_no = 0
     title_items = []
     while line_no < len(lines):
         line = lines[line_no]
         tokens = line.split()
         if tokens:
-            if tokens[0] == 'TITL':
+            if tokens[0] == "TITL":
                 # Skip the TITLE line, the information is not used
                 # in this package
                 title_items = parse_titl(line)
 
-            elif tokens[0] == 'CELL' and len(tokens) == 8:
+            elif tokens[0] == "CELL" and len(tokens) == 8:
                 abc = [float(tok) for tok in tokens[2:5]]
                 ang = [float(tok) for tok in tokens[5:8]]
-            elif tokens[0] == 'SFAC':
+            elif tokens[0] == "SFAC":
                 for atom_line in lines[line_no:]:
-                    if line.strip() == 'END':
+                    if line.strip() == "END":
                         break
                     match = coord_patt.search(atom_line)
                     if match:
@@ -84,7 +100,13 @@ def read_res(lines) -> Tuple[TitlInfo, Atoms]:
                     line_no += 1  # Make sure the global is updated
         line_no += 1
 
-    return title_items, Atoms(symbols=species, scaled_positions=coords, cell=cellpar_to_cell(list(abc) + list(ang)), pbc=True, info=info)
+    return title_items, Atoms(
+        symbols=species,
+        scaled_positions=coords,
+        cell=cellpar_to_cell(list(abc) + list(ang)),
+        pbc=True,
+        info=info,
+    )
 
 
 def read_stream(stream):
@@ -101,7 +123,7 @@ def read_stream(stream):
         # Skip any empty lines
         if not line:
             continue
-        if 'TITL' in line:
+        if "TITL" in line:
             if in_file is True:
                 # read the current file
                 titl, atoms = read_res(lines)
@@ -121,7 +143,7 @@ def read_stream(stream):
 @calcfunction
 def structure_from_res(resfile: SinglefileData) -> StructureData:
     """Return a structure from a given SHRELX file"""
-    lines = resfile.get_object_content(resfile.filename).split('\n')
+    lines = resfile.get_object_content(resfile.filename).split("\n")
     title, atoms = read_res(lines)
     atoms.wrap()
     out = StructureData(ase=atoms)

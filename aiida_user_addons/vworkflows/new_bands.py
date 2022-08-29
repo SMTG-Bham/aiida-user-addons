@@ -6,28 +6,35 @@ TODO:
 - Improve the hybrid workchain by performing local dryrun to extract the full kpoints
     - If running SOC, the ISYM should be turned to 0 or -1.
 """
-from copy import deepcopy
-from typing import List
-from tempfile import mkdtemp
-from pathlib import Path
 import shutil
+from copy import deepcopy
 from gzip import GzipFile
+from pathlib import Path
+from tempfile import mkdtemp
+from typing import List
 
-import numpy as np
 import aiida.orm as orm
+import numpy as np
 from aiida.common.extendeddicts import AttributeDict
 from aiida.common.links import LinkType
-from aiida.engine import WorkChain, calcfunction, if_, append_
-from aiida.plugins import WorkflowFactory
+from aiida.engine import WorkChain, append_, calcfunction, if_
 from aiida.orm.nodes.data.base import to_aiida_type
+from aiida.plugins import WorkflowFactory
+from aiida_vasp.utils.aiida_utils import get_data_class
 
-from aiida_user_addons.process.transform import magnetic_structure_decorate, magnetic_structure_dedecorate
-
+from aiida_user_addons.process.transform import (
+    magnetic_structure_decorate,
+    magnetic_structure_dedecorate,
+)
 from aiida_user_addons.tools.sumo_kpath import kpath_from_sumo
 
+from .common import (
+    OVERRIDE_NAMESPACE,
+    nested_update,
+    nested_update_dict_node,
+)
 from .mixins import WithVaspInputSet
-from .common import OVERRIDE_NAMESPACE, nested_update_dict_node, nested_update
-from aiida_vasp.utils.aiida_utils import get_data_class
+
 try:
     from aiida_vasp.parsers.content_parsers.vasprun import VasprunParser
 except ImportError:
@@ -61,9 +68,10 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
     Input for bands and dos calculations are optional. However, if they are needed, the full list of inputs must
     be passed. For the `parameters` node, one may choose to only specify those fields that need to be updated.
     """
-    _base_wk_string = 'vaspu.vasp'
-    _relax_wk_string = 'vaspu.relax'
-    DEFAULT_BAND_MODE = 'bradcrack'
+
+    _base_wk_string = "vaspu.vasp"
+    _relax_wk_string = "vaspu.relax"
+    DEFAULT_BAND_MODE = "bradcrack"
     DEFAULT_LINE_DENSITY = 20
     DEFAULT_SYMPREC = 0.01
 
@@ -74,84 +82,113 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         relax_work = WorkflowFactory(cls._relax_wk_string)
         base_work = WorkflowFactory(cls._base_wk_string)
 
-        spec.input('structure', help='The input structure', valid_type=orm.StructureData)
-        spec.input('bs_kpoints',
-                   help='Explicit kpoints for the bands. Will not generate kpoints if supplied.',
-                   valid_type=orm.KpointsData,
-                   required=False)
-        spec.input('bands_kpoints_distance',
-                   help='Spacing for band distances for automatic kpoints generation, used by seekpath-aiida mode.',
-                   valid_type=orm.Float,
-                   required=False)
-        spec.input('line_density',
-                   help='Density of the point along the path, used by sumo interface.',
-                   valid_type=orm.Float,
-                   required=False)
-        spec.input('band_mode',
-                   help='Mode for generating the band path. Choose from: bradcrack, pymatgen, seekpath, seekpath-aiida and latimer-munro.',
-                   required=False,
-                   valid_type=orm.Str)
-        spec.input('symprec', help='Precision of the symmetry determination', valid_type=orm.Float, required=True)
         spec.input(
-            'dos_kpoints_density',
-            help='Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.',
+            "structure", help="The input structure", valid_type=orm.StructureData
+        )
+        spec.input(
+            "bs_kpoints",
+            help="Explicit kpoints for the bands. Will not generate kpoints if supplied.",
+            valid_type=orm.KpointsData,
+            required=False,
+        )
+        spec.input(
+            "bands_kpoints_distance",
+            help="Spacing for band distances for automatic kpoints generation, used by seekpath-aiida mode.",
+            valid_type=orm.Float,
+            required=False,
+        )
+        spec.input(
+            "line_density",
+            help="Density of the point along the path, used by sumo interface.",
+            valid_type=orm.Float,
+            required=False,
+        )
+        spec.input(
+            "band_mode",
+            help="Mode for generating the band path. Choose from: bradcrack, pymatgen, seekpath, seekpath-aiida and latimer-munro.",
+            required=False,
+            valid_type=orm.Str,
+        )
+        spec.input(
+            "symprec",
+            help="Precision of the symmetry determination",
+            valid_type=orm.Float,
+            required=True,
+        )
+        spec.input(
+            "dos_kpoints_density",
+            help="Kpoints for running DOS calculations in A^-1 * 2pi. Will perform non-SCF DOS calculation is supplied.",
             serializer=to_aiida_type,
             required=False,
             valid_type=orm.Float,
         )
-        spec.expose_inputs(relax_work,
-                           namespace='relax',
-                           exclude=('structure',),
-                           namespace_options={
-                               'required': False,
-                               'populate_defaults': False,
-                               'help': 'Inputs for Relaxation workchain, if needed'
-                           })
-        spec.expose_inputs(base_work,
-                           namespace='scf',
-                           exclude=('structure',),
-                           namespace_options={
-                               'required': True,
-                               'populate_defaults': True,
-                               'help': 'Inputs for SCF workchain, mandatory'
-                           })
-        spec.expose_inputs(base_work,
-                           namespace='bands',
-                           exclude=('structure', 'kpoints'),
-                           namespace_options={
-                               'required': False,
-                               'populate_defaults': False,
-                               'help': 'Inputs for bands calculation, if needed'
-                           })
-        spec.expose_inputs(base_work,
-                           namespace='dos',
-                           exclude=('structure',),
-                           namespace_options={
-                               'required': False,
-                               'populate_defaults': False,
-                               'help': 'Inputs for DOS calculation, if needed'
-                           })
-        spec.input('clean_children_workdir',
-                   valid_type=orm.Str,
-                   serializer=to_aiida_type,
-                   help='What part of the called children to clean',
-                   required=False,
-                   default=lambda: orm.Str('none'))
+        spec.expose_inputs(
+            relax_work,
+            namespace="relax",
+            exclude=("structure",),
+            namespace_options={
+                "required": False,
+                "populate_defaults": False,
+                "help": "Inputs for Relaxation workchain, if needed",
+            },
+        )
+        spec.expose_inputs(
+            base_work,
+            namespace="scf",
+            exclude=("structure",),
+            namespace_options={
+                "required": True,
+                "populate_defaults": True,
+                "help": "Inputs for SCF workchain, mandatory",
+            },
+        )
+        spec.expose_inputs(
+            base_work,
+            namespace="bands",
+            exclude=("structure", "kpoints"),
+            namespace_options={
+                "required": False,
+                "populate_defaults": False,
+                "help": "Inputs for bands calculation, if needed",
+            },
+        )
+        spec.expose_inputs(
+            base_work,
+            namespace="dos",
+            exclude=("structure",),
+            namespace_options={
+                "required": False,
+                "populate_defaults": False,
+                "help": "Inputs for DOS calculation, if needed",
+            },
+        )
         spec.input(
-            'only_dos',
+            "clean_children_workdir",
+            valid_type=orm.Str,
+            serializer=to_aiida_type,
+            help="What part of the called children to clean",
             required=False,
-            help='Flag for running only DOS calculations',
+            default=lambda: orm.Str("none"),
+        )
+        spec.input(
+            "only_dos",
+            required=False,
+            help="Flag for running only DOS calculations",
             valid_type=orm.Bool,
             serializer=to_aiida_type,
         )
-        spec.input('chgcar',
-                   required=False,
-                   valid_type=get_data_class('vasp.chargedensity'),
-                   help='Explicit CHGCAR file used for DOS/Bands calculations')
-        spec.input('restart_folder',
-                   required=False,
-                   valid_type=get_data_class('remote'),
-                   help='A remote folder containing the CHGCAR file to be used')
+        spec.input(
+            "chgcar",
+            required=False,
+            valid_type=get_data_class("vasp.chargedensity"),
+            help="Explicit CHGCAR file used for DOS/Bands calculations",
+        )
+        spec.input(
+            "restart_folder",
+            required=False,
+            valid_type=get_data_class("remote"),
+            help="A remote folder containing the CHGCAR file to be used",
+        )
         spec.outline(
             cls.setup,
             if_(cls.should_do_relax)(
@@ -167,53 +204,71 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
             cls.inspect_bands_dos,
         )
 
-        spec.output('primitive_structure', required=False, help='Primitive structure used for band structure calculations')
-        spec.output('band_structure', required=False, help='Computed band structure with labels')
-        spec.output('seekpath_parameters', help='Parameters used by seekpath', required=False)
-        spec.output('dos', required=False)
-        spec.output('projectors', required=False)
+        spec.output(
+            "primitive_structure",
+            required=False,
+            help="Primitive structure used for band structure calculations",
+        )
+        spec.output(
+            "band_structure", required=False, help="Computed band structure with labels"
+        )
+        spec.output(
+            "seekpath_parameters", help="Parameters used by seekpath", required=False
+        )
+        spec.output("dos", required=False)
+        spec.output("projectors", required=False)
 
-        spec.exit_code(501, 'ERROR_SUB_PROC_RELAX_FAILED', message='Relaxation workchain failed')
-        spec.exit_code(502, 'ERROR_SUB_PROC_SCF_FAILED', message='SCF workchain failed')
-        spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
-        spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
-        spec.exit_code(601, 'ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE', message='The input structure is not the primitive one!')
+        spec.exit_code(
+            501, "ERROR_SUB_PROC_RELAX_FAILED", message="Relaxation workchain failed"
+        )
+        spec.exit_code(502, "ERROR_SUB_PROC_SCF_FAILED", message="SCF workchain failed")
+        spec.exit_code(
+            503,
+            "ERROR_SUB_PROC_BANDS_FAILED",
+            message="Band structure workchain failed",
+        )
+        spec.exit_code(504, "ERROR_SUB_PROC_DOS_FAILED", message="DOS workchain failed")
+        spec.exit_code(
+            601,
+            "ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE",
+            message="The input structure is not the primitive one!",
+        )
 
     def select_chgcar_from_inputs(self):
         """Setup CHGCAR from inputs"""
-        if self.inputs.get('chgcar'):
+        if self.inputs.get("chgcar"):
             self.ctx.chgcar = self.inputs.chgcar
-            self.report('Using CHGCAR {} from input'.format(self.inputs.chgcar))
+            self.report(f"Using CHGCAR {self.inputs.chgcar} from input")
         else:
             self.ctx.chgcar = None
 
-        if self.inputs.get('restart_folder'):
+        if self.inputs.get("restart_folder"):
             self.ctx.restart_folder = self.inputs.restart_folder
-            self.report('Using remote folder {} for restart'.format(self.inputs.restart_folder))
+            self.report(f"Using remote folder {self.inputs.restart_folder} for restart")
         else:
             self.ctx.restart_folder = None
 
     def setup(self):
         """Setup the calculation"""
         self.ctx.current_structure = self.inputs.structure
-        self.ctx.bs_kpoints = self.inputs.get('bs_kpoints')
+        self.ctx.bs_kpoints = self.inputs.get("bs_kpoints")
         param = self.inputs.scf.parameters.get_dict()
-        if 'magmom' in param[OVERRIDE_NAMESPACE] and not self.inputs.get('only_dos'):
-            self.report('Magnetic system passed for BS')
-            self.ctx.magmom = param[OVERRIDE_NAMESPACE]['magmom']
+        if "magmom" in param[OVERRIDE_NAMESPACE] and not self.inputs.get("only_dos"):
+            self.report("Magnetic system passed for BS")
+            self.ctx.magmom = param[OVERRIDE_NAMESPACE]["magmom"]
         else:
             self.ctx.magmom = None
 
     def should_do_relax(self):
         """Wether we should do relax or not"""
-        return 'relax' in self.inputs
+        return "relax" in self.inputs
 
     def run_relax(self):
         """Run the relaxation"""
         relax_work = WorkflowFactory(self._relax_wk_string)
-        inputs = self.exposed_inputs(relax_work, 'relax', agglomerate=True)
+        inputs = self.exposed_inputs(relax_work, "relax", agglomerate=True)
         inputs = AttributeDict(inputs)
-        inputs.metadata.call_link_label = 'relax'
+        inputs.metadata.call_link_label = "relax"
         inputs.structure = self.ctx.current_structure
 
         running = self.submit(relax_work, **inputs)
@@ -223,7 +278,7 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         """Verify the relaxation"""
         relax_workchain = self.ctx.workchain_relax
         if not relax_workchain.is_finished_ok:
-            self.report('Relaxation finished with Error')
+            self.report("Relaxation finished with Error")
             return self.exit_codes.ERROR_SUB_PROC_RELAX_FAILED
 
         # Use the relaxed structure as the current structure
@@ -241,7 +296,9 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         Seekpath should only run if no explicit bands is provided or we are just
         running for DOS, in which case the original structure is used.
         """
-        return 'bs_kpoints' not in self.inputs and (not self.inputs.get('only_dos', False))
+        return "bs_kpoints" not in self.inputs and (
+            not self.inputs.get("only_dos", False)
+        )
 
     def generate_path(self):
         """
@@ -250,56 +307,69 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
 
         current_structure_backup = self.ctx.current_structure
 
-        mode = self.inputs.get('band_mode')
+        mode = self.inputs.get("band_mode")
         if mode is None:
             mode = self.DEFAULT_BAND_MODE
         else:
             mode = mode.value
 
-        if mode == 'seekpath-aiida':
-            inputs = {'reference_distance': self.inputs.get('bands_kpoints_distance', None), 'metadata': {'call_link_label': 'seekpath'}}
+        if mode == "seekpath-aiida":
+            inputs = {
+                "reference_distance": self.inputs.get("bands_kpoints_distance", None),
+                "metadata": {"call_link_label": "seekpath"},
+            }
             func = seekpath_structure_analysis
         else:
             # Using sumo interface
             inputs = {
-                'line_density': self.inputs.get('line_density', orm.Float(self.DEFAULT_LINE_DENSITY)),
-                'symprec': self.inputs.get('symprec', orm.Float(self.DEFAULT_SYMPREC)),
-                'mode': orm.Str(mode),
-                'metadata': {
-                    'call_link_label': 'sumo_kpath'
-                }
+                "line_density": self.inputs.get(
+                    "line_density", orm.Float(self.DEFAULT_LINE_DENSITY)
+                ),
+                "symprec": self.inputs.get("symprec", orm.Float(self.DEFAULT_SYMPREC)),
+                "mode": orm.Str(mode),
+                "metadata": {"call_link_label": "sumo_kpath"},
             }
             func = kpath_from_sumo
 
-        magmom = self.ctx.get('magmom', None)
+        magmom = self.ctx.get("magmom", None)
 
         # For magnetic structures, create different kinds for the analysis in case that the
         # symmetry should be lowered. This also makes sure that the magnetic moments are consistent
         if magmom:
-            decorate_result = magnetic_structure_decorate(self.ctx.current_structure, orm.List(list=magmom))
-            decorated = decorate_result['structure']
+            decorate_result = magnetic_structure_decorate(
+                self.ctx.current_structure, orm.List(list=magmom)
+            )
+            decorated = decorate_result["structure"]
             # Run seekpath on the decorated structure
             kpath_results = func(decorated, **inputs)
-            decorated_primitive = kpath_results['primitive_structure']
+            decorated_primitive = kpath_results["primitive_structure"]
             # Convert back to undecorated structures and add consistent magmom input
-            dedecorate_result = magnetic_structure_dedecorate(decorated_primitive, decorate_result['mapping'])
-            self.ctx.magmom = dedecorate_result['magmom'].get_list()
-            self.ctx.current_structure = dedecorate_result['structure']
+            dedecorate_result = magnetic_structure_dedecorate(
+                decorated_primitive, decorate_result["mapping"]
+            )
+            self.ctx.magmom = dedecorate_result["magmom"].get_list()
+            self.ctx.current_structure = dedecorate_result["structure"]
         else:
             kpath_results = func(self.ctx.current_structure, **inputs)
-            self.ctx.current_structure = kpath_results['primitive_structure']
+            self.ctx.current_structure = kpath_results["primitive_structure"]
 
-        if not np.allclose(self.ctx.current_structure.cell, current_structure_backup.cell):
-            if self.inputs.scf.get('kpoints'):
+        if not np.allclose(
+            self.ctx.current_structure.cell, current_structure_backup.cell
+        ):
+            if self.inputs.scf.get("kpoints"):
                 self.report(
-                    'The primitive structure is not the same as the input structure but explicty kpoints are supplied - aborting the workchain.'
+                    "The primitive structure is not the same as the input structure but explicty kpoints are supplied - aborting the workchain."
                 )
-                return self.exit_codes.ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE  # pylint: disable=no-member
-            self.report('The primitive structure is not the same as the input structure - using the former for all calculations from now.')
-        self.ctx.bs_kpoints = kpath_results['explicit_kpoints']
-        self.out('primitive_structure', self.ctx.current_structure)
-        if 'parameters' in kpath_results:
-            self.out('seekpath_parameters', kpath_results['parameters'])
+                return (
+                    self.exit_codes.ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE
+                )  # pylint: disable=no-member
+            self.report(
+                "The primitive structure is not the same as the input structure - using the former for all calculations from now."
+            )
+        self.ctx.bs_kpoints = kpath_results["explicit_kpoints"]
+        self.out("primitive_structure", self.ctx.current_structure)
+        if "parameters" in kpath_results:
+            self.out("seekpath_parameters", kpath_results["parameters"])
 
     def run_scf(self):
         """
@@ -307,13 +377,13 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         """
 
         base_work = WorkflowFactory(self._base_wk_string)
-        inputs = AttributeDict(self.exposed_inputs(base_work, namespace='scf'))
-        inputs.metadata.call_link_label = 'scf'
-        inputs.metadata.label = self.inputs.metadata.label + ' SCF'
+        inputs = AttributeDict(self.exposed_inputs(base_work, namespace="scf"))
+        inputs.metadata.call_link_label = "scf"
+        inputs.metadata.label = self.inputs.metadata.label + " SCF"
         inputs.structure = self.ctx.current_structure
 
         # Turn off cleaning of the working directory
-        clean = inputs.get('clean_workdir')
+        clean = inputs.get("clean_workdir")
         if clean and clean.value == False:
             pass
         else:
@@ -321,41 +391,45 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
 
         # Ensure that writing the CHGCAR file is on
         pdict = inputs.parameters.get_dict()
-        if (pdict[OVERRIDE_NAMESPACE].get('lcharg') == False) or (pdict[OVERRIDE_NAMESPACE].get('LCHARG') == False):
-            pdict[OVERRIDE_NAMESPACE]['lcharg'] = True
+        if (pdict[OVERRIDE_NAMESPACE].get("lcharg") == False) or (
+            pdict[OVERRIDE_NAMESPACE].get("LCHARG") == False
+        ):
+            pdict[OVERRIDE_NAMESPACE]["lcharg"] = True
             inputs.parameters = orm.Dict(dict=pdict)
-            self.report('Correction: setting LCHARG to True')
+            self.report("Correction: setting LCHARG to True")
 
         # Take magmom from the context, in case that the magmom is rearranged in the primitive cell
-        magmom = self.ctx.get('magmom')
+        magmom = self.ctx.get("magmom")
         if magmom:
-            inputs.parameters = nested_update_dict_node(inputs.parameters, {OVERRIDE_NAMESPACE: {'magmom': magmom}})
+            inputs.parameters = nested_update_dict_node(
+                inputs.parameters, {OVERRIDE_NAMESPACE: {"magmom": magmom}}
+            )
 
         running = self.submit(base_work, **inputs)
-        self.report('Running SCF calculation {}'.format(running))
+        self.report(f"Running SCF calculation {running}")
         self.to_context(workchain_scf=running)
 
     def verify_scf(self):
         """Inspect the SCF calculation"""
         scf_workchain = self.ctx.workchain_scf
         if not scf_workchain.is_finished_ok:
-            self.report('SCF workchain finished with Error')
+            self.report("SCF workchain finished with Error")
             return self.exit_codes.ERROR_SUB_PROC_SCF_FAILED
 
         # Store the charge density or remote reference
-        if 'chgcar' in scf_workchain.outputs:
+        if "chgcar" in scf_workchain.outputs:
             self.ctx.chgcar = scf_workchain.outputs.chgcar
         else:
             self.ctx.chgcar = None
         self.ctx.restart_folder = scf_workchain.outputs.remote_folder
-        self.report('SCF calculation {} completed'.format(scf_workchain))
+        self.report(f"SCF calculation {scf_workchain} completed")
 
     def run_bands_dos(self):
         """Run the bands and the DOS calculations"""
         base_work = WorkflowFactory(self._base_wk_string)
 
         # Use the SCF inputs as the base
-        inputs = AttributeDict(self.exposed_inputs(base_work, namespace='scf'))
+        inputs = AttributeDict(self.exposed_inputs(base_work, namespace="scf"))
         inputs.structure = self.ctx.current_structure
 
         if self.ctx.restart_folder:
@@ -364,34 +438,40 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         if self.ctx.chgcar:
             inputs.chgcar = self.ctx.chgcar
 
-        if not (inputs.get('restart_folder') or inputs.get('chgcar')):
-            raise RuntimeError('One of the restart_folder or chgcar must be set for non-scf calculations')
+        if not (inputs.get("restart_folder") or inputs.get("chgcar")):
+            raise RuntimeError(
+                "One of the restart_folder or chgcar must be set for non-scf calculations"
+            )
 
         running = {}
 
-        only_dos = self.inputs.get('only_dos')
+        only_dos = self.inputs.get("only_dos")
 
         if (only_dos is None) or (only_dos.value is False):
-            if 'bands' in self.inputs:
-                bands_input = AttributeDict(self.exposed_inputs(base_work, namespace='bands'))
+            if "bands" in self.inputs:
+                bands_input = AttributeDict(
+                    self.exposed_inputs(base_work, namespace="bands")
+                )
             else:
-                bands_input = AttributeDict({
-                    'settings': orm.Dict(dict={'parser_settings': {
-                        'add_bands': True
-                    }}),
-                    'parameters': orm.Dict(dict={'charge': {
-                        'constant_charge': True
-                    }}),
-                })
+                bands_input = AttributeDict(
+                    {
+                        "settings": orm.Dict(
+                            dict={"parser_settings": {"add_bands": True}}
+                        ),
+                        "parameters": orm.Dict(
+                            dict={"charge": {"constant_charge": True}}
+                        ),
+                    }
+                )
 
             # Special treatment - combine the parameters
             parameters = inputs.parameters.get_dict()
             bands_parameters = bands_input.parameters.get_dict()
 
-            if 'charge' in bands_parameters:
-                bands_parameters['charge']['constant_charge'] = True
+            if "charge" in bands_parameters:
+                bands_parameters["charge"]["constant_charge"] = True
             else:
-                bands_parameters['charge'] = {'constant_charge': True}
+                bands_parameters["charge"] = {"constant_charge": True}
 
             nested_update(parameters, bands_parameters)
 
@@ -400,8 +480,8 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
             inputs.parameters = orm.Dict(dict=parameters)
 
             # Check if add_bands
-            settings = inputs.get('settings')
-            essential = {'parser_settings': {'add_bands': True}}
+            settings = inputs.get("settings")
+            essential = {"parser_settings": {"add_bands": True}}
             if settings is None:
                 inputs.settings = orm.Dict(dict=essential)
             else:
@@ -411,31 +491,37 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
             inputs.kpoints = self.ctx.bs_kpoints
 
             # Tag the calculation
-            inputs.metadata.label = self.inputs.metadata.label + ' BS'
-            inputs.metadata.call_link_label = 'bs'
+            inputs.metadata.label = self.inputs.metadata.label + " BS"
+            inputs.metadata.call_link_label = "bs"
 
             bands_calc = self.submit(base_work, **inputs)
-            running['bands_workchain'] = bands_calc
-            self.report('Submitted workchain {} for band structure'.format(bands_calc))
+            running["bands_workchain"] = bands_calc
+            self.report(f"Submitted workchain {bands_calc} for band structure")
 
         # Do DOS calculation if dos input namespace is populated or a
         # dos_kpoints input is passed.
-        if ('dos_kpoints_density' in self.inputs) or ('dos' in self.inputs):
+        if ("dos_kpoints_density" in self.inputs) or ("dos" in self.inputs):
 
-            if 'dos' in self.inputs:
-                dos_input = AttributeDict(self.exposed_inputs(base_work, namespace='dos'))
+            if "dos" in self.inputs:
+                dos_input = AttributeDict(
+                    self.exposed_inputs(base_work, namespace="dos")
+                )
             else:
-                dos_input = AttributeDict({
-                    'settings': orm.Dict(dict={'add_dos': True}),
-                    'parameters': orm.Dict(dict={'charge': {
-                        'constant_charge': True
-                    }}),
-                })
+                dos_input = AttributeDict(
+                    {
+                        "settings": orm.Dict(dict={"add_dos": True}),
+                        "parameters": orm.Dict(
+                            dict={"charge": {"constant_charge": True}}
+                        ),
+                    }
+                )
             # Use the supplied kpoints density for DOS
-            if 'dos_kpoints_density' in self.inputs:
+            if "dos_kpoints_density" in self.inputs:
                 dos_kpoints = orm.KpointsData()
                 dos_kpoints.set_cell_from_structure(self.ctx.current_structure)
-                dos_kpoints.set_kpoints_mesh_from_density(self.inputs.dos_kpoints_density.value * 2 * np.pi)
+                dos_kpoints.set_kpoints_mesh_from_density(
+                    self.inputs.dos_kpoints_density.value * 2 * np.pi
+                )
                 dos_input.kpoints = dos_kpoints
 
             # Special treatment - combine the parameters
@@ -444,20 +530,20 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
             nested_update(parameters, dos_parameters)
 
             # Ensure we start from constant charge
-            if 'charge' in dos_parameters:
-                dos_parameters['charge']['constant_charge'] = True
+            if "charge" in dos_parameters:
+                dos_parameters["charge"]["constant_charge"] = True
             else:
-                dos_parameters['charge'] = {'constant_charge': True}
+                dos_parameters["charge"] = {"constant_charge": True}
 
             # Apply updated parameters
             inputs.update(dos_input)
             inputs.parameters = orm.Dict(dict=parameters)
 
-            if 'dos' not in self.inputs:
+            if "dos" not in self.inputs:
                 # kindly add `add_dos` if the `dos` input namespace is not
                 # explicitly defined.
-                settings = inputs.get('settings')
-                essential = {'parser_settings': {'add_dos': True}}
+                settings = inputs.get("settings")
+                essential = {"parser_settings": {"add_dos": True}}
 
                 if settings is None:
                     inputs.settings = orm.Dict(dict=essential)
@@ -465,12 +551,12 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
                     inputs.settings = nested_update_dict_node(settings, essential)
 
             # Set the label
-            inputs.metadata.label = self.inputs.metadata.label + ' DOS'
-            inputs.metadata.call_link_label = 'dos'
+            inputs.metadata.label = self.inputs.metadata.label + " DOS"
+            inputs.metadata.call_link_label = "dos"
 
             dos_calc = self.submit(base_work, **inputs)
-            running['dos_workchain'] = dos_calc
-            self.report('Submitted workchain {} for DOS'.format(dos_calc))
+            running["dos_workchain"] = dos_calc
+            self.report(f"Submitted workchain {dos_calc} for DOS")
 
         return self.to_context(**running)
 
@@ -479,25 +565,32 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
 
         exit_code = None
 
-        if 'bands_workchain' in self.ctx:
+        if "bands_workchain" in self.ctx:
             bands = self.ctx.bands_workchain
             if not bands.is_finished_ok:
-                self.report('Bands calculation finished with error, exit_status: {}'.format(bands, bands.exit_status))
+                self.report(
+                    f"Bands calculation finished with error, exit_status: {bands}"
+                )
                 exit_code = self.exit_codes.ERROR_SUB_PROC_BANDS_FAILED
-            self.out('band_structure', compose_labelled_bands(bands.outputs.bands, bands.inputs.kpoints))
+            self.out(
+                "band_structure",
+                compose_labelled_bands(bands.outputs.bands, bands.inputs.kpoints),
+            )
         else:
             bands = None
 
-        if 'dos_workchain' in self.ctx:
+        if "dos_workchain" in self.ctx:
             dos = self.ctx.dos_workchain
             if not dos.is_finished_ok:
-                self.report('DOS calculation finished with error, exit_status: {}'.format(dos.exit_status))
+                self.report(
+                    f"DOS calculation finished with error, exit_status: {dos.exit_status}"
+                )
                 exit_code = self.exit_codes.ERROR_SUB_PROC_DOS_FAILED
 
             # Attach outputs
-            self.out('dos', dos.outputs.dos)
-            if 'projectors' in dos.outputs:
-                self.out('projectors', dos.outputs.projectors)
+            self.out("dos", dos.outputs.dos)
+            if "projectors" in dos.outputs:
+                self.out("projectors", dos.outputs.projectors)
         else:
             dos = None
 
@@ -508,20 +601,24 @@ class VaspBandsWorkChain(WorkChain, WithVaspInputSet):
         Clean the remote directories of all called childrens
         """
 
-        super(VaspBandsWorkChain, self).on_terminated()
+        super().on_terminated()
 
-        if self.inputs.clean_children_workdir.value != 'none':
+        if self.inputs.clean_children_workdir.value != "none":
             cleaned_calcs = []
             for called_descendant in self.node.called_descendants:
                 if isinstance(called_descendant, orm.CalcJobNode):
                     try:
                         called_descendant.outputs.remote_folder._clean()  # pylint: disable=protected-access
                         cleaned_calcs.append(called_descendant.pk)
-                    except (IOError, OSError, KeyError):
+                    except (OSError, KeyError):
                         pass
 
             if cleaned_calcs:
-                self.report('cleaned remote folders of calculations: {}'.format(' '.join(map(str, cleaned_calcs))))
+                self.report(
+                    "cleaned remote folders of calculations: {}".format(
+                        " ".join(map(str, cleaned_calcs))
+                    )
+                )
 
 
 @calcfunction
@@ -542,7 +639,9 @@ def seekpath_structure_analysis(structure, **kwargs):
     from aiida.tools import get_explicit_kpoints_path
 
     # All keyword arugments should be `Data` node instances of base type and so should have the `.value` attribute
-    unwrapped_kwargs = {key: node.value for key, node in kwargs.items() if isinstance(node, orm.Data)}
+    unwrapped_kwargs = {
+        key: node.value for key, node in kwargs.items() if isinstance(node, orm.Data)
+    }
 
     return get_explicit_kpoints_path(structure, **unwrapped_kwargs)
 
@@ -567,22 +666,23 @@ def get_primitive_strucrture_and_scf_kpoints(structure):
     VASP and getting the explicity kpoints for SCF calculation.
     """
     # Locate the relaxation work
-    from aiida_user_addons.tools.dryrun import dryrun_relax_builder
     from aiida.tools import get_explicit_kpoints_path
 
+    from aiida_user_addons.tools.dryrun import dryrun_relax_builder
+
     # Locate the relaxation work
-    relax_work = structure.get_incoming(link_label_filter='relax__structure').one().node
-    primitive = get_explicit_kpoints_path(structure)['primitive_structure']
+    relax_work = structure.get_incoming(link_label_filter="relax__structure").one().node
+    primitive = get_explicit_kpoints_path(structure)["primitive_structure"]
 
     # Create an restart builder
     builder = relax_work.get_builder_restart()
     builder.structure = primitive
 
     # Dryrun and construct the SCF kpoints
-    kpoint_weights = np.array(dryrun_relax_builder(builder)['kpoints_and_weights'])
+    kpoint_weights = np.array(dryrun_relax_builder(builder)["kpoints_and_weights"])
     scf_kpoints = orm.KpointsData()
     scf_kpoints.set_kpoints(kpoint_weights[:, :3], weights=kpoint_weights[:, -1])
-    return {'primitive': primitive, 'scf_kpoints': scf_kpoints}
+    return {"primitive": primitive, "scf_kpoints": scf_kpoints}
 
 
 class VaspHybridBandsWorkChain(VaspBandsWorkChain):
@@ -615,33 +715,43 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
         relax_work = WorkflowFactory(cls._relax_wk_string)
         base_work = WorkflowFactory(cls._base_wk_string)
 
-        spec.input('kpoints_per_split',
-                   valid_type=orm.Int,
-                   help='Number of kpoints per split, INCLUDING the weighted SCF kpoints.',
-                   required=True)
-        spec.input('structure', help='The input structure', valid_type=orm.StructureData)
-        spec.expose_inputs(relax_work,
-                           namespace='relax',
-                           exclude=('structure',),
-                           namespace_options={
-                               'required': False,
-                               'populate_defaults': False,
-                               'help': 'Inputs for Relaxation workchain, if needed'
-                           })
-        spec.expose_inputs(base_work,
-                           namespace='scf',
-                           exclude=('structure',),
-                           namespace_options={
-                               'required': True,
-                               'populate_defaults': True,
-                               'help': 'Inputs for SCF workchain, mandatory'
-                           })
-        spec.input('clean_children_workdir',
-                   valid_type=orm.Str,
-                   serializer=to_aiida_type,
-                   help='What part of the called children to clean',
-                   required=False,
-                   default=lambda: orm.Str('none'))
+        spec.input(
+            "kpoints_per_split",
+            valid_type=orm.Int,
+            help="Number of kpoints per split, INCLUDING the weighted SCF kpoints.",
+            required=True,
+        )
+        spec.input(
+            "structure", help="The input structure", valid_type=orm.StructureData
+        )
+        spec.expose_inputs(
+            relax_work,
+            namespace="relax",
+            exclude=("structure",),
+            namespace_options={
+                "required": False,
+                "populate_defaults": False,
+                "help": "Inputs for Relaxation workchain, if needed",
+            },
+        )
+        spec.expose_inputs(
+            base_work,
+            namespace="scf",
+            exclude=("structure",),
+            namespace_options={
+                "required": True,
+                "populate_defaults": True,
+                "help": "Inputs for SCF workchain, mandatory",
+            },
+        )
+        spec.input(
+            "clean_children_workdir",
+            valid_type=orm.Str,
+            serializer=to_aiida_type,
+            help="What part of the called children to clean",
+            required=False,
+            default=lambda: orm.Str("none"),
+        )
         spec.outline(
             cls.setup,
             if_(cls.should_do_relax)(
@@ -654,39 +764,74 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
             cls.inspect_and_combine_bands,  # Combined the band structure
         )
 
-        spec.output('primitive_structure', required=False, help='Primitive structure used for band structure calculations')
-        spec.output('band_structure', required=False, help='Computed band structure with labels')
-        spec.output('seekpath_parameters', help='Parameters used by seekpath', required=False)
+        spec.output(
+            "primitive_structure",
+            required=False,
+            help="Primitive structure used for band structure calculations",
+        )
+        spec.output(
+            "band_structure", required=False, help="Computed band structure with labels"
+        )
+        spec.output(
+            "seekpath_parameters", help="Parameters used by seekpath", required=False
+        )
 
-        spec.exit_code(501, 'ERROR_SUB_PROC_RELAX_FAILED', message='Relaxation workchain failed')
-        spec.exit_code(502, 'ERROR_SUB_PROC_SCF_FAILED', message='SCF workchain failed')
-        spec.exit_code(503, 'ERROR_SUB_PROC_BANDS_FAILED', message='Band structure workchain failed')
-        spec.exit_code(504, 'ERROR_SUB_PROC_DOS_FAILED', message='DOS workchain failed')
-        spec.exit_code(505, 'ERROR_NO_VALID_SCF_KPOINTS_INPUT', message='Cannot found valid inputs for SCF kpoints')
-        spec.exit_code(601, 'ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE', message='The input structure is not the primitive one!')
+        spec.exit_code(
+            501, "ERROR_SUB_PROC_RELAX_FAILED", message="Relaxation workchain failed"
+        )
+        spec.exit_code(502, "ERROR_SUB_PROC_SCF_FAILED", message="SCF workchain failed")
+        spec.exit_code(
+            503,
+            "ERROR_SUB_PROC_BANDS_FAILED",
+            message="Band structure workchain failed",
+        )
+        spec.exit_code(504, "ERROR_SUB_PROC_DOS_FAILED", message="DOS workchain failed")
+        spec.exit_code(
+            505,
+            "ERROR_NO_VALID_SCF_KPOINTS_INPUT",
+            message="Cannot found valid inputs for SCF kpoints",
+        )
+        spec.exit_code(
+            601,
+            "ERROR_INPUT_STRUCTURE_NOT_PRIMITIVE",
+            message="The input structure is not the primitive one!",
+        )
 
     def make_splitted_kpoints(self):
         """Split the kpoints"""
         # Fully specified band structure kpoints
         full_kpoints = self.ctx.bs_kpoints
 
-        if 'kpoints' in self.inputs.scf:
+        if "kpoints" in self.inputs.scf:
             scf_kpoints = self.inputs.scf.kpoints
         # Relaxation workchain has kpoints output
-        elif 'workchain_relax' in self.ctx and 'kpoints' in self.ctx['workchain_relax'].outputs:
+        elif (
+            "workchain_relax" in self.ctx
+            and "kpoints" in self.ctx["workchain_relax"].outputs
+        ):
             scf_kpoints = self.ctx.workchain_relax.outputs.kpoints
-            self.report('Using output from <{}> for SCF kpoints.'.format(self.ctx.workchain_relax))
+            self.report(
+                f"Using output from <{self.ctx.workchain_relax}> for SCF kpoints."
+            )
         # Parse from relaxation output
-        elif 'workchain_relax' in self.ctx:
+        elif "workchain_relax" in self.ctx:
             # Try getting the kpoints from the retrieved folder
             scf_kpoints = extract_kpoints_from_calc(self.ctx.workchain_relax)
-            self.report('Extracted SCF kpoints from retrieved vasprun.xml of <{}>.'.format(self.ctx.workchain_relax))
+            self.report(
+                f"Extracted SCF kpoints from retrieved vasprun.xml of <{self.ctx.workchain_relax}>."
+            )
         else:
-            self.report('No valid SCF kpoints is avaliable to use. Please define scf.kpoints explicitly!')
-            return self.exit_codes.ERROR_NO_VALID_SCF_KPOINTS_INPUT  # pylint: disable=no-member
+            self.report(
+                "No valid SCF kpoints is avaliable to use. Please define scf.kpoints explicitly!"
+            )
+            return (
+                self.exit_codes.ERROR_NO_VALID_SCF_KPOINTS_INPUT
+            )  # pylint: disable=no-member
 
         # Number of kpoints per split, NOT including the SCF kpoints
-        per_split = orm.Int(self.inputs.kpoints_per_split.value - scf_kpoints.get_kpoints().shape[0])
+        per_split = orm.Int(
+            self.inputs.kpoints_per_split.value - scf_kpoints.get_kpoints().shape[0]
+        )
         kpoints_for_calc = split_kpoints(scf_kpoints, full_kpoints, per_split)
         self.ctx.kpoints_for_calc = kpoints_for_calc
 
@@ -697,24 +842,30 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
 
         workflow_class = WorkflowFactory(self._base_wk_string)
         for key, value in self.ctx.kpoints_for_calc.items():
-            idx = int(key.split('_')[-1])
+            idx = int(key.split("_")[-1])
 
-            inputs = self.exposed_inputs(workflow_class, 'scf')
+            inputs = self.exposed_inputs(workflow_class, "scf")
 
             # Ensure that the bands are parsed
-            if 'settings' not in inputs:
-                inputs.settings = orm.Dict(dict={'parser_settings': {'add_bands': True}})
+            if "settings" not in inputs:
+                inputs.settings = orm.Dict(
+                    dict={"parser_settings": {"add_bands": True}}
+                )
             else:
                 # Merge with 'parser_settings'
-                inputs.settings = nested_update_dict_node(inputs.settings, {'parser_settings': {'add_bands': True}})
+                inputs.settings = nested_update_dict_node(
+                    inputs.settings, {"parser_settings": {"add_bands": True}}
+                )
 
             # Swap the kpoints the the one with zero-weight parts
             inputs.kpoints = value
-            inputs.metadata.label = self.inputs.metadata.label + f' SPLIT {idx}'
-            inputs.metadata.call_link_label = f'bandstructure_split_{idx:03d}'
+            inputs.metadata.label = self.inputs.metadata.label + f" SPLIT {idx}"
+            inputs.metadata.call_link_label = f"bandstructure_split_{idx:03d}"
             inputs.structure = self.ctx.current_structure
             running = self.submit(workflow_class, **inputs)
-            self.report('launching {}<{}> for split #{}'.format(workflow_class.__name__, running.pk, idx))
+            self.report(
+                f"launching {workflow_class.__name__}<{running.pk}> for split #{idx}"
+            )
             self.to_context(workchains=append_(running))
 
     def inspect_and_combine_bands(self):
@@ -725,19 +876,23 @@ class VaspHybridBandsWorkChain(VaspBandsWorkChain):
 
         return_codes = [work.exit_status for work in workchains]
         if any(return_codes):
-            self.report('At least one calculation did not have zero return code!')
+            self.report("At least one calculation did not have zero return code!")
 
         # Extract the bands information
-        self.report(f'Extracting output bandstructure from {len(self.ctx.workchains)} workchains.')
+        self.report(
+            f"Extracting output bandstructure from {len(self.ctx.workchains)} workchains."
+        )
         kwargs = {}
         for work in workchains:
-            link_label = work.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
-            link_idx = int(link_label.split('_')[-1])
-            kwargs[f'band_{link_idx:03d}'] = work.outputs.bands
-            kwargs[f'kpoint_{link_idx:03d}'] = work.inputs.kpoints
+            link_label = (
+                work.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
+            )
+            link_idx = int(link_label.split("_")[-1])
+            kwargs[f"band_{link_idx:03d}"] = work.outputs.bands
+            kwargs[f"kpoint_{link_idx:03d}"] = work.inputs.kpoints
 
         combined_bands = combine_bands_data(self.ctx.bs_kpoints, **kwargs)
-        self.out('band_structure', combined_bands)
+        self.out("band_structure", combined_bands)
 
 
 @calcfunction
@@ -750,7 +905,9 @@ def split_kpoints(scf_kpoints, band_kpoints, kpn_per_split):
     return _split_kpoints(scf_kpoints, band_kpoints, kpn_per_split)
 
 
-def _split_kpoints(scf_kpoints: orm.KpointsData, band_kpoints: orm.KpointsData, kpn_per_split: orm.Int):
+def _split_kpoints(
+    scf_kpoints: orm.KpointsData, band_kpoints: orm.KpointsData, kpn_per_split: orm.Int
+):
     """
     Split the kpoints into multiple one and combined with SCF kpoints
 
@@ -763,7 +920,9 @@ def _split_kpoints(scf_kpoints: orm.KpointsData, band_kpoints: orm.KpointsData, 
 
     # Split the kpoints
     kpn_per_split = int(kpn_per_split)
-    kpt_splits = [band_kpn[i:i + kpn_per_split] for i in range(0, nband_kpts, kpn_per_split)]
+    kpt_splits = [
+        band_kpn[i : i + kpn_per_split] for i in range(0, nband_kpts, kpn_per_split)
+    ]
 
     splitted_kpoints = {}
     for isplit, skpts in enumerate(kpt_splits):
@@ -774,18 +933,20 @@ def _split_kpoints(scf_kpoints: orm.KpointsData, band_kpoints: orm.KpointsData, 
         weights_array[:nscf_kpts] = scf_weights_array
         # Set kpoints and the weights
         kpt.set_kpoints(kpt_array, weights=weights_array)
-        kpt.label = f'SPLIT {isplit:03d}'
-        kpt.description = 'Splitted kpoints'
-        splitted_kpoints[f'bs_kpoints_{isplit:03d}'] = kpt
+        kpt.label = f"SPLIT {isplit:03d}"
+        kpt.description = "Splitted kpoints"
+        splitted_kpoints[f"bs_kpoints_{isplit:03d}"] = kpt
 
     return splitted_kpoints
 
 
-def dryrun_split_kpoints(structure: orm.StructureData,
-                         scf_kpoints: orm.KpointsData,
-                         kpn_per_split: orm.Int,
-                         kpoints_args=None,
-                         verbose=True):
+def dryrun_split_kpoints(
+    structure: orm.StructureData,
+    scf_kpoints: orm.KpointsData,
+    kpn_per_split: orm.Int,
+    kpoints_args=None,
+    verbose=True,
+):
     """
     Perform a "dryrun" for splitting the kpoints
     """
@@ -794,12 +955,12 @@ def dryrun_split_kpoints(structure: orm.StructureData,
     if kpoints_args is None:
         kpoints_args = {}
     seekpath_results = get_explicit_kpoints_path(structure, **kpoints_args)
-    explicit_kpoints = seekpath_results['explicit_kpoints']
+    explicit_kpoints = seekpath_results["explicit_kpoints"]
     splitted = _split_kpoints(scf_kpoints, explicit_kpoints, kpn_per_split)
     if verbose:
         nseg = len(splitted)
         nkpts = [kpn.get_kpoints().shape[0] for kpn in splitted.values()]
-        print(f'Splitted in to {nseg} segements with number of kpoints: {nkpts}')
+        print(f"Splitted in to {nseg} segements with number of kpoints: {nkpts}")
     return seekpath_results, splitted
 
 
@@ -814,18 +975,28 @@ def combine_bands_data(bs_kpoints, **kwargs):
 
     Returns a `BandsData` by combining the zero-weighted bands from each calculation.
     """
-    kpoints_list = [[node, int(key.split('_')[1])] for key, node in kwargs.items() if 'kpoint' in key]
+    kpoints_list = [
+        [node, int(key.split("_")[1])]
+        for key, node in kwargs.items()
+        if "kpoint" in key
+    ]
     kpoints_list.sort(key=lambda x: x[1])
     kpoints_list = [item[0] for item in kpoints_list]
 
-    bands_list = [[node, int(key.split('_')[1])] for key, node in kwargs.items() if 'band' in key]
+    bands_list = [
+        [node, int(key.split("_")[1])] for key, node in kwargs.items() if "band" in key
+    ]
     bands_list.sort(key=lambda x: x[1])
     bands_list = [item[0] for item in bands_list]
 
     return _combine_bands_data(bs_kpoints, kpoints_list, bands_list)
 
 
-def _combine_bands_data(bs_kpoints: orm.KpointsData, kpoints_list: List[orm.KpointsData], bands_list: List[orm.BandsData]):
+def _combine_bands_data(
+    bs_kpoints: orm.KpointsData,
+    kpoints_list: List[orm.KpointsData],
+    bands_list: List[orm.BandsData],
+):
     """
     Combine bands from splitted kpoints into a single bands node.
 
@@ -837,12 +1008,12 @@ def _combine_bands_data(bs_kpoints: orm.KpointsData, kpoints_list: List[orm.Kpoi
 
     for skpts, sbands in zip(kpoints_list, bands_list):
         kpt_array, weights_array = skpts.get_kpoints(also_weights=True)
-        zero_weight_mask = weights_array == 0.
+        zero_weight_mask = weights_array == 0.0
         kpoints_combine.append(kpt_array[zero_weight_mask, :])
 
         bands_array = sbands.get_bands()
-        if 'occupations' in sbands.get_arraynames():
-            occ_array = sbands.get_array('occupations')
+        if "occupations" in sbands.get_arraynames():
+            occ_array = sbands.get_array("occupations")
         else:
             occ_array = None
 
@@ -873,7 +1044,9 @@ def _combine_bands_data(bs_kpoints: orm.KpointsData, kpoints_list: List[orm.Kpoi
     # Sanity check all valid kpoints should combine into the original path
     all_kpoints = np.concatenate(kpoints_combine, axis=0)
     if not np.allclose(all_kpoints, bs_kpoints.get_kpoints()):
-        raise ValueError('The k-path segements do not much the original path when combined!')
+        raise ValueError(
+            "The k-path segements do not much the original path when combined!"
+        )
 
     # Compose the node
     band_data = orm.BandsData()
@@ -904,39 +1077,41 @@ def _extract_kpoints_from_retrieved(retrieved):
     Extract explicity kpoints from a finished calculation
     """
     tmpdir = Path(mkdtemp())
-    if 'vasprun.xml' in retrieved.list_object_names():
-        with retrieved.open('vasprun.xml', mode='r') as fsrc:
-            with open(tmpdir / 'vasprun.xml', mode='w') as fdst:
+    if "vasprun.xml" in retrieved.list_object_names():
+        with retrieved.open("vasprun.xml", mode="r") as fsrc:
+            with open(tmpdir / "vasprun.xml", mode="w") as fdst:
                 shutil.copyfileobj(fsrc, fdst)
-    elif 'vasprun.xml.gz' in retrieved.list_object_names():
-        with retrieved.open('vasprun.xml.gz', mode='rb') as fsrc:
-            with GzipFile(fileobj=fsrc, mode='rb') as gobj:
-                with open(tmpdir / 'vasprun.xml', mode='wb') as fdst:
+    elif "vasprun.xml.gz" in retrieved.list_object_names():
+        with retrieved.open("vasprun.xml.gz", mode="rb") as fsrc:
+            with GzipFile(fileobj=fsrc, mode="rb") as gobj:
+                with open(tmpdir / "vasprun.xml", mode="wb") as fdst:
                     shutil.copyfileobj(gobj, fdst)
     else:
-        raise RuntimeError('No valid vasprun.xml file to use!!')
+        raise RuntimeError("No valid vasprun.xml file to use!!")
 
     new_format = False
 
     try:
         # NOTE should be deprecated!!!
-        parser = VasprunParser(file_path=str(tmpdir / 'vasprun.xml'))
+        parser = VasprunParser(file_path=str(tmpdir / "vasprun.xml"))
     except TypeError:
         # Use newer version - use file_obj instead
         new_format = True
-        with open(tmpdir / 'vasprun.xml') as fh:
+        with open(tmpdir / "vasprun.xml") as fh:
             parser = VasprunParser(handler=fh)
 
     vkpoints = parser.kpoints
-    if vkpoints['mode'] != 'explicit':
-        raise ValueError('Only explicity kpoints is supported!')
+    if vkpoints["mode"] != "explicit":
+        raise ValueError("Only explicity kpoints is supported!")
 
     if new_format:
-        kpoints_array = vkpoints['points']
-        weights_array = vkpoints['weights']
+        kpoints_array = vkpoints["points"]
+        weights_array = vkpoints["weights"]
     else:
-        kpoints_array = np.stack([kpt.get_point() for kpt in vkpoints['points']], axis=0)
-        weights_array = np.array([kpt.get_weight() for kpt in vkpoints['points']])
+        kpoints_array = np.stack(
+            [kpt.get_point() for kpt in vkpoints["points"]], axis=0
+        )
+        weights_array = np.array([kpt.get_weight() for kpt in vkpoints["points"]])
 
     kpoints_data = orm.KpointsData()
     kpoints_data.set_kpoints(kpoints=kpoints_array, weights=weights_array)

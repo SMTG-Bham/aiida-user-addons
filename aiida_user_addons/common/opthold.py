@@ -1,10 +1,11 @@
 """
 Module containing the OptionHolder class
 """
-from typing import Tuple, List
+from typing import List, Tuple
 from warnings import warn
-from aiida.common.extendeddicts import AttributeDict
+
 from aiida.common.exceptions import InputValidationError
+from aiida.common.extendeddicts import AttributeDict
 
 
 class Option(property):
@@ -42,7 +43,7 @@ class Option(property):
         if obj is None:
             return self
         if self.required and self.name not in obj._opt_data:
-            raise ValueError(f'Field {self.name} has not been set yet!')
+            raise ValueError(f"Field {self.name} has not been set yet!")
 
         return obj._opt_data.get(self.name, self.default_value)
 
@@ -60,7 +61,9 @@ class TypedOption(Option):
 
     target_type = bool
 
-    def __init__(self, docstring, default_value=None, required=False, enforce_type=False):
+    def __init__(
+        self, docstring, default_value=None, required=False, enforce_type=False
+    ):
         """
         Instantiate an TypedOption field
 
@@ -76,7 +79,7 @@ class TypedOption(Option):
             if isinstance(value, self.target_type):
                 obj._opt_data[self.name] = value
             else:
-                raise ValueError(f'{value} is not a {self.target_type} type!')
+                raise ValueError(f"{value} is not a {self.target_type} type!")
         else:
             obj._opt_data[self.name] = self.target_type(value)
 
@@ -101,46 +104,61 @@ class ChoiceOption(Option):
     def __set__(self, obj, value):
         """Setter that sets the field"""
         if value not in self.choices:
-            raise ValueError(f'{value} is not a valid choice, choose from: {self.choices}.')
+            raise ValueError(
+                f"{value} is not a valid choice, choose from: {self.choices}."
+            )
         obj._opt_data[self.name] = value
 
 
 class BoolOption(TypedOption):
     """Class for an option that accepts bool values"""
+
     target_type = bool
 
 
 class FloatOption(TypedOption):
     """Class for an option that accepts float values"""
+
     target_type = float
 
 
 class IntOption(TypedOption):
     """Class for an option that accepts integer values"""
+
     target_type = int
 
 
 class DictOption(TypedOption):
     """Class for an option that accepts a dictionary"""
+
     target_type = dict
 
 
 class ListOption(TypedOption):
     """Class for an option that accepts a list"""
+
     target_type = list
 
 
 class ListOrStringOption(TypedOption):
     """Class for an option that accepts a list"""
+
     target_type = (list, str)
 
 
 class StringOption(TypedOption):
     """Class for an option that accepts only string values"""
 
-    def __init__(self, docstring, default_value=None, required=False, enforce_type=True):
+    def __init__(
+        self, docstring, default_value=None, required=False, enforce_type=True
+    ):
         """Instantiate an object, note that we enforce_type by default here."""
-        super().__init__(docstring, default_value=default_value, required=required, enforce_type=enforce_type)
+        super().__init__(
+            docstring,
+            default_value=default_value,
+            required=required,
+            enforce_type=enforce_type,
+        )
 
 
 class OptionContainer:
@@ -159,12 +177,17 @@ class OptionContainer:
 
         # the key word arguments are interpreted as the options to be set, an we check
         # If they are valid in the first place
-        self.valid_options, self.required_options = self._get_valid_and_required_options()
+        (
+            self.valid_options,
+            self.required_options,
+        ) = self._get_valid_and_required_options()
         for key, value in kwargs.items():
             if key in self.valid_options:
                 setattr(self, key, value)
             else:
-                raise ValueError(f'{key} is not a valid option for a {type(self)} instance!')
+                raise ValueError(
+                    f"{key} is not a valid option for a {type(self)} instance!"
+                )
 
     def _get_valid_and_required_options(self) -> Tuple[list, list]:
         """
@@ -177,7 +200,7 @@ class OptionContainer:
         required = []
         class_dict = vars(type(self))
         for name in dir(self):
-            if name.startswith('__'):
+            if name.startswith("__"):
                 pass
             # Check if the name exists in the class's __dict__
             if name not in class_dict:
@@ -194,7 +217,7 @@ class OptionContainer:
     @property
     def _invalid_attributes(self) -> List[str]:
         """Any attribute store inside __dict__ is an invalid option"""
-        known = ['_opt_data', 'valid_options', 'required_options']
+        known = ["_opt_data", "valid_options", "required_options"]
         invalid = []
         for key in self.__dict__.keys():
             if key not in known:
@@ -206,7 +229,9 @@ class OptionContainer:
         # Check for any additional attributes
         invalid_attrs = self._invalid_attributes
         if check_invalids and invalid_attrs:
-            raise ValueError(f'The following attributes are not valid options: {invalid_attrs}')
+            raise ValueError(
+                f"The following attributes are not valid options: {invalid_attrs}"
+            )
 
         outdict = {}
         for key in self.valid_options:
@@ -217,20 +242,23 @@ class OptionContainer:
         return AttributeDict(outdict)
 
     def to_aiida_dict(self):
-        """Return an `aiida.orm.Dict` presentation """
+        """Return an `aiida.orm.Dict` presentation"""
         from aiida.orm import Dict
+
         python_dict = self.to_dict()
         return Dict(dict=python_dict)
 
     def __setitem__(self, key, value) -> None:
         """Set items - we call the setattr method"""
         if key not in self.valid_options:
-            raise KeyError(f'{key} is not an valid option for a {type(self)} instance.')
+            raise KeyError(f"{key} is not an valid option for a {type(self)} instance.")
         setattr(self, key, value)
 
     def to_string(self) -> str:
         """In string format"""
-        return self.to_dict(check_invalids=False).__repr__().replace('AttributeDict', '')
+        return (
+            self.to_dict(check_invalids=False).__repr__().replace("AttributeDict", "")
+        )
 
     def __getitem__(self, key):
         """Set items - we just the getattr method"""
@@ -238,12 +266,12 @@ class OptionContainer:
 
     def __repr__(self):
         string = self.to_string()
-        string = string.replace('\n', ' ')
-        string = string.replace('#', '')
+        string = string.replace("\n", " ")
+        string = string.replace("#", "")
         string = string.strip()
         if len(string) > 60:
-            string = string[:60] + '...'
-        return '{}<{}>'.format(type(self).__name__, string)
+            string = string[:60] + "..."
+        return f"{type(self).__name__}<{string}>"
 
     @classmethod
     def validate_dict(cls, input_dict, port=None) -> None:
@@ -266,13 +294,13 @@ class OptionContainer:
         # Check for any missing required fields
         missing = [key for key in all_options if key in obj.required_options]
         if missing:
-            raise InputValidationError(f'There are missing options: {missing}')
+            raise InputValidationError(f"There are missing options: {missing}")
 
         # Check for any problems with obj.to_dict()
         try:
             obj.to_dict()
         except ValueError as error:
-            raise InputValidationError(f'Error during validation: {error.args}')
+            raise InputValidationError(f"Error during validation: {error.args}")
 
     @classmethod
     def serialise(cls, value):
@@ -292,9 +320,20 @@ class OptionContainer:
         # The constructor is different with/without any required_options
         # If there are any required options, it does not make any sense to have a default for the port.
         if obj.required_options:
-            spec.input(port_name, validator=cls.validate_dict, serializer=cls.serialise, **kwargs)
+            spec.input(
+                port_name,
+                validator=cls.validate_dict,
+                serializer=cls.serialise,
+                **kwargs,
+            )
         else:
-            spec.input(port_name, validator=cls.validate_dict, default=lambda: cls().to_aiida_dict(), serializer=cls.serialise, **kwargs)
+            spec.input(
+                port_name,
+                validator=cls.validate_dict,
+                default=lambda: cls().to_aiida_dict(),
+                serializer=cls.serialise,
+                **kwargs,
+            )
 
     @classmethod
     def get_description(cls):
@@ -303,22 +342,33 @@ class OptionContainer:
         """
 
         obj = cls()
-        template = '{:>{width_name}s}:  {:10s} \n{default:>{width_name2}}: {}'
+        template = "{:>{width_name}s}:  {:10s} \n{default:>{width_name2}}: {}"
         entries = []
         for name in obj.valid_options:
             if name not in obj.required_options:
                 value = getattr(obj, name)
                 # Each entry is name, type, doc, default value
-                entries.append([name, getattr(cls, name).__doc__, str(type(value)), value])
+                entries.append(
+                    [name, getattr(cls, name).__doc__, str(type(value)), value]
+                )
             else:
-                entries.append([name, getattr(cls, name).__doc__, 'Undefined', 'None (required)'])
+                entries.append(
+                    [name, getattr(cls, name).__doc__, "Undefined", "None (required)"]
+                )
 
-        max_width_name = max([len(entry[0]) for entry in entries]) + 2
+        max_width_name = max(len(entry[0]) for entry in entries) + 2
 
         lines = []
         for entry in entries:
-            lines.append(template.format(*entry, width_name=max_width_name, width_name2=max_width_name + 10, default='Default'))
-        return '\n'.join(lines)
+            lines.append(
+                template.format(
+                    *entry,
+                    width_name=max_width_name,
+                    width_name2=max_width_name + 10,
+                    default="Default",
+                )
+            )
+        return "\n".join(lines)
 
 
 ########
@@ -340,7 +390,9 @@ def typed_field(name, types, doc, default):
     def setter(self, value):
         # not None and wrong type - warn about it
         if (value is not None) and (not isinstance(value, types)):
-            raise InputValidationError(f'Value {value} is in the wrong type for {name}, the allowed types are: {types}')
+            raise InputValidationError(
+                f"Value {value} is in the wrong type for {name}, the allowed types are: {types}"
+            )
         self._set_opt(name, value)  # pylint: disable=protected-access
 
     def deleter(self):
@@ -355,13 +407,15 @@ def required_field(name, types, doc):
     def getter(self):
         output = self._get_opt(name)  # pylint: disable=protected-access
         if output is None:
-            raise InputValidationError(f'{name} is a required field!')
+            raise InputValidationError(f"{name} is a required field!")
         return output
 
     def setter(self, value):
         # not None and wrong type - warn about it
         if (value is not None) and (not isinstance(value, types)):
-            raise InputValidationError(f'Value {value} is in the wrong type for {name}, the allowed types are: {types}')
+            raise InputValidationError(
+                f"Value {value} is in the wrong type for {name}, the allowed types are: {types}"
+            )
         self._set_opt(name, value)  # pylint: disable=protected-access
 
     def deleter(self):
@@ -370,7 +424,7 @@ def required_field(name, types, doc):
     return property(getter, setter, deleter, doc)
 
 
-class OptionHolder(object):
+class OptionHolder:
     """
     DEPRECATED.
     A container for holding a dictionary of options.
@@ -397,7 +451,7 @@ class OptionHolder(object):
     @classmethod
     def _validate_class(cls):
         if not cls._allowed_options:
-            raise RuntimeError('Must have non-empty _allowed_options')
+            raise RuntimeError("Must have non-empty _allowed_options")
 
     def __init__(self, **kwargs):
         """
@@ -413,7 +467,11 @@ class OptionHolder(object):
         for key, value in kwargs.items():
             setattr(self, key, value)
 
-        warn('OptionHolder is deprecated and superseeded by OptionContainer', DeprecationWarning, stacklevel=2)
+        warn(
+            "OptionHolder is deprecated and superseeded by OptionContainer",
+            DeprecationWarning,
+            stacklevel=2,
+        )
 
     def _get_opt_dict(self):
         return self._opt_data
@@ -436,14 +494,20 @@ class OptionHolder(object):
 
     def to_string(self):
         """In string format"""
-        return self.to_dict().__repr__().replace('AttributeDict', '')
+        return self.to_dict().__repr__().replace("AttributeDict", "")
 
     def to_dict(self):
         """
         Return a dictionary of the options with values, exclude those with
         values equal to None
         """
-        return AttributeDict({key: getattr(self, key) for key in self._allowed_options if getattr(self, key) is not None})
+        return AttributeDict(
+            {
+                key: getattr(self, key)
+                for key in self._allowed_options
+                if getattr(self, key) is not None
+            }
+        )
 
     @classmethod
     def validate_dict(cls, input_dict, port=None):
@@ -465,17 +529,19 @@ class OptionHolder(object):
             setattr(obj, key, value)
             all_options.remove(key)
         # Check if any of the keys are not set
-        missing = list(filter(lambda x: x not in cls._allowed_empty_fields, all_options))
+        missing = list(
+            filter(lambda x: x not in cls._allowed_empty_fields, all_options)
+        )
         if any(missing):
-            raise InputValidationError(f'Keys: {missing} are missing')
+            raise InputValidationError(f"Keys: {missing} are missing")
         try:
             obj.to_dict()
         except ValueError as error:
-            raise InputValidationError('Problems encouterred: {}'.format(error.args))
+            raise InputValidationError(f"Problems encouterred: {error.args}")
 
     def __setitem__(self, key, value):
         if key not in self._allowed_options:
-            raise KeyError(f'Option {key} is not a valid one!')
+            raise KeyError(f"Option {key} is not a valid one!")
         setattr(self, key, value)
 
     def __getitem__(self, key):
@@ -502,16 +568,17 @@ class OptionHolder(object):
     def to_aiida_dict(self):
         """Construct a orm.Dict object"""
         from aiida.orm import Dict
+
         return Dict(dict=self.to_dict())
 
     def __repr__(self):
         string = self.to_string()
-        string = string.replace('\n', ' ')
-        string = string.replace('#', '')
+        string = string.replace("\n", " ")
+        string = string.replace("#", "")
         string = string.strip()
         if len(string) > 60:
-            string = string[:60] + '...'
-        return '{}<{}>'.format(type(self).__name__, string)
+            string = string[:60] + "..."
+        return f"{type(self).__name__}<{string}>"
 
     @classmethod
     def serialise(cls, value):
@@ -528,7 +595,13 @@ class OptionHolder(object):
     @classmethod
     def setup_spec(cls, spec, port_name, **kwargs):
         """Setup the spec for this input"""
-        spec.input(port_name, validator=cls.validate_dict, default=lambda: cls().to_aiida_dict(), serializer=cls.serialise, **kwargs)
+        spec.input(
+            port_name,
+            validator=cls.validate_dict,
+            default=lambda: cls().to_aiida_dict(),
+            serializer=cls.serialise,
+            **kwargs,
+        )
 
     @classmethod
     def get_description(cls):
@@ -537,17 +610,24 @@ class OptionHolder(object):
         """
 
         obj = cls()
-        template = '{:>{width_name}s}:  {:10s} \n{type:>{width_name2}}: {} \n{default:>{width_name2}}: {}'
+        template = "{:>{width_name}s}:  {:10s} \n{type:>{width_name2}}: {} \n{default:>{width_name2}}: {}"
         entries = []
         for name in cls._allowed_options:
             value = getattr(obj, name)
             # Each entry is name, type, doc, default value
             entries.append([name, getattr(cls, name).__doc__, str(type(value)), value])
 
-        max_width_name = max([len(entry[0]) for entry in entries]) + 2
+        max_width_name = max(len(entry[0]) for entry in entries) + 2
 
         lines = []
         for entry in entries:
-            lines.append(template.format(*entry, width_name=max_width_name, width_name2=max_width_name + 10, default='Default',
-                                         type='Type'))
-        return '\n'.join(lines)
+            lines.append(
+                template.format(
+                    *entry,
+                    width_name=max_width_name,
+                    width_name2=max_width_name + 10,
+                    default="Default",
+                    type="Type",
+                )
+            )
+        return "\n".join(lines)

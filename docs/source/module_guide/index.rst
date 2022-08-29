@@ -8,4 +8,3 @@ Modules provided with plugin (API reference)
     calculations
     data
     parsers
-

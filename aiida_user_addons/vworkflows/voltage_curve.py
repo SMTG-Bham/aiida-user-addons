@@ -14,35 +14,51 @@ The basic logic is the following:
 6. Store the segments of the curve
 
 """
-from aiida.orm.querybuilder import QueryBuilder
-import numpy as np
-
-from pymatgen.core import Structure
 import aiida.orm as orm
+import numpy as np
 from aiida.common.links import LinkType
-from aiida.engine import WorkChain, if_, append_, calcfunction
+from aiida.engine import WorkChain, append_, calcfunction, if_
+from aiida.orm.querybuilder import QueryBuilder
 from aiida.plugins import WorkflowFactory
+from pymatgen.core import Structure
 from pymatgen.core.composition import Composition
 from sqlalchemy.orm.query import Query
 
-from aiida_user_addons.process.transform import delithiate_by_wyckoff, delithiate_full, delithiate_unique_sites, rattle
-from aiida_user_addons.process.battery import VoltageCurve, _obtain_li_ref_calc, compute_li_voltage_shortcut, check_li_ref_calc
-from aiida_user_addons.common.opthold import OptionContainer, IntOption, Option
 from aiida_user_addons.common.inputset.vaspsets import get_ldau_keys
 from aiida_user_addons.common.misc import get_energy_from_misc
+from aiida_user_addons.common.opthold import (
+    IntOption,
+    Option,
+    OptionContainer,
+)
+from aiida_user_addons.process.battery import (
+    VoltageCurve,
+    _obtain_li_ref_calc,
+    check_li_ref_calc,
+    compute_li_voltage_shortcut,
+    create_delithiated_multiple_level,
+)
+from aiida_user_addons.process.transform import (
+    delithiate_by_wyckoff,
+    delithiate_full,
+    delithiate_unique_sites,
+    rattle,
+)
 from aiida_user_addons.tools.pymatgen import get_entry_from_calc
-from aiida_user_addons.process.battery import create_delithiated_multiple_level
 
-from .mixins import WithVaspInputSet
 from .common import OVERRIDE_NAMESPACE
+from .mixins import WithVaspInputSet
 
-VaspRelaxWorkChain = WorkflowFactory('vaspu.relax')
+VaspRelaxWorkChain = WorkflowFactory("vaspu.relax")
 
 
 class EwaldFilterOptions(OptionContainer):
     """Options for filtering the delithiated structure by electrostatic energies"""
-    oxidation_state_mapping = Option('Mapping for the oxidation states', required=True)
-    pick_ewald_n_lowest = IntOption('Number of lowest energy structures to be picked', default_value=10)
+
+    oxidation_state_mapping = Option("Mapping for the oxidation states", required=True)
+    pick_ewald_n_lowest = IntOption(
+        "Number of lowest energy structures to be picked", default_value=10
+    )
 
 
 class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
@@ -56,6 +72,7 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
     The input (lithiated) structure is optimised first, and then delithiated structures are created and submitted for calculation.
     Optionally, this can be skipped by directly passing the `misc` output of the relaxed lithiated structure.
     """
+
     ALLOWED_OK_EXIT_CODES = [601]
 
     @classmethod
@@ -63,37 +80,49 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
 
         super().define(spec)
 
-        spec.expose_inputs(VaspRelaxWorkChain, 'relax', exclude=('structure',))
-        spec.input('ewald_filter_settings',
-                   valid_type=orm.Dict,
-                   serializer=EwaldFilterOptions.serialise,
-                   required=False,
-                   help=f'Parameters for controlling filtering structure using Ewald summation:\n{EwaldFilterOptions.get_description()}')
-        spec.input('structure', valid_type=orm.StructureData)
-        spec.input('rattle', valid_type=orm.Float, help='Amplitude of rattling', default=lambda: orm.Float(0.05))
+        spec.expose_inputs(VaspRelaxWorkChain, "relax", exclude=("structure",))
         spec.input(
-            'final_li_level',
+            "ewald_filter_settings",
+            valid_type=orm.Dict,
+            serializer=EwaldFilterOptions.serialise,
+            required=False,
+            help=f"Parameters for controlling filtering structure using Ewald summation:\n{EwaldFilterOptions.get_description()}",
+        )
+        spec.input("structure", valid_type=orm.StructureData)
+        spec.input(
+            "rattle",
             valid_type=orm.Float,
-            help=
-            ('Final lithiation level with respect to the reduced formula of the non-Li part of the composition. '
-             'For example, if the formula is Li3O2, then the non-Li part is O2, whose reduced formula is O, hence this composition has a Li level of 3.'
-            ))
+            help="Amplitude of rattling",
+            default=lambda: orm.Float(0.05),
+        )
         spec.input(
-            'lithiated_calc_misc',
+            "final_li_level",
+            valid_type=orm.Float,
+            help=(
+                "Final lithiation level with respect to the reduced formula of the non-Li part of the composition. "
+                "For example, if the formula is Li3O2, then the non-Li part is O2, whose reduced formula is O, hence this composition has a Li level of 3."
+            ),
+        )
+        spec.input(
+            "lithiated_calc_misc",
             valid_type=orm.Dict,
             required=False,
-            help=
-            'The misc output of a calculation for the fully lithiated phase. If passed, will not perform any relaxation for the initial lithiated structure.'
+            help="The misc output of a calculation for the fully lithiated phase. If passed, will not perform any relaxation for the initial lithiated structure.",
         )
         spec.input(
-            'li_metal_calc_misc',
+            "li_metal_calc_misc",
             valid_type=orm.Dict,
             required=True,
-            help='The `misc` output of a reference calculation for Li metal',
+            help="The `misc` output of a reference calculation for Li metal",
         )
-        spec.input('atol', required=False, valid_type=orm.Float, help='Symmetry tolerance for generating unique structures.')
         spec.input(
-            'ldau_mapping',
+            "atol",
+            required=False,
+            valid_type=orm.Float,
+            help="Symmetry tolerance for generating unique structures.",
+        )
+        spec.input(
+            "ldau_mapping",
             required=True,  # I set it to be mandatory here as in most cases we will need a U
             help="""Settings for assign LDA+U related settings according to the input structure.
 
@@ -101,11 +130,14 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
     utype: the type of LDA+U, default to 2, which is the one with only one parameter
     jmapping: a dictionary in the format of  {"Mn": [d, 4]...} but for J
     felec: Wether we are dealing with f electrons, will increase lmaxmix if we are.""",
-            valid_type=orm.Dict)
-        spec.input('deli_magmom_mapping',
-                   required=True,
-                   help='Mapping for MAGMOM for the delithiated state. For example: {"Fe": 5.0, "Co": 3.0}.',
-                   valid_type=orm.Dict)
+            valid_type=orm.Dict,
+        )
+        spec.input(
+            "deli_magmom_mapping",
+            required=True,
+            help='Mapping for MAGMOM for the delithiated state. For example: {"Fe": 5.0, "Co": 3.0}.',
+            valid_type=orm.Dict,
+        )
         spec.outline(
             cls.setup,
             if_(cls.should_run_initial_relax)(
@@ -116,26 +148,50 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
             cls.run_delithiated_relax,  # Deploy relaxation for the delithiated structures
             cls.result,  # Finialise the results
         )
-        spec.output_namespace('relaxed_delithiated_structures',
-                              dynamic=True,
-                              valid_type=orm.StructureData,
-                              required=True,
-                              help='Relaxed delithiated structures')
-        spec.output('relaxed_lithiated_structure', valid_type=orm.StructureData, required=False, help='Relaxed original structure')
-        spec.output('voltage_curve_data', valid_type=orm.Dict, required=True, help='Summary data regarding the voltage curve.')
+        spec.output_namespace(
+            "relaxed_delithiated_structures",
+            dynamic=True,
+            valid_type=orm.StructureData,
+            required=True,
+            help="Relaxed delithiated structures",
+        )
+        spec.output(
+            "relaxed_lithiated_structure",
+            valid_type=orm.StructureData,
+            required=False,
+            help="Relaxed original structure",
+        )
+        spec.output(
+            "voltage_curve_data",
+            valid_type=orm.Dict,
+            required=True,
+            help="Summary data regarding the voltage curve.",
+        )
 
-        spec.exit_code(301, 'ERROR_INITIAL_RELAX_FAILED', message='The initial relaxation is failed.')
-        spec.exit_code(401,
-                       'ERROR_SOME_SUB_WORK_FAILED',
-                       message='Some of the launched relaxations have failed - results may still be usable.')
-        spec.exit_code(501, 'ERROR_ALL_SUB_WORK_FAILED', message='All of the launched relaxations have failed.')
+        spec.exit_code(
+            301,
+            "ERROR_INITIAL_RELAX_FAILED",
+            message="The initial relaxation is failed.",
+        )
+        spec.exit_code(
+            401,
+            "ERROR_SOME_SUB_WORK_FAILED",
+            message="Some of the launched relaxations have failed - results may still be usable.",
+        )
+        spec.exit_code(
+            501,
+            "ERROR_ALL_SUB_WORK_FAILED",
+            message="All of the launched relaxations have failed.",
+        )
 
     def setup(self):
         """Setup the workspace"""
         self.ctx.delithiated_frames = {}  # delithiated structures
         self.ctx.delithiated_masks = {}  # masks for the delithiated structures
         self.ctx.workchains = []  # List of WorkChains for the underlying calculation
-        self.ctx.current_structure = self.inputs.structure  # List of the current structure
+        self.ctx.current_structure = (
+            self.inputs.structure
+        )  # List of the current structure
         self.ctx.lithiated_calc = None
 
         # Store the reference calculation for Li metal
@@ -143,7 +199,7 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
 
     def should_run_initial_relax(self):
         """Wether to run the initial relaxation"""
-        if self.inputs.get('lithiated_calc_misc'):
+        if self.inputs.get("lithiated_calc_misc"):
             calc = get_creator(self.inputs.lithiated_calc_misc)
             self.ctx.lithiated_calc = calc
             return False
@@ -151,49 +207,57 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
 
     def run_initial_relax(self):
         """VaspRelaxWorkChain the input structure"""
-        inputs = self.exposed_inputs(VaspRelaxWorkChain, 'relax')
+        inputs = self.exposed_inputs(VaspRelaxWorkChain, "relax")
         inputs.structure = self.inputs.structure
-        inputs.metadata.call_link_label = 'initial_relax'
+        inputs.metadata.call_link_label = "initial_relax"
 
-        if not inputs.metadata.get('label'):
-            inputs.metadata.label = inputs.structure.get_formula('count') + ' RELAX'
+        if not inputs.metadata.get("label"):
+            inputs.metadata.label = inputs.structure.get_formula("count") + " RELAX"
 
         running = self.submit(VaspRelaxWorkChain, **inputs)
         self.to_context(initial_relax=running)
-        self.report(f'Submitted initial relaxation workchain {running}')
+        self.report(f"Submitted initial relaxation workchain {running}")
 
     def verify_initial_relax(self):
         """Verify if the initial relaxation has been a success"""
-        workchain = self.ctx.get('initial_relax')
+        workchain = self.ctx.get("initial_relax")
 
         # Stop if there was a problem
         if not workchain.is_finished_ok:
             return self.exit_codes.ERROR_INITIAL_RELAX_FAILED
 
         try:
-            self.ctx.current_structure = workchain.outputs.relax__structure  # WORKCHAIN specific!
+            self.ctx.current_structure = (
+                workchain.outputs.relax__structure
+            )  # WORKCHAIN specific!
         except AttributeError:
-            self.ctx.current_structure = workchain.outputs.relax.structure  # WORKCHAIN specific!
+            self.ctx.current_structure = (
+                workchain.outputs.relax.structure
+            )  # WORKCHAIN specific!
 
         # Makes sure that the current structure is labelled - as it will be used in the next steps
-        self.ctx.current_structure.label = workchain.inputs.structure.label + ' RELAXED'
+        self.ctx.current_structure.label = workchain.inputs.structure.label + " RELAXED"
         # Record the calculation for the lithiated structure
         self.ctx.lithiated_calc = get_creator(workchain.outputs.misc)
 
-        self.report('Initial relaxation is a success, registerred the relaxed structure')
-        self.out('relaxed_lithiated_structure', self.ctx.current_structure)
+        self.report(
+            "Initial relaxation is a success, registerred the relaxed structure"
+        )
+        self.out("relaxed_lithiated_structure", self.ctx.current_structure)
 
     def generate_delithiated_structures(self):
         """Delithiate the structure at a range of Li concentrations"""
         structure = self.ctx.current_structure
         params = {}
-        if 'atol' in self.inputs:
-            params['atol'] = self.inputs.atol
-        if 'ewald_filter_settings' in self.inputs:
-            params['ewald_filter_settings'] = self.inputs.ewald_filter_settings
+        if "atol" in self.inputs:
+            params["atol"] = self.inputs.atol
+        if "ewald_filter_settings" in self.inputs:
+            params["ewald_filter_settings"] = self.inputs.ewald_filter_settings
 
         # Generate all of the delithiated frames
-        delithiated = create_delithiated_multiple_level(structure, self.inputs.final_li_level, self.inputs.rattle, **params)
+        delithiated = create_delithiated_multiple_level(
+            structure, self.inputs.final_li_level, self.inputs.rattle, **params
+        )
 
         self.ctx.delithiated_frames = delithiated
 
@@ -204,15 +268,15 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
         for istruc, (key, frame) in enumerate(all_frames.items()):
 
             # Now setup the calculations
-            inputs = self.exposed_inputs(VaspRelaxWorkChain, 'relax')
+            inputs = self.exposed_inputs(VaspRelaxWorkChain, "relax")
             inputs.structure = frame  # Use the delithiated structure
 
             # Set the call link label to identify the relaxation for specific structures
-            inputs.metadata.call_link_label = f'relax_{key}'
+            inputs.metadata.call_link_label = f"relax_{key}"
 
             # Label the frame by formula and iterations here we just use the label assigned
             # by the original calcfunction
-            if not inputs.metadata.get('label'):
+            if not inputs.metadata.get("label"):
                 inputs.metadata.label = frame.label
 
             # Setup the parameters - update the magnetic moments
@@ -221,10 +285,10 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
 
             # Apply the supplied mapping for delithiated structures
             magmom = []
-            default = deli_magmom_mapping.get('default', 0.6)  # Default MAGMOM is 0.6
+            default = deli_magmom_mapping.get("default", 0.6)  # Default MAGMOM is 0.6
             for site in frame.sites:
                 magmom.append(deli_magmom_mapping.get(site.kind_name, default))
-            param_dict[OVERRIDE_NAMESPACE]['magmom'] = magmom
+            param_dict[OVERRIDE_NAMESPACE]["magmom"] = magmom
 
             # Setup LDA+U
             ldau_settings = self.inputs.ldau_mapping.get_dict()
@@ -236,10 +300,10 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
 
             # Submit the calculation - the order does not matter here
             running = self.submit(VaspRelaxWorkChain, **inputs)
-            self.report(f'Submitted {running} for structure {istruc + 1} out of {nst}.')
+            self.report(f"Submitted {running} for structure {istruc + 1} out of {nst}.")
             self.to_context(workchains=append_(running))
 
-        self.report(f'All {nst} relaxations submitted')
+        self.report(f"All {nst} relaxations submitted")
 
     def result(self):
         """
@@ -252,26 +316,40 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
         nfail = 0
         # Inspect all workchains
         for workchain in self.ctx.workchains:
-            link_name = workchain.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
-            if not workchain.is_finished_ok and workchain.exit_status not in self.ALLOWED_OK_EXIT_CODES:
-                self.report('Relaxation {} ({}) did not finished ok - not attaching the results'.format(workchain, link_name))
+            link_name = (
+                workchain.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
+            )
+            if (
+                not workchain.is_finished_ok
+                and workchain.exit_status not in self.ALLOWED_OK_EXIT_CODES
+            ):
+                self.report(
+                    f"Relaxation {workchain} ({link_name}) did not finished ok - not attaching the results"
+                )
                 nfail += 1
             else:
                 miscs[link_name] = workchain.outputs.misc
                 if workchain.exit_status in self.ALLOWED_OK_EXIT_CODES:
-                    self.report('Relaxation {} ({}) finished with exit code: {}, but treated as if it was OK'.format(
-                        workchain, link_name, workchain.exit_status))
+                    self.report(
+                        "Relaxation {} ({}) finished with exit code: {}, but treated as if it was OK".format(
+                            workchain, link_name, workchain.exit_status
+                        )
+                    )
 
         if not miscs:
-            self.report('None of the work has finished ok - serious problem must occurred')
+            self.report(
+                "None of the work has finished ok - serious problem must occurred"
+            )
             return self.exit_codes.ERROR_ALL_SUB_WORK_FAILED
 
         # Include the lithiated results which is either from the initial relax or from the passed misc node
-        miscs['lithiated'] = self.ctx.lithiated_calc.outputs.misc
+        miscs["lithiated"] = self.ctx.lithiated_calc.outputs.misc
 
         # Construct the record node
-        record_node = compose_voltage_curve_data(self.inputs.li_metal_calc_misc, **miscs)
-        self.out('voltage_curve_data', record_node)
+        record_node = compose_voltage_curve_data(
+            self.inputs.li_metal_calc_misc, **miscs
+        )
+        self.out("voltage_curve_data", record_node)
 
         if nfail > 1:
             return self.exit_codes.ERROR_SOME_SUB_WORK_FAILED
@@ -280,14 +358,14 @@ class VoltageCurveWorkChain(WorkChain, WithVaspInputSet):
         frames = self.ctx.delithiated_frames
         for key, frame in frames.items():
             q = orm.QueryBuilder()
-            q.append(orm.Node, filters={'id': frame.id})
-            q.append(VaspRelaxWorkChain, filters={'attributes.exit_status': 0})
-            q.append(orm.StructureData, edge_filters={'label': 'relax__structure'})
+            q.append(orm.Node, filters={"id": frame.id})
+            q.append(VaspRelaxWorkChain, filters={"attributes.exit_status": 0})
+            q.append(orm.StructureData, edge_filters={"label": "relax__structure"})
             try:
                 relaxed = q.one()[0]
             except Exception:
                 continue
-            self.out(f'relaxed_delithiated_structures.{key}', relaxed)
+            self.out(f"relaxed_delithiated_structures.{key}", relaxed)
 
         return
 
@@ -305,8 +383,8 @@ def compose_voltage_curve_data(li_ref_misc, **miscs):
 
         # Locate the workchain node it is the relaxation that returned this MISC
         q = orm.QueryBuilder()
-        q.append(orm.CalcJobNode, project=['*'])
-        q.append(orm.Node, filters={'id': misc.pk})
+        q.append(orm.CalcJobNode, project=["*"])
+        q.append(orm.Node, filters={"id": misc.pk})
         calc = q.one()[0]
 
         entry = get_entry_from_calc(calc)
@@ -314,8 +392,8 @@ def compose_voltage_curve_data(li_ref_misc, **miscs):
 
     # Locate the reference calculations
     q = orm.QueryBuilder()
-    q.append(orm.CalcJobNode, project=['*'])
-    q.append(orm.Node, filters={'id': li_ref_misc.pk})
+    q.append(orm.CalcJobNode, project=["*"])
+    q.append(orm.Node, filters={"id": li_ref_misc.pk})
     ref_calc = q.one()[0]
     ref_entry = get_entry_from_calc(ref_calc)
 
@@ -323,29 +401,31 @@ def compose_voltage_curve_data(li_ref_misc, **miscs):
     vcurve = VoltageCurve(entries, ref_entry)
     stables = []
     for entry in vcurve.stable_entries:
-        stables.append(entry.parameters['calc_uuid'])
+        stables.append(entry.parameters["calc_uuid"])
     xvalues, yvalues = vcurve.get_plot_data(x_axis_deli=True)
     outdict = {
-        'stable_calcs': stables,
-        'voltage_curve_x': xvalues,
-        'voltage_curve_y': yvalues,
+        "stable_calcs": stables,
+        "voltage_curve_x": xvalues,
+        "voltage_curve_y": yvalues,
     }
     voltage_pair_data = []
     for (pair, voltage) in vcurve.compute_voltages():
-        voltage_pair_data.append({
-            'comp1': pair[0].as_dict(),
-            'comp2': pair[1].as_dict(),
-            'voltage': voltage,
-        })
-    outdict['voltage_pair_data'] = voltage_pair_data
+        voltage_pair_data.append(
+            {
+                "comp1": pair[0].as_dict(),
+                "comp2": pair[1].as_dict(),
+                "voltage": voltage,
+            }
+        )
+    outdict["voltage_pair_data"] = voltage_pair_data
     return orm.Dict(dict=outdict)
 
 
 def get_creator(node):
     """Return the creator CalculationNode that generated the passed node"""
     q = QueryBuilder()
-    q.append(orm.CalculationNode, project=['*'])
-    q.append(orm.Node, filters={'id': node.id})
+    q.append(orm.CalculationNode, project=["*"])
+    q.append(orm.Node, filters={"id": node.id})
     calc = q.one()[0]
     return calc
 
@@ -353,19 +433,21 @@ def get_creator(node):
 def get_returner(node, node_type):
     """Return the creator CalculationNode that generated the passed node"""
     q = QueryBuilder()
-    q.append(node_type, project=['*'])
-    q.append(orm.Node, filters={'id': node.id})
+    q.append(node_type, project=["*"])
+    q.append(orm.Node, filters={"id": node.id})
     calc = q.one()[0]
     return calc
 
 
 def get_voltage_curve_obj(workchain):
     """Regenerate a VoltageCurve object from a completed workchain node"""
-    if 'lithiated_calc_misc' in workchain.inputs:
+    if "lithiated_calc_misc" in workchain.inputs:
         lithiated_calc = get_creator(workchain.inputs.lithiated_calc_misc)
     else:
         # Get the relaxation workchain that was used to create the lithiated structure
-        lithiated_calc = get_returner(workchain.outputs.relaxed_lithiated_structure, VaspRelaxWorkChain)
+        lithiated_calc = get_returner(
+            workchain.outputs.relaxed_lithiated_structure, VaspRelaxWorkChain
+        )
     li_ref_calc = get_creator(workchain.inputs.li_metal_calc_misc)
     delithiated_calcs = []
     for node in workchain.outputs.relaxed_delithiated_structures.values():
