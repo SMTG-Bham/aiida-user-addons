@@ -465,7 +465,7 @@ class VaspRelaxUpdater(VaspBuilderUpdater):
     WF_ENTRYPOINT = "vaspu.relax"
 
     def __init__(self, builder, override_vasp_namespace=None, namespace_relax=None):
-        super().__init__(builder)
+        super().__init__(builder, root_namespace=builder)
         # The primary VASP namespace is under builder.vasp
         if override_vasp_namespace is None:
             self.namespace_vasp = builder.vasp
@@ -492,7 +492,7 @@ class VaspRelaxUpdater(VaspBuilderUpdater):
 
     def clear_relax_settings(self):
         """Reset any existing relax options"""
-        self.root_namespace.relax_settings = RelaxOptions().to_aiida_dict()
+        self.namespace_relax.relax_settings = RelaxOptions().to_aiida_dict()
         return self
 
     def update_from_config(self, structure: orm.StructureData, config: dict):

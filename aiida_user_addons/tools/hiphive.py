@@ -137,7 +137,7 @@ class ShortRangeFitting:
                     f"Mismatch in supercell lattice vectors, stored: {frame.atoms.cell}, reference: {self.atoms_supercell.cell}"
                 )
             new_atoms = frame.atoms[perm]
-            new_container.add(new_atoms)
+            new_container.add_structure(new_atoms)
         self.container = new_container
 
     def get_fit_data(self):
