@@ -204,7 +204,9 @@ class ShortRangeFitting:
             opt.parameters,
             metadata={
                 "fc2_LR": self.fc2_LR,
-                "summary": {key: value for key, value in opt.summary if key in terms},
+                "summary": {
+                    key: value for key, value in opt.summary.items() if key in terms
+                },
             },
         )
         return fcp
