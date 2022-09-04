@@ -19,7 +19,7 @@ def atoms2phonopy(atoms):
     atoms_phonopy = PhonopyAtoms(
         symbols=atoms.get_chemical_symbols(),
         scaled_positions=atoms.get_scaled_positions(),
-        cell=atoms.cell,
+        cell=atoms.cell.copy(),
     )
     return atoms_phonopy
 
@@ -77,22 +77,22 @@ class ShortRangeFitting:
         from phonopy.cui.load_helper import get_nac_params
 
         self.container = container
+        prim = container.cluster_space.primitive_structure
         if isinstance(born_file, dict):
             self.nac_params = born_file
         else:
             self.nac_params = get_nac_params(
-                atoms2phonopy(container.primitive), born_filename=born_file
+                atoms2phonopy(prim), born_filename=born_file
             )
 
         self.supercell_mat = supercell_mat
 
-        prim = container.cluster_space.primitive_structure
         self.atoms_supercell = make_supercell(prim, supercell_mat)
 
         unitcell_phonopy = PhonopyAtoms(
             symbols=prim.get_chemical_symbols(),
             scaled_positions=prim.get_scaled_positions(),
-            cell=prim.cell,
+            cell=prim.cell.copy(),
         )
 
         phonon = Phonopy(
@@ -109,11 +109,10 @@ class ShortRangeFitting:
         phonon.nac_params["factor"] = nac_factor  # Needed?
 
         phonon.set_force_constants(np.zeros((len(supercell), len(supercell), 3, 3)))
-
-        phonon.set_force_constants(np.zeros((len(supercell), len(supercell), 3, 3)))
         dynmat = phonon.get_dynamical_matrix()
         dynmat.make_Gonze_nac_dataset()
         self.fc2_LR = -dynmat.get_Gonze_nac_dataset()[0]
+        self.phonon = phonon
 
     def _rebuild_container(self):
         """
@@ -121,37 +120,55 @@ class ShortRangeFitting:
 
         Ensure that the container
         """
-        # Check if structure contains contains valid frames
-        perm = find_permutation(
-            self.atoms_supercell, phonopy2atoms(self.phonopy_supercell)
-        )
-        if np.all(perm == np.arange(len(perm))):
-            return
+        phonon_ref_cell = phonopy2atoms(self.phonopy_supercell)
 
         # Reconstruct the structure container with atoms permutated
-        new_container = StructureContainer(self.container.cluster_space)
+        all_new_atoms = []
+        need_reconstruct = False
         for frame in self.container:
             # Check if the supercell lattice vectors matches - sanity check
             if not np.all(frame.atoms.cell == self.atoms_supercell.cell):
                 raise RuntimeError(
                     f"Mismatch in supercell lattice vectors, stored: {frame.atoms.cell}, reference: {self.atoms_supercell.cell}"
                 )
-            new_atoms = frame.atoms[perm]
-            new_container.add_structure(new_atoms)
-        self.container = new_container
+
+            # Get the reference cell for finding the permutation
+            ideal_cell = frame.atoms.copy()
+            ideal_cell.positions -= frame.displacements
+            perm = find_permutation(ideal_cell, phonon_ref_cell)
+            # Check if permutation is needed``
+            if np.all(perm == np.arange(len(perm))):
+                new_atoms = frame.atoms
+            else:
+                new_atoms = frame.atoms[perm]
+                need_reconstruct = True
+
+            all_new_atoms.append(new_atoms)
+
+        if need_reconstruct:
+            new_container = StructureContainer(self.container.cluster_space)
+            for atoms in all_new_atoms:
+                new_container.add_structure(atoms)
+            self.container = new_container
+            return True
+        return False
 
     def get_fit_data(self):
         """Get the fitting data with long-range forces subtracted"""
         self._rebuild_container()
+        # Sanity check
         M, F = self.container.get_fit_data()
         displacements = np.array([frame.displacements for frame in self.container])
         F_LR = np.einsum("ijab,njb->nia", -self.fc2_LR, displacements).flatten()
+        self.F_LR = F_LR
         F_SR = F - F_LR
         return M, F_SR
 
     def get_fc2(self, fcp):
         """Get the second-order force constants with LR included"""
-        fc = fcp.get_force_constants(phonopy2atoms(self.phonopy_supercell))
+        fc = fcp.get_force_constants(
+            phonopy2atoms(self.phonopy_supercell)
+        )  # Use the supercell that is created by the phonopy
         fc2 = fc.get_fc_array(2) + self.fc2_LR
         return fc2
 
@@ -159,3 +176,37 @@ class ShortRangeFitting:
         """Write second order force constants in phonopy format"""
         fc2 = self.get_fc2(fcp)
         write_phonopy_fc2(outfile, fc2)
+
+    def get_fcp(self, opt):
+        """Get an FCP using the fitted data"""
+        from hiphive import ForceConstantPotential
+
+        terms = [
+            "seed",
+            "fit_method",
+            "standardize",
+            "n_target_values",
+            "n_parameters",
+            "n_nonzero_parameters",
+            "parameters_norm",
+            "target_values_std",
+            "rmse_train",
+            "rmse_test",
+            "R2_train",
+            "R2_test",
+            "AIC",
+            "BIC",
+            "train_size",
+            "test_size",
+        ]
+        fcp = ForceConstantPotential(
+            self.container.cluster_space,
+            opt.parameters,
+            metadata={
+                "fc2_LR": self.fc2_LR,
+                "summary": {
+                    key: value for key, value in opt.summary.items() if key in terms
+                },
+            },
+        )
+        return fcp

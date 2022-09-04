@@ -46,10 +46,7 @@
             "aiida-core[tests]>=2.0.1,<3"
         ],
         "pre-commit": [
-            "pre-commit==1.18.3",
-            "yapf==0.28.0",
-            "prospector==1.2.0",
-            "pylint==2.4.4"
+            "pre-commit>=2,<3"
         ],
         "docs": [
             "sphinx"

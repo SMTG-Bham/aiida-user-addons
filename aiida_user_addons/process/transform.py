@@ -83,17 +83,30 @@ def magnetic_structure_dedecorate(structure, mapping):
 
 
 @calcfunction
-def make_vac(cell, indices, supercell):
-    """Make a defect containing cell"""
+def make_vac(cell, indices, supercell, **kwargs):
+    """
+    Make a defect containing cell
+
+    If sorting of atoms in the supercell can be controlled with the ``sort`` keyword argument.
+    """
+    from ase.build import make_supercell
+
     atoms = cell.get_ase()
-    supercell = atoms.repeat(supercell.get_list())
-    mask = np.in1d(np.arange(len(supercell)), indices.get_list())
-    supercell = supercell[~mask]  ## Remove any atoms in the original indices
-    supercell.set_tags(None)
-    supercell.set_masses(None)
+    if isinstance(supercell.get_list()[0], int):
+        supercell_atoms = atoms.repeat(supercell.get_list())
+    else:
+        supercell_atoms = make_supercell(atoms, np.array(supercell.get_list()))
+
+    mask = np.in1d(np.arange(len(supercell_atoms)), indices.get_list())
+    supercell_atoms = supercell_atoms[
+        ~mask
+    ]  ## Remove any atoms in the original indices
+    supercell_atoms.set_tags(None)
+    supercell_atoms.set_masses(None)
     # Now I sort the supercell in the order of chemical symbols
-    supercell = sort(supercell)
-    output = StructureData(ase=supercell)
+    if kwargs.get("sort", True):
+        supercell_atoms = sort(supercell_atoms)
+    output = StructureData(ase=supercell_atoms)
     return output
 
 
