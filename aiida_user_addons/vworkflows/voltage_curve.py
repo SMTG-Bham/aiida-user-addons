@@ -435,6 +435,7 @@ def get_returner(node, node_type):
     q = QueryBuilder()
     q.append(node_type, project=["*"])
     q.append(orm.Node, filters={"id": node.id})
+    q.distinct()
     calc = q.one()[0]
     return calc
 
