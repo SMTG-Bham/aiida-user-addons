@@ -52,10 +52,11 @@ from .common import (
 )
 from .mixins import WithVaspInputSet
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 
 # Change log
 # 0.4.0 update such `vasp` namespace in `parameters` is renamed to `incar`
+# 0.5.0 update the logic of convergence checking. Cell comparsion is always done using the input/output structures.
 
 
 class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
