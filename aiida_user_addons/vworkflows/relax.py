@@ -34,7 +34,6 @@ from aiida.orm.nodes.data.base import to_aiida_type
 from aiida.plugins import WorkflowFactory
 from aiida_vasp.utils.aiida_utils import get_data_class
 from aiida_vasp.utils.workchains import compose_exit_code
-from sqlalchemy.sql.sqltypes import Float
 
 from ..common.opthold import (
     BoolOption,
@@ -42,11 +41,9 @@ from ..common.opthold import (
     FloatOption,
     IntOption,
     OptionContainer,
-    StringOption,
 )
 from .common import (
     OVERRIDE_NAMESPACE,
-    nested_update,
     nested_update_dict_node,
     site_magnetization_to_magmom,
 )
