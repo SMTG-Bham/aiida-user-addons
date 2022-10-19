@@ -1,4 +1,4 @@
-# aiida-user-addons
+# aiida-user-addons (probably should be rename to something else)
 
 Some (personal) addons to AiiDA to help my research. Mainly focusing using VASP through `aiida-vasp` and also some workflows for CASTEP are also included.
 
@@ -107,4 +107,4 @@ Development version of `aiida-vasp` should be used.
 Custom workflows are registered as entry points, so `WorkflowFactory('vaspu.relax')` will load the relaxation workflow.
 Check the outputs of `verdi plugin list aiida.workflows` to see the workflows available.
 
-Example notebooks can be found in the `examples` folder.
+Example notebooks can be found in the `example_notebooks` folder.
