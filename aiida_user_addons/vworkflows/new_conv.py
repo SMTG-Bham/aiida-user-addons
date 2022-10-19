@@ -57,9 +57,7 @@ class VaspConvergenceWorkChain(WorkChain):
         super().define(spec)
 
         spec.expose_inputs(cls._sub_workchain)
-        spec.input(
-            "conv_settings", help="Settings of the workchain", valid_type=orm.Dict
-        )
+        spec.input("conv_settings", help="Settings of the workchain", valid_type=orm.Dict)
         spec.outline(cls.setup, cls.launch_conv_calcs, cls.analyse)
 
         spec.exit_code(
@@ -127,18 +125,14 @@ class VaspConvergenceWorkChain(WorkChain):
             k_cut = min(self.ctx.kspacing_list)
 
         cutoff_for_kconv = self.ctx.settings.get("cutoff_kconv", cut_k)
-        kspacing_for_cutoffconv = orm.Float(
-            self.ctx.settings.get("kspacing_cutconv", k_cut)
-        )
+        kspacing_for_cutoffconv = orm.Float(self.ctx.settings.get("kspacing_cutconv", k_cut))
 
         # Launch cut off energy tests
         inputs = self.exposed_inputs(self._sub_workchain)
         inputs.kpoints_spacing = kspacing_for_cutoffconv
         original_label = inputs.metadata.get("label", "")
         for cut in self.ctx.cutoff_list:
-            new_param = nested_update_dict_node(
-                inputs.parameters, {"incar": {"encut": cut}}
-            )
+            new_param = nested_update_dict_node(inputs.parameters, {"incar": {"encut": cut}})
             inputs.parameters = new_param
             if original_label:
                 inputs.metadata.label = original_label + f" CUTCONV {cut:.2f}"
@@ -150,9 +144,7 @@ class VaspConvergenceWorkChain(WorkChain):
             self.to_context(cutoff_conv_workchains=append_(running))
 
         # Launch kpoints convergence tests
-        new_param = nested_update_dict_node(
-            inputs.parameters, {"incar": {"encut": cutoff_for_kconv}}
-        )
+        new_param = nested_update_dict_node(inputs.parameters, {"incar": {"encut": cutoff_for_kconv}})
         for kspacing in self.ctx.kspacing_list:
             inputs.parameters = new_param
             inputs.kpoints_spacing = kspacing
@@ -205,16 +197,12 @@ class VaspConvergenceWorkChain(WorkChain):
 
                 if workchain.exit_status != 0:
                     exit_code = self.exit_codes.ERROR_SUBWORKFLOW_ERRORED
-                    self.report(
-                        f"Skipping workchain {workchain} with exit status {workchain.exit_status} "
-                    )
+                    self.report(f"Skipping workchain {workchain} with exit status {workchain.exit_status} ")
                     continue
 
                 cutoff = workchain.inputs.parameters["incar"]["encut"]
                 cutoff_data[cutoff] = collect_data(workchain)
-                cutoff_data[cutoff]["mesh"] = workchain.called[
-                    0
-                ].inputs.kpoints.get_kpoints_mesh()[0]
+                cutoff_data[cutoff]["mesh"] = workchain.called[0].inputs.kpoints.get_kpoints_mesh()[0]
                 cutoff_miscs[f"worchain_{iwork}"] = workchain.outputs.misc
 
         kspacing_data = {}
@@ -225,16 +213,12 @@ class VaspConvergenceWorkChain(WorkChain):
 
                 if workchain.exit_status != 0:
                     exit_code = self.exit_codes.ERROR_SUBWORKFLOW_ERRORED
-                    self.report(
-                        f"Skipping Workchain {workchain} with exit status {workchain.exit_status} "
-                    )
+                    self.report(f"Skipping Workchain {workchain} with exit status {workchain.exit_status} ")
                     continue
 
                 spacing = float(workchain.inputs.kpoints_spacing)
                 kspacing_data[spacing] = collect_data(workchain)
-                kspacing_data[spacing]["mesh"] = workchain.called[
-                    0
-                ].inputs.kpoints.get_kpoints_mesh()[0]
+                kspacing_data[spacing]["mesh"] = workchain.called[0].inputs.kpoints.get_kpoints_mesh()[0]
                 kspacing_miscs[f"worchain_{iwork}"] = workchain.outputs.misc
                 cutoff = workchain.inputs.parameters["incar"]["encut"]
                 kspacing_data[spacing]["cutoff_energy"] = cutoff
@@ -273,7 +257,7 @@ class VaspConvergenceWorkChain(WorkChain):
         A tuple of cut-off convergence and k-point convergence result dataframe
         """
         cdf, kdf = get_conv_data(conv_work)
-        if plot:
+        if plot is True:
             plot_conv_data(cdf, kdf, **plot_kwargs)
         return cdf, kdf
 
@@ -287,12 +271,8 @@ class ConvOptions(OptionContainer):
     kspacing_start = FloatOption("The starting kspacing", 0.07)
     kspacing_stop = FloatOption("The final kspacing", 0.02)
     kspacing_step = FloatOption("Step size of the cut-off energy", 0.01)
-    cutoff_kconv = FloatOption(
-        "The cut-off energy used for kpoints convergence tests", 450
-    )
-    kspacing_cutconv = FloatOption(
-        "The kpoints spacing used for cut-off energy convergence tests", 0.07
-    )
+    cutoff_kconv = FloatOption("The cut-off energy used for kpoints convergence tests", 450)
+    kspacing_cutconv = FloatOption("The kpoints spacing used for cut-off energy convergence tests", 0.07)
 
 
 def get_conv_data(conv_work):
@@ -309,12 +289,8 @@ def get_conv_data(conv_work):
 
     if "cutoff_conv_data" in conv_work.outputs:
         cutdf = pd.DataFrame(conv_work.outputs.cutoff_conv_data.get_dict())
-        cutdf["energy_per_atom"] = cutdf["energy"] / len(
-            conv_work.inputs.structure.sites
-        )
-        cutdf["dE_per_atom"] = (
-            cutdf["energy_per_atom"] - cutdf["energy_per_atom"].iloc[-1]
-        )
+        cutdf["energy_per_atom"] = cutdf["energy"] / len(conv_work.inputs.structure.sites)
+        cutdf["dE_per_atom"] = cutdf["energy_per_atom"] - cutdf["energy_per_atom"].iloc[-1]
     else:
         cutdf = None
 
@@ -335,10 +311,11 @@ def plot_conv_data(cdf, kdf, **kwargs):
 
     # Create a subplot
     figs = []
-    if cdf:
+    if cdf is not None:
         fig, axs = plt.subplots(3, 1, sharex=True, **kwargs)
         figs.append(fig)
         axs[0].plot(cdf.cutoff_energy, cdf.dE_per_atom, "-x")
+        axs[0].set_ylabel("dE (eV / atom)")
         i = 0
         if "maximum_force" in cdf.columns:
             i += 1
@@ -351,7 +328,7 @@ def plot_conv_data(cdf, kdf, **kwargs):
         axs[i].set_xlabel("Cut-off energy (eV)")
         fig.tight_layout()
 
-    if kdf:
+    if kdf is not None:
         fig, axs = plt.subplots(3, 1, sharex=True, **kwargs)
         figs.append(fig)
         axs[0].plot(kdf.kpoints_spacing, kdf.dE_per_atom, "-x")

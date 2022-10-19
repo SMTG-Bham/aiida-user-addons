@@ -103,13 +103,7 @@ def export_vasp_calc(node, folder, decompress=False, include_potcar=True):
     elif isinstance(node, WorkChainNode):
         # In this case the node is an workchain we export the
         # 'retrieved' output link and trace to its ancestor
-        calcjob = (
-            retrieved.get_incoming(
-                link_label_filter="retrieved", link_type=LinkType.CREATE
-            )
-            .one()
-            .node
-        )
+        calcjob = retrieved.get_incoming(link_label_filter="retrieved", link_type=LinkType.CREATE).one().node
     else:
         raise RuntimeError(f"The node {node} is not a valid calculation")
     info_file = folder / ("aiida_info")
@@ -124,17 +118,13 @@ def export_vasp_calc(node, folder, decompress=False, include_potcar=True):
 
 def export_pseudos(calc_job_node, folder):
     """Save the pseudopotential file (POTCAR)"""
-    pps = calc_job_node.get_incoming(link_label_filter="potential%").nested()[
-        "potential"
-    ]
+    pps = calc_job_node.get_incoming(link_label_filter="potential%").nested()["potential"]
     multi_potcar = MultiPotcarIo.from_structure(calc_job_node.inputs.structure, pps)
     dst = str(folder / "POTCAR")
     multi_potcar.write(dst)
 
 
-def pmg_vasprun(
-    node, parse_xml=True, parse_potcar_file=False, parse_outcar=True, **kwargs
-):
+def pmg_vasprun(node, parse_xml=True, parse_potcar_file=False, parse_outcar=True, **kwargs):
     """
     Attempt to parse outputs using pymatgen
     """
@@ -188,10 +178,8 @@ def export_relax(work, dst, include_potcar=False, decompress=False):
 
     dst = Path(dst)
     dst.mkdir(exist_ok=True)
-    if not isinstance(work, (VaspRelaxWorkChain, RelaxWorkChain)):
-        raise ValueError(
-            f"Error {work} should be `VaspRelaxWorkChain` or `RelaxWorkChain`, but it is {work.process_class}"
-        )
+    if work.process_class not in (VaspRelaxWorkChain, RelaxWorkChain):
+        raise ValueError(f"Error {work} should be `VaspRelaxWorkChain` or `RelaxWorkChain`, but it is {work.process_class}")
 
     q = QueryBuilder()
     q.append(Node, filters={"id": work.pk})
@@ -200,9 +188,7 @@ def export_relax(work, dst, include_potcar=False, decompress=False):
     for index, (pk, node) in enumerate(q.iterall()):
         relax_folder = dst / f"relax_calc_{index:03d}"
         try:
-            export_vasp_calc(
-                node, relax_folder, decompress=decompress, include_potcar=include_potcar
-            )
+            export_vasp_calc(node, relax_folder, decompress=decompress, include_potcar=include_potcar)
         except (ValueError, AttributeError, KeyError):
             print(f"Error exporting calculation {pk}")
 
@@ -218,9 +204,7 @@ def export_relax(work, dst, include_potcar=False, decompress=False):
         try:
             out_structure = work.inputs.outputs.relax.structure
         except AttributeError:
-            print(
-                "Cannot find the output structure - skipping. This usually means that the relaxation did not finish without error."
-            )
+            print("Cannot find the output structure - skipping. This usually means that the relaxation did not finish without error.")
             out_structure = None
     if out_structure:
         poscar_parser = PoscarParser(data=out_structure, precision=10)
@@ -228,9 +212,7 @@ def export_relax(work, dst, include_potcar=False, decompress=False):
 
     # Write the info
     info_file = dst / ("aiida_info")
-    info_content = (
-        f"Label: {work.label}\nDescription: {work.description}\nUUID: {work.uuid}\n"
-    )
+    info_content = f"Label: {work.label}\nDescription: {work.description}\nUUID: {work.uuid}\n"
     info_file.write_text(info_content)
 
 
@@ -240,19 +222,12 @@ def export_neb(workchain, dst):
 
     from aiida_user_addons.tools.vasp import export_vasp_calc
 
-    energies = {
-        key: value["energy_without_entropy"]
-        for key, value in workchain.outputs.neb_misc["neb_data"].items()
-    }
+    energies = {key: value["energy_without_entropy"] for key, value in workchain.outputs.neb_misc["neb_data"].items()}
 
     # Query for the energy computed for the end structures
     q = orm.QueryBuilder()
-    q.append(
-        orm.Node, filters={"id": workchain.inputs.initial_structure.id}, tag="root"
-    )
-    q.append(
-        orm.CalcFunctionNode, with_outgoing="root", project=["attributes.function_name"]
-    )
+    q.append(orm.Node, filters={"id": workchain.inputs.initial_structure.id}, tag="root")
+    q.append(orm.CalcFunctionNode, with_outgoing="root", project=["attributes.function_name"])
     q.append(
         orm.StructureData,
         with_outgoing=orm.CalcFunctionNode,
@@ -381,9 +356,7 @@ def compare_incars(nodes):
 def _traj_node_to_atoms(traj, energies=None):
     """Convert TrajectorData from aiida-vasp to ase.Atoms"""
     symbols = traj.get_attribute("symbols")
-    cells, positions, forces = (
-        traj.get_array(n) for n in ["cells", "positions", "forces"]
-    )
+    cells, positions, forces = (traj.get_array(n) for n in ["cells", "positions", "forces"])
     atoms_list = []
     if energies is not None:
         engs = energies.get_array("energy_no_entropy")
@@ -468,16 +441,12 @@ def traj_to_atoms(node):
             q.append(WorkChainNode, filters={"id": node.pk}, tag="root")
             q.append(WorkChainNode, with_incoming="root", tag="vcalc")
             q.append(CalcJobNode, tag="calc", with_incoming="vcalc")
-            q.append(
-                ArrayData, with_incoming="calc", edge_filters={"label": "energies"}
-            )
+            q.append(ArrayData, with_incoming="calc", edge_filters={"label": "energies"})
             q.order_by({"calc": ["id"]})
             q.distinct()
             engs = [tmp[0] for tmp in q.all()]
             # Note energies may not be there - but it should be handled
-            atoms_lists = [
-                _traj_node_to_atoms(traj, eng) for traj, eng in zip_longest(trajs, engs)
-            ]
+            atoms_lists = [_traj_node_to_atoms(traj, eng) for traj, eng in zip_longest(trajs, engs)]
             out = []
             for atom_list in atoms_lists:
                 out.extend(atom_list)
@@ -496,9 +465,7 @@ def traj_to_atoms(node):
             q.append(WorkChainNode, filters={"id": node.pk})
             q.append(Node, tag="res", with_incoming=WorkChainNode)
             q.append(CalcJobNode, tag="calc", with_outgoing="res")
-            q.append(
-                ArrayData, edge_filters={"label": "energies"}, with_incoming="calc"
-            )
+            q.append(ArrayData, edge_filters={"label": "energies"}, with_incoming="calc")
             q.distinct()
             if q.count() > 0:
                 eng = q.first()[0]
