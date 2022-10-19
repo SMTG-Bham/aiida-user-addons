@@ -1,16 +1,19 @@
 # aiida-user-addons
 
-Some addons to AiiDA
+Some (personal) addons to AiiDA to help my research. Mainly focusing using VASP through `aiida-vasp` and also some workflows for CASTEP are also included.
 
 ## Requirements
 
-`aiida-phonopy` needs to be at commit *d410a9a309ff45d4c25a9b24bcaf06b65f0c4f1a*.
+For phonon calculation the
+`aiida-phonopy` package needs to be at commit *d410a9a309ff45d4c25a9b24bcaf06b65f0c4f1a*.
 https://github.com/aiida-phonopy/aiida-phonopy/commit/d410a9a309ff45d4c25a9b24bcaf06b65f0c4f1a
 
-for magnetic material, a patched versions is needed:
+for magnetic material, a patched versions might be needed:
 https://github.com/zhubonan/aiida-phonopy/commit/7cfe9d357348606ea4914e935beb282e573f2e22
 
-`aiida-core>1.3.0`
+For  `aiida-core>2.0.1` is needed.
+The `aiida-vasp` should be at the development version.
+A recent version `aiida-castep` is needed.
 
 
 ## Command line tools
@@ -36,7 +39,9 @@ Options:
   --help                 Show this message and exit.
 ```
 
-`verdi data addons` is the entry point for additional commands, availiable commands are:
+This package acts as a plugin for `aiida-core` and provides workflows and other functionalities.
+
+The command line interface is integrated with `verdi`, additional commands are available under `verdi data addons`:
 
 ```
 Usage: verdi data addons [OPTIONS] COMMAND [ARGS]...
@@ -58,15 +63,17 @@ Commands:
 
 ## Additional VASP workflows
 
-- `vaspu.relax`: `RelaxWorkChain` with additional check and bug fixes.
+The main entry point has the `vaspu` prefix:
+
+- `vaspu.relax`: `VaspRelaxWorkChain` with additional check and bug fixes.
 - `vaspu.converge`: A simpler convergence testing workchain that runs tests in parallel.
-- `vaspu.vasp`: Almost as the original one, used by other workcahins.
+- `vaspu.vasp`: Almost as the original one, used by other workchains.
 - `vaspu.bands`: Includes pre-relaxation of the input structure with more functionalities such as dealing with AFM spin arrangement. Based on `castep.bands`.
 - `vaspu.hybrid_bands`: Run band structure calculations normal calculations with *zero-weighted kpoints*. Useful if hybrid functional is used.
 - `vaspu.phonopy`: Fully automated Phonon workflow from initial relaxation to final bandstructure/thermal properties.
 - `vaspu.magnetic`: Magnetic enumeration workflow for finding lowest energy magnetic states.
 - `vaspu.delithiate`: Workchain for delithiate structures and performing relaxation.
-- `vaspu.voltage`: Workchain for constructing voltage curve upon delithiation of certain lithiated structure.
+- `vaspu.voltage_curve`: Workchain for constructing voltage curve upon delithiation of certain lithiated structure.
 
 ## Related codes
 
@@ -80,8 +87,8 @@ This package also provide some convenient routine for the following packages:
 
 ## Additional Scheduler plugins
 
-- `pbsarcher`: ARCHER scheduler plugin allows selecting `bigmem` nodes
 - `sgenodetail`: SGE scheduler plugin that omits the `detailed_job_info` retrieval which can be slow on high-throughput cluster due to the large size of the accoutring file.
+
 
 ## Installation
 
@@ -98,4 +105,6 @@ Development version of `aiida-vasp` should be used.
 ## Usage
 
 Custom workflows are registered as entry points, so `WorkflowFactory('vaspu.relax')` will load the relaxation workflow.
-Check the outputs of `verdi plugin list aiida.workflows` to see the workflows avaliable.
+Check the outputs of `verdi plugin list aiida.workflows` to see the workflows available.
+
+Example notebooks can be found in the `examples` folder.
