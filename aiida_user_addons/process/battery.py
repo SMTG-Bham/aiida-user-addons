@@ -324,9 +324,10 @@ class DelithiationManager:
         nli = self.nli
         frac_remove = 1 - (final_li_level / self.lithiation_level)
         max_remove = nli * frac_remove
-        if abs(int(max_remove) - max_remove) > 1e-5:
+        if abs(round(max_remove) - max_remove) > 1e-5:
             raise RuntimeError(
-                f"The final lithiation level does not represent an integer number of {self.working_ion} atoms in the unit cell."
+                f"The final lithiation level ({final_li_level}) does not represent an integer number ({self.lithiation_level})" 
+                f"of {self.working_ion} atoms in the unit cell (requested to remove {max_remove} atoms)."
             )
         max_remove = int(round(max_remove))
         records = {}
