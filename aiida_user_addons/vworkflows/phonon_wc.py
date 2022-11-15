@@ -606,7 +606,6 @@ class PhononSettings(OptionContainer):
     primitive_matrix = ListOrStringOption(
         'Primitive matrix for phonons, can be set to "auto"',
         required=True,
-        enforce_type=True,
     )
     mesh = IntOption("Mesh for phonon calculation", required=True)
     magmom = ListOption("Starting magnetic moments for phonopy", required=False)

@@ -140,10 +140,8 @@ class ListOption(TypedOption):
     target_type = list
 
 
-class ListOrStringOption(TypedOption):
+class ListOrStringOption(Option):
     """Class for an option that accepts a list"""
-
-    target_type = (list, str)
 
 
 class StringOption(TypedOption):

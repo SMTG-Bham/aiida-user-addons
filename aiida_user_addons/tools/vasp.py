@@ -550,3 +550,25 @@ def get_corestate_eigenenergies(node):
     with open_compressed(node, "OUTCAR") as handle:
         data = parse_core_state_eigenenergies(handle)
     return data
+
+
+def parse_mag(node):
+    """Parse magnetic moments using information from the OUTCAR, group them into species"""
+    from aiida_vasp.parsers.content_parsers.outcar import Outcar
+
+    with node.outputs.retrieved.base.repository.open("OUTCAR") as fh:
+        parser = Outcar(file_handler=fh)
+    species = [s.kind_name for s in node.inputs.structure.sites]
+    mag = parser.get_magnetization()
+    out = {}
+    for spec in set(species):
+        if spec in out:
+            pass
+        else:
+            out[spec] = []
+    for key, value in sorted(
+        mag["sphere"]["x"]["site_moment"].items(), key=lambda x: x[0]
+    ):
+        s = species[key - 1]
+        out[s].append(value["tot"])
+    return out

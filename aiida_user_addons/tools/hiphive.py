@@ -120,31 +120,8 @@ class ShortRangeFitting:
 
         Ensure that the container
         """
-        phonon_ref_cell = phonopy2atoms(self.phonopy_supercell)
-
-        # Reconstruct the structure container with atoms permutated
-        all_new_atoms = []
-        need_reconstruct = False
-        for frame in self.container:
-            # Check if the supercell lattice vectors matches - sanity check
-            if not np.all(frame.atoms.cell == self.atoms_supercell.cell):
-                raise RuntimeError(
-                    f"Mismatch in supercell lattice vectors, stored: {frame.atoms.cell}, reference: {self.atoms_supercell.cell}"
-                )
-
-            # Get the reference cell for finding the permutation
-            ideal_cell = frame.atoms.copy()
-            ideal_cell.positions -= frame.displacements
-            perm = find_permutation(ideal_cell, phonon_ref_cell)
-            # Check if permutation is needed``
-            if np.all(perm == np.arange(len(perm))):
-                new_atoms = frame.atoms
-            else:
-                new_atoms = frame.atoms[perm]
-                need_reconstruct = True
-
-            all_new_atoms.append(new_atoms)
-
+        need_reconstruct, all_new_atoms = self.get_reordered_atoms()
+        # Reconstruct the structure container with atoms permutate
         if need_reconstruct:
             new_container = StructureContainer(self.container.cluster_space)
             for atoms in all_new_atoms:
@@ -152,6 +129,42 @@ class ShortRangeFitting:
             self.container = new_container
             return True
         return False
+
+    def get_reordered_atoms(self, all_atoms=None):
+        """
+        Reordered atoms according to the phonopy reference cell.
+        The first element of the returned tuple indicates if any reordering has been carried out.
+
+        Using such atoms for StructureContainer to avoid rebuilding it each time.
+        """
+        phonon_ref_cell = phonopy2atoms(self.phonopy_supercell)
+
+        # Reconstruct the structure container with atoms permutated
+        all_new_atoms = []
+        need_reconstruct = False
+        iterobj = self.container if all_atoms is None else all_atoms
+        for frame in iterobj:
+            # If a container is passed, then the atoms is frame.atoms otherwise frame itself is the atoms
+            this_atoms = frame.atoms if all_atoms is None else frame
+            # Check if the supercell lattice vectors matches - sanity check
+            if not np.all(this_atoms.cell == self.atoms_supercell.cell):
+                raise RuntimeError(
+                    f"Mismatch in supercell lattice vectors, stored: {this_atoms.cell}, reference: {self.atoms_supercell.cell}"
+                )
+
+            # Get the reference cell for finding the permutation
+            ideal_cell = this_atoms.copy()
+            ideal_cell.positions -= this_atoms.get_array("displacements")
+            perm = find_permutation(ideal_cell, phonon_ref_cell)
+            # Check if permutation is needed``
+            if np.all(perm == np.arange(len(perm))):
+                new_atoms = this_atoms
+            else:
+                new_atoms = this_atoms[perm]
+                need_reconstruct = True
+
+            all_new_atoms.append(new_atoms)
+        return need_reconstruct, all_new_atoms
 
     def get_fit_data(self):
         """Get the fitting data with long-range forces subtracted"""

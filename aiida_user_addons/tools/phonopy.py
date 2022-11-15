@@ -71,10 +71,13 @@ def export_phonon_work(work, dst, include_potcar=False):
                 include_potcar=include_potcar,
             )
 
-    nac_calc = work.get_outgoing(link_label_filter="nac_calc").first().node
+    nac_calc = work.get_outgoing(link_label_filter="nac_calc").first()
     if nac_calc:
         export_vasp_calc(
-            nac_calc, (dst / "nac_calc"), decompress=True, include_potcar=include_potcar
+            nac_calc.node,
+            (dst / "nac_calc"),
+            decompress=True,
+            include_potcar=include_potcar,
         )
 
     # Write POSCAR file used from creating the displacements

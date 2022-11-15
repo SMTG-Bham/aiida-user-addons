@@ -655,11 +655,25 @@ def _delithiate_unique_sites(
 
 @calcfunction
 def niggli_reduce(structure):
-    """Peroform niggli reduction"""
+    """Peroform niggli reduction using ase as the backend - this will rotate the structure into the standard setting"""
     from ase.build import niggli_reduce as niggli_reduce_
 
     atoms = structure.get_ase()
     niggli_reduce_(atoms)
+    new_structure = StructureData(ase=atoms)
+    new_structure.label = structure.label + " NIGGLI"
+    return new_structure
+
+
+@calcfunction
+def niggli_reduce_spglib(structure):
+    """Peroform niggli reduction using spglib as backend - this does not rotate the structure"""
+    from spglib import niggli_reduce as niggli_reduce_spg
+
+    atoms = structure.get_ase()
+    reduced_cell = niggli_reduce_spg(atoms.cell)
+    atoms.set_cell(reduced_cell)
+    atoms.wrap()
     new_structure = StructureData(ase=atoms)
     new_structure.label = structure.label + " NIGGLI"
     return new_structure
