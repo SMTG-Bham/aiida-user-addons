@@ -8,6 +8,7 @@ from functools import wraps
 from itertools import zip_longest
 from multiprocessing.sharedctypes import Value
 from pathlib import Path
+from typing import List
 
 import numpy as np
 from aiida.orm.nodes.data.array import TrajectoryData
@@ -533,9 +534,22 @@ def parse_mag(node):
             pass
         else:
             out[spec] = []
-    for key, value in sorted(
-        mag["sphere"]["x"]["site_moment"].items(), key=lambda x: x[0]
-    ):
+    for key, value in sorted(mag["sphere"]["x"]["site_moment"].items(), key=lambda x: x[0]):
         s = species[key - 1]
         out[s].append(value["tot"])
     return out
+
+
+def _parse_loop_data(node) -> List[float]:
+    """Return a list of reported LOOP time"""
+    times = []
+    with node.open("OUTCAR") as fhandle:
+        for line in fhandle:
+            if "LOOP:" in line:
+                times.append(float(line.split()[-1]))
+    return times
+
+
+def parse_loop_data(node) -> List[float]:
+    """Parse the LOOP data"""
+    return _parse_loop_data(node.outputs.retrieved)
