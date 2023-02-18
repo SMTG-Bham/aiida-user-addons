@@ -42,7 +42,10 @@ def load_mp_struct(mp_id):
     if exist:
         return exist[0]
     # No data in the db yet - import from pymatgen
-    struc = pmg.get_structure_from_mp(mp_id)
+    from pymatgen.ext.matproj import MPRester
+
+    rester = MPRester()
+    struc = rester.get_structure_by_material_id(mp_id)
     magmom = struc.site_properties.get("magmom")
     strucd = StructureData(pymatgen=struc)
     strucd.label = strucd.get_formula()
@@ -128,9 +131,7 @@ def get_entry_from_calc(calc):
         incar = calc.inputs.parameters.get_dict()
         pots = {pot.functional for pot in calc.inputs.potential.values()}
         if len(pots) != 1:
-            raise RuntimeError(
-                "Inconsistency in POTCAR functionals! Something is very wrong..."
-            )
+            raise RuntimeError("Inconsistency in POTCAR functionals! Something is very wrong...")
         pot = pots.pop()
 
     elif calc.process_label == "VaspWorkChain":
@@ -217,9 +218,7 @@ def get_functional(incar: dict, pot: str) -> str:
                 return "pbesol"
         else:
             if (not gga) or gga.lower() == "pe":
-                if incar.get("aexx") in [0.25, None] and (
-                    incar.get("hfscreen") - 0.2 < 0.01
-                ):
+                if incar.get("aexx") in [0.25, None] and (incar.get("hfscreen") - 0.2 < 0.01):
                     return "hse06"
 
     return "unknown"

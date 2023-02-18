@@ -1,0 +1,293 @@
+digraph {
+	N1319 [label="VaspAutoPhononWorkChain (1319)
+State: finished
+Exit Code: 0" color=red fillcolor="#e38851ff" penwidth=6 shape=rectangle style=filled]
+	N1320 [label="VaspRelaxWorkChain (1320)
+State: finished
+Exit Code: 0" fillcolor="#e38851ff" penwidth=0 shape=rectangle style=filled]
+	N1323 [label="VaspWorkChain (1323)
+State: finished
+Exit Code: 0" fillcolor="#e38851ff" penwidth=0 shape=rectangle style=filled]
+	N1326 [label="VaspCalculation (1326)
+State: finished
+Exit Code: 0" fillcolor="#de707fff" penwidth=0 shape=rectangle style=filled]
+	N1327 [label="RemoteData (1327)
+@localhost" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1328 [label="FolderData (1328)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1329 [label="TrajectoryData (1329)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1330 [label="ArrayData (1330)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1331 [label="Dict (1331)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1332 [label="StructureData (1332)
+Cl4Na4" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1333 [label="VaspWorkChain (1333)
+State: finished
+Exit Code: 0" fillcolor="#e38851ff" penwidth=0 shape=rectangle style=filled]
+	N1336 [label="VaspCalculation (1336)
+State: finished
+Exit Code: 0" fillcolor="#de707fff" penwidth=0 shape=rectangle style=filled]
+	N1337 [label="RemoteData (1337)
+@localhost" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1338 [label="FolderData (1338)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1339 [label="Dict (1339)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1340 [label="generate_phonopy_cells (1340)
+State: finished
+Exit Code: 0" fillcolor="#de707f77" penwidth=0 shape=rectangle style=filled]
+	N1341 [label="Dict (1341)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1342 [label="StructureData (1342)
+Cl32Na32" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1343 [label="StructureData (1343)
+Cl32Na32" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1344 [label="StructureData (1344)
+Cl32Na32" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1345 [label="StructureData (1345)
+ClNa" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1347 [label="VaspWorkChain (1347)
+State: finished
+Exit Code: 0" fillcolor="#e38851ff" penwidth=0 shape=rectangle style=filled]
+	N1348 [label="VaspWorkChain (1348)
+State: finished
+Exit Code: 0" fillcolor="#e38851ff" penwidth=0 shape=rectangle style=filled]
+	N1350 [label="VaspWorkChain (1350)
+State: finished
+Exit Code: 0" fillcolor="#e38851ff" penwidth=0 shape=rectangle style=filled]
+	N1353 [label="VaspCalculation (1353)
+State: finished
+Exit Code: 0" fillcolor="#de707fff" penwidth=0 shape=rectangle style=filled]
+	N1356 [label="VaspCalculation (1356)
+State: finished
+Exit Code: 0" fillcolor="#de707fff" penwidth=0 shape=rectangle style=filled]
+	N1359 [label="VaspCalculation (1359)
+State: finished
+Exit Code: 0" fillcolor="#de707fff" penwidth=0 shape=rectangle style=filled]
+	N1360 [label="RemoteData (1360)
+@kiwi-e" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1361 [label="RemoteData (1361)
+@kiwi-e" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1362 [label="RemoteData (1362)
+@kiwi-e" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1363 [label="FolderData (1363)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1364 [label="Dict (1364)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1365 [label="ArrayData (1365)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1366 [label="ArrayData (1366)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1367 [label="FolderData (1367)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1368 [label="FolderData (1368)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1369 [label="Dict (1369)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1370 [label="ArrayData (1370)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1371 [label="Dict (1371)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1372 [label="ArrayData (1372)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1373 [label="get_vasp_force_sets_dict (1373)
+State: finished
+Exit Code: 0" fillcolor="#de707f77" penwidth=0 shape=rectangle style=filled]
+	N1374 [label="ArrayData (1374)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1375 [label="get_nac_params (1375)
+State: finished
+Exit Code: 0" fillcolor="#de707f77" penwidth=0 shape=rectangle style=filled]
+	N1376 [label="ArrayData (1376)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1377 [label="get_force_constants (1377)
+State: finished
+Exit Code: 0" fillcolor="#de707f77" penwidth=0 shape=rectangle style=filled]
+	N1378 [label="ArrayData (1378)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1379 [label="get_phonon (1379)
+State: finished
+Exit Code: 0" fillcolor="#de707f77" penwidth=0 shape=rectangle style=filled]
+	N1380 [label="XyData (1380)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1381 [label="XyData (1381)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1382 [label="XyData (1382)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1383 [label="BandsData (1383)
+(Path of 424 kpts)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1323 -> N1326 [color="#000000" style=dotted]
+	N1356 -> N1371 [color="#000000" style=solid]
+	N1375 -> N1376 [color="#000000" style=solid]
+	N1379 -> N1383 [color="#000000" style=solid]
+	N1323 -> N1332 [color="#000000" style=dashed]
+	N1341 -> N1377 [color="#000000" style=solid]
+	N1323 -> N1328 [color="#000000" style=dashed]
+	N1348 -> N1361 [color="#000000" style=dashed]
+	N1319 -> N1320 [color="#000000" style=dotted]
+	N1333 -> N1339 [color="#000000" style=dashed]
+	N1353 -> N1367 [color="#000000" style=solid]
+	N1378 -> N1379 [color="#000000" style=solid]
+	N1372 -> N1373 [color="#000000" style=solid]
+	N1332 -> N1333 [color="#000000" style=dashed]
+	N1319 -> N1332 [color="#000000" style=dashed]
+	N1319 -> N1374 [color="#000000" style=dashed]
+	N1319 -> N1379 [color="#000000" style=dotted]
+	N1373 -> N1374 [color="#000000" style=solid]
+	N1374 -> N1377 [color="#000000" style=solid]
+	N1319 -> N1377 [color="#000000" style=dotted]
+	N1348 -> N1372 [color="#000000" style=dashed]
+	N1342 -> N1353 [color="#000000" style=solid]
+	N1353 -> N1360 [color="#000000" style=solid]
+	N1333 -> N1338 [color="#000000" style=dashed]
+	N1342 -> N1347 [color="#000000" style=dashed]
+	N1319 -> N1376 [color="#000000" style=dashed]
+	N1326 -> N1332 [color="#000000" style=solid]
+	N1356 -> N1372 [color="#000000" style=solid]
+	N1345 -> N1350 [color="#000000" style=dashed]
+	N1319 -> N1350 [color="#000000" style=dotted]
+	N1319 -> N1373 [color="#000000" style=dotted]
+	N1332 -> N1377 [color="#000000" style=solid]
+	N1348 -> N1368 [color="#000000" style=dashed]
+	N1340 -> N1342 [color="#000000" style=solid]
+	N1359 -> N1364 [color="#000000" style=solid]
+	N1340 -> N1341 [color="#000000" style=solid]
+	N1379 -> N1381 [color="#000000" style=solid]
+	N1319 -> N1375 [color="#000000" style=dotted]
+	N1356 -> N1368 [color="#000000" style=solid]
+	N1333 -> N1336 [color="#000000" style=dotted]
+	N1320 -> N1337 [color="#000000" style=dashed]
+	N1319 -> N1383 [color="#000000" style=dashed]
+	N1347 -> N1353 [color="#000000" style=dotted]
+	N1359 -> N1362 [color="#000000" style=solid]
+	N1359 -> N1366 [color="#000000" style=solid]
+	N1323 -> N1327 [color="#000000" style=dashed]
+	N1370 -> N1373 [color="#000000" style=solid]
+	N1350 -> N1359 [color="#000000" style=dotted]
+	N1336 -> N1337 [color="#000000" style=solid]
+	N1340 -> N1343 [color="#000000" style=solid]
+	N1350 -> N1366 [color="#000000" style=dashed]
+	N1347 -> N1369 [color="#000000" style=dashed]
+	N1347 -> N1370 [color="#000000" style=dashed]
+	N1356 -> N1361 [color="#000000" style=solid]
+	N1353 -> N1370 [color="#000000" style=solid]
+	N1326 -> N1329 [color="#000000" style=solid]
+	N1376 -> N1379 [color="#000000" style=solid]
+	N1326 -> N1327 [color="#000000" style=solid]
+	N1319 -> N1380 [color="#000000" style=dashed]
+	N1348 -> N1356 [color="#000000" style=dotted]
+	N1345 -> N1375 [color="#000000" style=solid]
+	N1366 -> N1375 [color="#000000" style=solid]
+	N1347 -> N1367 [color="#000000" style=dashed]
+	N1340 -> N1345 [color="#000000" style=solid]
+	N1350 -> N1365 [color="#000000" style=dashed]
+	N1333 -> N1337 [color="#000000" style=dashed]
+	N1350 -> N1363 [color="#000000" style=dashed]
+	N1319 -> N1340 [color="#000000" style=dotted]
+	N1319 -> N1348 [color="#000000" style=dotted]
+	N1343 -> N1348 [color="#000000" style=dashed]
+	N1323 -> N1331 [color="#000000" style=dashed]
+	N1319 -> N1382 [color="#000000" style=dashed]
+	N1336 -> N1339 [color="#000000" style=solid]
+	N1340 -> N1344 [color="#000000" style=solid]
+	N1320 -> N1332 [color="#000000" style=dashed]
+	N1319 -> N1347 [color="#000000" style=dotted]
+	N1350 -> N1364 [color="#000000" style=dashed]
+	N1326 -> N1331 [color="#000000" style=solid]
+	N1341 -> N1379 [color="#000000" style=solid]
+	N1320 -> N1338 [color="#000000" style=dashed]
+	N1377 -> N1378 [color="#000000" style=solid]
+	N1336 -> N1338 [color="#000000" style=solid]
+	N1348 -> N1371 [color="#000000" style=dashed]
+	N1323 -> N1330 [color="#000000" style=dashed]
+	N1323 -> N1329 [color="#000000" style=dashed]
+	N1326 -> N1328 [color="#000000" style=solid]
+	N1359 -> N1365 [color="#000000" style=solid]
+	N1332 -> N1336 [color="#000000" style=solid]
+	N1320 -> N1323 [color="#000000" style=dotted]
+	N1353 -> N1369 [color="#000000" style=solid]
+	N1379 -> N1382 [color="#000000" style=solid]
+	N1343 -> N1356 [color="#000000" style=solid]
+	N1371 -> N1373 [color="#000000" style=solid]
+	N1332 -> N1379 [color="#000000" style=solid]
+	N1319 -> N1378 [color="#000000" style=dashed]
+	N1365 -> N1375 [color="#000000" style=solid]
+	N1350 -> N1362 [color="#000000" style=dashed]
+	N1326 -> N1330 [color="#000000" style=solid]
+	N1319 -> N1341 [color="#000000" style=dashed]
+	N1369 -> N1373 [color="#000000" style=solid]
+	N1319 -> N1345 [color="#000000" style=dashed]
+	N1347 -> N1360 [color="#000000" style=dashed]
+	N1379 -> N1380 [color="#000000" style=solid]
+	N1359 -> N1363 [color="#000000" style=solid]
+	N1320 -> N1333 [color="#000000" style=dotted]
+	N1320 -> N1339 [color="#000000" style=dashed]
+	N1345 -> N1359 [color="#000000" style=solid]
+	N1332 -> N1340 [color="#000000" style=solid]
+	N1319 -> N1344 [color="#000000" style=dashed]
+	N301 [label="InstalledCode (301)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1115 [label="StructureData (1115)
+Cl4Na4" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1236 [label="InstalledCode (1236)
+VAP 6.2.0 compiled on kiwi-e" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1237 [label="Dict (1237)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1238 [label="Str (1238)
+PBE.54" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1239 [label="Dict (1239)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1240 [label="Float (1240)
+value: 0.05" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1241 [label="Dict (1241)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1245 [label="Dict (1245)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1246 [label="Dict (1246)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1247 [label="Str (1247)
+PBE.54" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1248 [label="Dict (1248)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1249 [label="Float (1249)
+value: 0.05" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1250 [label="Dict (1250)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1254 [label="Dict (1254)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1255 [label="Str (1255)
+PBE.54" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1256 [label="Dict (1256)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1257 [label="Float (1257)
+value: 0.05" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1258 [label="Dict (1258)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1262 [label="Dict (1262)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1307 [label="Int (1307)
+value: 5" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1308 [label="Bool (1308)
+True" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1309 [label="Bool (1309)
+False" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1310 [label="Int (1310)
+value: 5" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1311 [label="Bool (1311)
+True" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1312 [label="Bool (1312)
+False" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1313 [label="Int (1313)
+value: 5" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1314 [label="Bool (1314)
+True" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1315 [label="Bool (1315)
+False" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1316 [label="Bool (1316)
+False" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1317 [label="Float (1317)
+value: 1e-05" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1318 [label="Bool (1318)
+False" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1317 -> N1319 [color="#000000" style=dashed]
+	N1313 -> N1319 [color="#000000" style=dashed]
+	N1249 -> N1319 [color="#000000" style=dashed]
+	N1250 -> N1319 [color="#000000" style=dashed]
+	N1316 -> N1319 [color="#000000" style=dashed]
+	N1309 -> N1319 [color="#000000" style=dashed]
+	N301 -> N1319 [color="#000000" style=dashed]
+	N1310 -> N1319 [color="#000000" style=dashed]
+	N1314 -> N1319 [color="#000000" style=dashed]
+	N1318 -> N1319 [color="#000000" style=dashed]
+	N1236 -> N1319 [color="#000000" style=dashed]
+	N1311 -> N1319 [color="#000000" style=dashed]
+	N1237 -> N1319 [color="#000000" style=dashed]
+	N1238 -> N1319 [color="#000000" style=dashed]
+	N1308 -> N1319 [color="#000000" style=dashed]
+	N1236 -> N1319 [color="#000000" style=dashed]
+	N1254 -> N1319 [color="#000000" style=dashed]
+	N1315 -> N1319 [color="#000000" style=dashed]
+	N1262 -> N1319 [color="#000000" style=dashed]
+	N1115 -> N1319 [color="#000000" style=dashed]
+	N1307 -> N1319 [color="#000000" style=dashed]
+	N1246 -> N1319 [color="#000000" style=dashed]
+	N1247 -> N1319 [color="#000000" style=dashed]
+	N1241 -> N1319 [color="#000000" style=dashed]
+	N1256 -> N1319 [color="#000000" style=dashed]
+	N1115 -> N1319 [color="#000000" style=dashed]
+	N1255 -> N1319 [color="#000000" style=dashed]
+	N1248 -> N1319 [color="#000000" style=dashed]
+	N1312 -> N1319 [color="#000000" style=dashed]
+	N1240 -> N1319 [color="#000000" style=dashed]
+	N1245 -> N1319 [color="#000000" style=dashed]
+	N1258 -> N1319 [color="#000000" style=dashed]
+	N1239 -> N1319 [color="#000000" style=dashed]
+	N1257 -> N1319 [color="#000000" style=dashed]
+}

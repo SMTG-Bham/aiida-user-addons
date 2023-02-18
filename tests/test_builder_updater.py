@@ -2,9 +2,6 @@
 Tests for the build updater and DictWrapper
 """
 
-import pytest
-from aiida.manage.tests.pytest_fixtures import aiida_profile
-
 from aiida_user_addons.common.dictwrap import DictWrapper
 
 

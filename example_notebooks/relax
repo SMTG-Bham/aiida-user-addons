@@ -1,0 +1,115 @@
+digraph {
+	N1006 [label="VaspRelaxWorkChain (1006)
+State: finished
+Exit Code: 0" color=red fillcolor="#e38851ff" penwidth=6 shape=rectangle style=filled]
+	N1009 [label="VaspWorkChain (1009)
+State: finished
+Exit Code: 0" fillcolor="#e38851ff" penwidth=0 shape=rectangle style=filled]
+	N1012 [label="VaspCalculation (1012)
+State: finished
+Exit Code: 0" fillcolor="#de707fff" penwidth=0 shape=rectangle style=filled]
+	N1013 [label="RemoteData (1013)
+@localhost" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1014 [label="FolderData (1014)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1015 [label="TrajectoryData (1015)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1016 [label="ArrayData (1016)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1017 [label="Dict (1017)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1018 [label="StructureData (1018)
+O3SrTi" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1019 [label="VaspWorkChain (1019)
+State: finished
+Exit Code: 0" fillcolor="#e38851ff" penwidth=0 shape=rectangle style=filled]
+	N1022 [label="VaspCalculation (1022)
+State: finished
+Exit Code: 0" fillcolor="#de707fff" penwidth=0 shape=rectangle style=filled]
+	N1023 [label="RemoteData (1023)
+@localhost" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1024 [label="FolderData (1024)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1025 [label="TrajectoryData (1025)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1026 [label="ArrayData (1026)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1027 [label="Dict (1027)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1028 [label="StructureData (1028)
+O3SrTi" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1029 [label="VaspWorkChain (1029)
+State: finished
+Exit Code: 0" fillcolor="#e38851ff" penwidth=0 shape=rectangle style=filled]
+	N1032 [label="VaspCalculation (1032)
+State: finished
+Exit Code: 0" fillcolor="#de707fff" penwidth=0 shape=rectangle style=filled]
+	N1033 [label="RemoteData (1033)
+@localhost" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1034 [label="FolderData (1034)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1035 [label="Dict (1035)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1009 -> N1013 [color="#000000" style=dashed]
+	N1019 -> N1026 [color="#000000" style=dashed]
+	N1009 -> N1017 [color="#000000" style=dashed]
+	N1019 -> N1025 [color="#000000" style=dashed]
+	N1018 -> N1022 [color="#000000" style=solid]
+	N1012 -> N1015 [color="#000000" style=solid]
+	N1006 -> N1009 [color="#000000" style=dotted]
+	N1028 -> N1029 [color="#000000" style=dashed]
+	N1029 -> N1034 [color="#000000" style=dashed]
+	N1019 -> N1028 [color="#000000" style=dashed]
+	N1012 -> N1018 [color="#000000" style=solid]
+	N1006 -> N1028 [color="#000000" style=dashed]
+	N1022 -> N1027 [color="#000000" style=solid]
+	N1006 -> N1033 [color="#000000" style=dashed]
+	N1009 -> N1015 [color="#000000" style=dashed]
+	N1032 -> N1034 [color="#000000" style=solid]
+	N1029 -> N1033 [color="#000000" style=dashed]
+	N1022 -> N1028 [color="#000000" style=solid]
+	N1032 -> N1033 [color="#000000" style=solid]
+	N1012 -> N1017 [color="#000000" style=solid]
+	N1006 -> N1034 [color="#000000" style=dashed]
+	N1022 -> N1024 [color="#000000" style=solid]
+	N1019 -> N1022 [color="#000000" style=dotted]
+	N1006 -> N1035 [color="#000000" style=dashed]
+	N1028 -> N1032 [color="#000000" style=solid]
+	N1029 -> N1035 [color="#000000" style=dashed]
+	N1032 -> N1035 [color="#000000" style=solid]
+	N1009 -> N1018 [color="#000000" style=dashed]
+	N1012 -> N1014 [color="#000000" style=solid]
+	N1012 -> N1013 [color="#000000" style=solid]
+	N1022 -> N1026 [color="#000000" style=solid]
+	N1018 -> N1019 [color="#000000" style=dashed]
+	N1009 -> N1012 [color="#000000" style=dotted]
+	N1019 -> N1024 [color="#000000" style=dashed]
+	N1006 -> N1019 [color="#000000" style=dotted]
+	N1019 -> N1023 [color="#000000" style=dashed]
+	N1009 -> N1016 [color="#000000" style=dashed]
+	N1006 -> N1029 [color="#000000" style=dotted]
+	N1009 -> N1014 [color="#000000" style=dashed]
+	N1029 -> N1032 [color="#000000" style=dotted]
+	N1022 -> N1025 [color="#000000" style=solid]
+	N1019 -> N1027 [color="#000000" style=dashed]
+	N1012 -> N1016 [color="#000000" style=solid]
+	N1022 -> N1023 [color="#000000" style=solid]
+	N300 [label="StructureData (300)
+O3SrTi" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N301 [label="InstalledCode (301)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N997 [label="Dict (997)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N998 [label="Str (998)
+PBE.54" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N999 [label="Dict (999)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1000 [label="Float (1000)
+value: 0.05" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1001 [label="Dict (1001)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1002 [label="Int (1002)
+value: 5" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1003 [label="Bool (1003)
+True" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1004 [label="Bool (1004)
+False" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N1005 [label="Dict (1005)" fillcolor="#8cd499ff" penwidth=0 shape=ellipse style=filled]
+	N300 -> N1006 [color="#000000" style=dashed]
+	N1003 -> N1006 [color="#000000" style=dashed]
+	N997 -> N1006 [color="#000000" style=dashed]
+	N999 -> N1006 [color="#000000" style=dashed]
+	N301 -> N1006 [color="#000000" style=dashed]
+	N1005 -> N1006 [color="#000000" style=dashed]
+	N1002 -> N1006 [color="#000000" style=dashed]
+	N1000 -> N1006 [color="#000000" style=dashed]
+	N1001 -> N1006 [color="#000000" style=dashed]
+	N998 -> N1006 [color="#000000" style=dashed]
+	N1004 -> N1006 [color="#000000" style=dashed]
+}

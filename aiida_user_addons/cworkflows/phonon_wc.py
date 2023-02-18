@@ -27,7 +27,6 @@ from aiida_user_addons.common.opthold import (
     ListOption,
     ListOrStringOption,
     OptionContainer,
-    OptionHolder,
 )
 from aiida_user_addons.vworkflows.common import OVERRIDE_NAMESPACE
 
@@ -63,9 +62,7 @@ class CastepAutoPhononWorkChain(WorkChain):
             ),
             cls.run_force_and_nac_calcs,
             cls.create_force_set_and_constants,
-            if_(cls.remote_phonopy)(
-                cls.run_phonopy_remote, cls.collect_remote_run_data
-            ).else_(
+            if_(cls.remote_phonopy)(cls.run_phonopy_remote, cls.collect_remote_run_data).else_(
                 cls.create_force_constants,
                 cls.run_phonopy_local,
             ),
@@ -176,9 +173,7 @@ class CastepAutoPhononWorkChain(WorkChain):
             help="The output structure of the high precision relaxation, used for phonon calculations.",
         )
 
-        spec.exit_code(
-            501, "ERROR_RELAX_FAILURE", message="Initial relaxation has failed!"
-        )
+        spec.exit_code(501, "ERROR_RELAX_FAILURE", message="Initial relaxation has failed!")
 
     def setup(self):
         """Setup the workspace"""
@@ -189,9 +184,7 @@ class CastepAutoPhononWorkChain(WorkChain):
     def should_run_relax(self):
         if "relax" in self.inputs:
             return True
-        self.report(
-            "Not performing relaxation - assuming the input structure is fully relaxed."
-        )
+        self.report("Not performing relaxation - assuming the input structure is fully relaxed.")
         return False
 
     def should_run_supercell_charge_density(self):
@@ -224,9 +217,7 @@ class CastepAutoPhononWorkChain(WorkChain):
             return self.exit_codes.ERROR_RELAX_FAILURE  # pylint: disable=no-member
 
         # All OK
-        self.ctx.current_structure = (
-            workchain.outputs.output_structure
-        )  # NOTE: this is workchain specific
+        self.ctx.current_structure = workchain.outputs.output_structure  # NOTE: this is workchain specific
         self.report("Relaxation finished OK, recorded the relaxed structure")
         self.out("relaxed_structure", self.ctx.current_structure)
 
@@ -257,9 +248,7 @@ class CastepAutoPhononWorkChain(WorkChain):
             phonon_settings_dict = self.inputs.phonon_settings
 
         if "supercell_matrix" not in phonon_settings:
-            raise RuntimeError(
-                "Must supply 'supercell_matrix' in the phonon_settings input."
-            )
+            raise RuntimeError("Must supply 'supercell_matrix' in the phonon_settings input.")
 
         kwargs = {}
         return_vals = generate_phonopy_cells(
@@ -323,16 +312,12 @@ class CastepAutoPhononWorkChain(WorkChain):
 
         workchain = self.ctx.supercell_calc
         if not workchain.is_finished_ok:
-            self.report(
-                "Supercell calculation finished with error, abort further actions"
-            )
+            self.report("Supercell calculation finished with error, abort further actions")
             return self.exit_codes.ERROR_RELAX_FAILURE  # pylint: disable=no-member
 
         if "chgcar" in workchain.outputs:
             self.ctx.supercell_remote_folder = workchain.outputs.remote_folder
-            self.report(
-                "Supercell calculation finished OK, will reuse the restart folder"
-            )
+            self.report("Supercell calculation finished OK, will reuse the restart folder")
         return None
 
     def run_force_and_nac_calcs(self):
@@ -357,9 +342,7 @@ class CastepAutoPhononWorkChain(WorkChain):
             force_calc_inputs.calc.structure = node
             force_calc_inputs.metadata.call_link_label = label
             # Set the label of the force calculation
-            force_calc_inputs.metadata.label = (
-                self.ctx.label + " FC_" + key.split("_")[-1]
-            )
+            force_calc_inputs.metadata.label = self.ctx.label + " FC_" + key.split("_")[-1]
 
             running = self.submit(self._singlepoint_chain, **force_calc_inputs)
 
@@ -389,9 +372,7 @@ class CastepAutoPhononWorkChain(WorkChain):
         """
 
         self.report("Creating force set and nac (if applicable)")
-        forces_dict = collect_castep_forces_and_energies(
-            self.ctx, self.ctx.supercell_structures, "force_calc"
-        )
+        forces_dict = collect_castep_forces_and_energies(self.ctx, self.ctx.supercell_structures, "force_calc")
 
         # Will set force_sets, supercell_forces, supercell_energy - the latter two are optional
         for key, value in get_castep_force_sets_dict(**forces_dict).items():
@@ -411,15 +392,9 @@ class CastepAutoPhononWorkChain(WorkChain):
                 structure = calc.inputs.structure
 
             if "born_charges" not in calc_dict:
-                raise RuntimeError(
-                    "Born effective charges could not be found "
-                    "in the calculation. Please check the calculation setting."
-                )
+                raise RuntimeError("Born effective charges could not be found " "in the calculation. Please check the calculation setting.")
             if "dielectrics" not in calc_dict:
-                raise RuntimeError(
-                    "Dielectric constant could not be found "
-                    "in the calculation. Please check the calculation setting."
-                )
+                raise RuntimeError("Dielectric constant could not be found " "in the calculation. Please check the calculation setting.")
 
             self.ctx.nac_params = get_nac_params(
                 calc_dict["born_charges"],
@@ -436,9 +411,7 @@ class CastepAutoPhononWorkChain(WorkChain):
         code_string = self.inputs.code_string.value
         builder = orm.Code.get_from_string(code_string).get_builder()
         builder.structure = self.ctx.current_structure
-        builder.settings = (
-            self.ctx.phonon_setting_info
-        )  # This was generated by the earlier call
+        builder.settings = self.ctx.phonon_setting_info  # This was generated by the earlier call
         builder.metadata.options.update(self.inputs.options)
         builder.metadata.label = self.ctx.label
         builder.force_sets = self.ctx.force_sets  # Generated earlier
@@ -526,9 +499,7 @@ class CastepAutoPhononWorkChain(WorkChain):
         return bool(node)
 
 
-def collect_castep_forces_and_energies(
-    ctx, ctx_supercells, prefix="force_calc", obj=None
-):
+def collect_castep_forces_and_energies(ctx, ctx_supercells, prefix="force_calc", obj=None):
     """
     Collect forces and energies from CASTEP calculations.
     This is essentially for pre-process before dispatching to the calcfunction for creating
@@ -558,17 +529,13 @@ def collect_castep_forces_and_energies(
             if "output_array" in calc_node.outputs:
                 calc_dict = calc_node.outputs
 
-        if (
-            "output_array" in calc_dict
-            and "forces" in calc_dict["output_array"].get_arraynames()
-        ):
+        if "output_array" in calc_dict and "forces" in calc_dict["output_array"].get_arraynames():
             forces_dict[f"forces_{num}"] = calc_dict["output_array"]
         else:
             raise RuntimeError(f"Forces could not be found in calculation {num}.")
 
         if (
-            "output_parameters" in calc_dict
-            and "zero_K_energy" in calc_dict["output_parameters"].keys()
+            "output_parameters" in calc_dict and "zero_K_energy" in calc_dict["output_parameters"].keys()
         ):  # needs .keys() - calc_dict can be a dict or a LinkManager
             forces_dict[f"misc_{num}"] = calc_dict["output_parameters"]
 
@@ -659,9 +626,7 @@ def validate_reuse_supercell_calc(node, port=None):
     if not node:
         return
     if not node.value in ["restart", "retrieve"]:
-        raise InputValidationError(
-            "Valid options for <reuse_supercell_calc> are: 'retrieve' and 'restart'"
-        )
+        raise InputValidationError("Valid options for <reuse_supercell_calc> are: 'retrieve' and 'restart'")
 
 
 @calcfunction
@@ -684,9 +649,7 @@ def get_castep_force_sets_dict(**forces_dict):
     for key in forces_dict:
         num = int(key.split("_")[-1])  # e.g. "001" --> 1
         if "forces" in key:
-            forces_ndarray = forces_dict[key].get_array("forces")[
-                -1
-            ]  # Take the first/last element of the force array (nsteps, natoms, 3)
+            forces_ndarray = forces_dict[key].get_array("forces")[-1]  # Take the first/last element of the force array (nsteps, natoms, 3)
             if num == 0:
                 forces_0 = forces_ndarray
             else:
