@@ -57,4 +57,4 @@ jobs:
       - name: Record python dependencies
         run: pip freeze
       - name: Run pytest
-        run: pytest aiida_user_addons
+        run: pytest
