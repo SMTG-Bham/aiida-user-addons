@@ -1,0 +1,77 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "aiida_user_addons"
+authors = [{name = "Bonan Zhu", email = "zhubonan@outlook.com"}]
+readme = "README.md"
+license = {file = "LICENSE"}
+
+classifiers = [
+    "Programming Language :: Python",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+    "Framework :: AiiDA",
+    "Development Status :: 5 - Production/Stable",
+	"Environment :: Plugins",
+	"Intended Audience :: Science/Research",
+	"License :: OSI Approved :: MIT License",
+	"Programming Language :: Python :: 3.8",
+	"Programming Language :: Python :: 3.9",
+	"Programming Language :: Python :: 3.10",
+	"Topic :: Scientific/Engineering :: Physics",
+	"Topic :: Scientific/Engineering :: Chemistry",
+	"Framework :: AiiDA"
+]
+
+dynamic = ["version"]
+dependencies = [
+        "aiida-vasp>=2.0",
+        "aiida-grouppathx",
+        "aiida-phonopy @ git+https://github.com/zhubonan/aiida-phonopy@bz-changes#egg=aiida-phonopy",
+        "aiida-core>=2.0.1,<3",
+        "aiida-castep>=1.2.0a5,<3",
+        "bsym~=1.1",
+        "sumo~=2.3",
+        "adjustText"
+]
+requires-python=">=3.8"
+keywords = ["aiida", "plugin", "vasp", "castep", "electronic structure"]
+description = "Additional workflows and tools for working with AiiDA"
+
+[project.urls]
+Home = "https://github.com/zhubonan/aiida_user_addons"
+
+[project.optional-dependencies]
+
+tests = [
+    "aiida-core[tests]~=2.2",
+]
+pre-commit = [
+    "aiida-core[pre-commit]~=2.2",
+]
+docs = [
+    "sphinx"
+]
+
+
+[project.entry-points."aiida.workflows"]
+"vaspu.relax" = "aiida_user_addons.vworkflows.relax:VaspRelaxWorkChain"
+"vaspu.converge" = "aiida_user_addons.vworkflows.new_conv:VaspConvergenceWorkChain"
+"vaspu.vasp" = "aiida_user_addons.vworkflows.vasp:VaspWorkChain"
+"vaspu.bands" = "aiida_user_addons.vworkflows.new_bands:VaspBandsWorkChain"
+"vaspu.hybrid_bands" = "aiida_user_addons.vworkflows.new_bands:VaspHybridBandsWorkChain"
+"vaspu.phonopy" = "aiida_user_addons.vworkflows.phonon_wc:VaspAutoPhononWorkChain"
+"vaspu.magnetic" = "aiida_user_addons.vworkflows.magnetic:SpinEnumerateWorkChain"
+"vaspu.delithiate" = "aiida_user_addons.vworkflows.delithiate:SimpleDelithiateWorkChain"
+"vaspu.voltage_curve" = "aiida_user_addons.vworkflows.voltage_curve:VoltageCurveWorkChain"
+
+[project.entry-points."aiida.data"]
+"addons" = "aiida_user_addons.cmdline.cmd_addons:addons"
+
+[project.entry-points."aiida.schedulers"]
+"sgenodetail" = "aiida_user_addons.schedulers.sgenodetail:SgeNoDetailScheduler"
+
+[project.scripts]
+"vasp-dryrun" = "aiida_user_addons.cmdline.cmd_vasp_dryrun:cmd_vasp_dryrun"
