@@ -67,7 +67,7 @@ docs = [
 "vaspu.delithiate" = "aiida_user_addons.vworkflows.delithiate:SimpleDelithiateWorkChain"
 "vaspu.voltage_curve" = "aiida_user_addons.vworkflows.voltage_curve:VoltageCurveWorkChain"
 
-[project.entry-points."aiida.data"]
+[project.entry-points."aiida.cmdline.data"]
 "addons" = "aiida_user_addons.cmdline.cmd_addons:addons"
 
 [project.entry-points."aiida.schedulers"]
