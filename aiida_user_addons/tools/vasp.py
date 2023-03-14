@@ -4,15 +4,13 @@ Module for VASP related stuff
 import re
 import shutil
 import tempfile
-from functools import wraps
+from datetime import datetime
 from itertools import zip_longest
-from multiprocessing.sharedctypes import Value
 from pathlib import Path
 from typing import List
 
 import numpy as np
 from aiida.orm.nodes.data.array import TrajectoryData
-from aiida.orm.nodes.process.process import ProcessNode
 from ase import Atoms
 from ase.calculators.singlepoint import SinglePointCalculator
 
@@ -23,55 +21,16 @@ except ImportError:
     from aiida_vasp.parsers.file_parsers.potcar import MultiPotcarIo
     from aiida_vasp.parsers.file_parsers.poscar import PoscarParser
 
+from aiida_user_addons.common.decorators import (
+    with_node,
+    with_node_list,
+    with_retrieved,
+    with_retrieved_content,
+)
 from aiida_user_addons.common.repository import (
     open_compressed,
     save_all_repository_objects,
 )
-
-
-def with_node(f):
-    """Decorator to ensure that the function receives a node"""
-    from aiida.orm import Node, load_node
-
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        if not isinstance(args[0], Node):
-            args = list(args)
-            args[0] = load_node(args[0])
-        return f(*args, **kwargs)
-
-    return wrapped
-
-
-def with_retrieved(f):
-    """Decorator to ensure that the function receives a FolderData"""
-    from aiida.orm import Node, load_node
-
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        if isinstance(args[0], ProcessNode):
-            args[0] = args[0].outputs.retrieved
-        return f(*args, **kwargs)
-
-    return wrapped
-
-
-def with_node_list(f):
-    """Decorator to ensure that the function receives a list of nodes in its first
-    positional argument"""
-    from aiida.orm import Node, load_node
-
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        arg0 = list(args[0])
-        for idx, item in enumerate(arg0):
-            if not isinstance(item, Node):
-                arg0[idx] = load_node(arg0[idx])
-        args = list(args)
-        args[0] = arg0
-        return f(*args, **kwargs)
-
-    return wrapped
 
 
 def get_magmom(structure, mapping, default=0.6):
@@ -92,7 +51,7 @@ def export_vasp_calc(node, folder, decompress=False, include_potcar=True):
         node: A VaspCalculation node or VaspWorkChain node
     """
     from aiida.common.links import LinkType
-    from aiida.orm import CalcJobNode, QueryBuilder, WorkChainNode
+    from aiida.orm import CalcJobNode, WorkChainNode
 
     folder = Path(folder)
     folder.mkdir(exist_ok=True)
@@ -160,19 +119,34 @@ def pmg_vasprun(node, parse_xml=True, parse_potcar_file=False, parse_outcar=True
     return vrun, outcar
 
 
+@with_retrieved
+def parsevasp_vasprun(retrieved):
+    """Return a parser for vasprun"""
+    from io import BytesIO
+
+    from aiida_vasp.parsers.content_parsers.vasprun import VasprunParser
+
+    with retrieved.base.repository.open("vasprun.xml", "rb") as fh:
+        io = BytesIO(fh)
+        io.seek(0)
+        try:
+            parser = VasprunParser(handler=fh)
+        except NotImplementedError:
+            # Probably the steam is compressed so cannot read backwards as VasprunParser needs
+            # Read the content in memory and use the VasprunParser to parse it....
+            fh.seek(0)
+            io = BytesIO(fh)
+            parser = VasprunParser(handler=io)
+    return parser
+
+
 def export_relax(work, dst, include_potcar=False, decompress=False):
     """
     Export a relaxation workflow (e.g. VaspRelaxWorkChain)
 
     This function exports a series of relaxation calculations in sub-folders
     """
-    from aiida.orm import (
-        CalcFunctionNode,
-        Node,
-        QueryBuilder,
-        StructureData,
-        WorkChainNode,
-    )
+    from aiida.orm import Node, QueryBuilder, WorkChainNode
     from aiida_vasp.workchains.relax import RelaxWorkChain
 
     from aiida_user_addons.vworkflows.relax import VaspRelaxWorkChain
@@ -475,7 +449,8 @@ def traj_to_atoms(node):
             return _traj_node_to_atoms(traj, eng)
 
 
-def parse_core_state_eigenenergies(fh):
+@with_retrieved_content("OUTCAR")
+def parse_core_state_eigenenergies(lines):
     """
     Parse core state eigenenergies from a stream of OUTCAR
 
@@ -484,7 +459,7 @@ def parse_core_state_eigenenergies(fh):
     capture = False
     data = {}
     all_data = {}
-    for line in fh:
+    for line in lines:
         if "the core state eigenenergies are" in line:
             capture = True
             continue
@@ -511,7 +486,6 @@ def parse_core_state_eigenenergies(fh):
     return all_data
 
 
-@with_node
 @with_retrieved
 def get_corestate_eigenenergies(node):
     """Parse the OUTCAR to get the core-state eigenenergies"""
@@ -520,6 +494,7 @@ def get_corestate_eigenenergies(node):
     return data
 
 
+@with_node
 def parse_mag(node):
     """Parse magnetic moments using information from the OUTCAR, group them into species"""
     from aiida_vasp.parsers.content_parsers.outcar import Outcar
@@ -540,16 +515,115 @@ def parse_mag(node):
     return out
 
 
-def _parse_loop_data(node) -> List[float]:
+@with_retrieved
+def parse_loop_data(node) -> List[float]:
     """Return a list of reported LOOP time"""
     times = []
-    with node.open("OUTCAR") as fhandle:
+    with node.base.repository.open("OUTCAR") as fhandle:
         for line in fhandle:
             if "LOOP:" in line:
                 times.append(float(line.split()[-1]))
     return times
 
 
-def parse_loop_data(node) -> List[float]:
-    """Parse the LOOP data"""
-    return _parse_loop_data(node.outputs.retrieved)
+@with_retrieved_content("OUTCAR")
+def parse_timmings(outcar_lines, take_average=True):
+    """
+    Parse extra timing/jobsize information from the outcar
+    """
+    output = {}
+    output["code_version"] = outcar_lines[0].strip()
+    timing_keys = ["LOOP:", "EDDAV:", "SETDIF:", "POTLOK:", "CHARGE:", "MIXING:", "TRIAL:", "CORREC:", "EDDIAG:"]
+    for key in timing_keys:
+        output[f"timing_{key[:-1]}_real"] = []
+        output[f"timing_{key[:-1]}_cpu"] = []
+
+    # Parse parallelisation information
+    for index, line in enumerate(outcar_lines[:20]):
+        if "executed on" in line:
+            output["executed_on"] = line.strip().split(maxsplit=2)[-1]
+            dtstring = re.match(r"^.+date (.+)$", line)
+            if dtstring:
+                output["started_at"] = datetime.strptime(dtstring.group(1), "%Y.%m.%d  %H:%M:%S")
+
+        if "running on" in line:
+            output["total_cores"] = int(line.strip().split()[2])
+
+        if "mpi-ranks" in line:
+            output["total_cores"] = int(line.strip().split()[1])
+            output["threads"] = int(line.strip().split()[-2])
+
+        if "distrk" in line:
+            match = re.match(r"^.+(\d+) cores.*(\d+) groups", line)
+            output["each_kpoint_on"] = int(match.group(1))
+            output["num_kgroup"] = int(match.group(2))
+
+        if "distr" in line:
+            match = re.match(r"^.+(\d+) cores.*(\d+) groups", line)
+            output["each_band_on"] = int(match.group(1))
+            output["num_bgroup"] = int(match.group(2))
+
+    marker = -1
+    for index, line in enumerate(outcar_lines):
+        if "Dimension of arrays" in line:
+            marker = index
+            subset = outcar_lines[index : index + 12]
+            for subline in subset:
+                result = re.findall(r"([A-Z]+) *= *(\d+)", subline)
+                for name, value in result:
+                    output["array_" + name] = int(value)
+        elif "LREAL" in line:
+            tmp = line.strip().split()[2]
+            output["lreal"] = True if tmp.startswith("T") else False
+        elif "ECUT" in line:
+            tmp = line.strip().split()[2]
+            output["encut"] = float(tmp)
+        elif "LHFCALC =" in line:
+            tmp = line.strip().split()[2]
+            output["hf"] = True if tmp.startswith("T") else False
+        elif "AEXX =" in line:
+            tmp = line.strip().split()[2]
+            output["aexx"] = True if tmp.startswith("T") else False
+        elif "GGA type" in line:
+            tmp = line.strip().split()[2]
+            output["gga"] = tmp
+        elif "GGA type" in line:
+            tmp = line.strip().split()[2]
+            output["gga"] = tmp
+        elif "METAGGA=" in line:
+            tmp = line.strip().split()[1]
+            output["metagga"] = True if tmp.startswith("T") else False
+        elif "NELECT =" in line:
+            tmp = line.strip().split()[2]
+            output["nelect"] = float(tmp)
+        elif "ISPIN  =" in line:
+            tmp = line.strip().split()[2]
+            output["nelect"] = int(tmp)
+        elif "IALGO  =" in line:
+            output["ialgo"] = int(line.strip().split()[2])
+
+        if (marker > 0) and (index > marker + 2000):
+            break
+
+    # Read the timings
+    for index, line in enumerate(outcar_lines):
+        # READ timings
+        for key in timing_keys:
+            if key in line:
+                match = re.search(r"cpu time *([0-9.]+).*real time *([0-9.]+)", line)
+                output[f"timing_{key[:-1]}_cpu"].append(float(match.group(1)))
+                output[f"timing_{key[:-1]}_real"].append(float(match.group(2)))
+                break
+
+    # Average values
+    if take_average:
+        for key in list(output.keys()):
+            if "timing" in key:
+                if output[key]:
+                    output[key + "_median"] = np.median(output[key])
+                    output[key + "_max"] = max(output[key])
+                    output[key + "_min"] = min(output[key])
+                    output[key] = np.mean(output[key])
+                else:
+                    output.pop(key)
+    return output
