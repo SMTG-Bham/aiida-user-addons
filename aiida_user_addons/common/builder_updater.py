@@ -37,9 +37,9 @@ from warnings import warn
 import aiida.orm as orm
 from aiida.common.extendeddicts import AttributeDict
 from aiida.engine.processes.builder import ProcessBuilder
-from toolchest.aiidautils.dictwrap import DictWrapper
 
 from aiida_user_addons.common.inputset.vaspsets import VASPInputSet
+from aiida_user_addons.common.dictwrap import DictWrapper
 from aiida_user_addons.vworkflows.relax import RelaxOptions
 
 # Template for setting options
@@ -136,9 +136,7 @@ class VaspBuilderUpdater(BuilderUpdater):
     def use_inputset(self, structure, set_name="UCLRelaxSet", overrides=None):
 
         inset = VASPInputSet(set_name, structure, overrides=overrides)
-        self.namespace_vasp.parameters = orm.Dict(
-            dict={"incar": inset.get_input_dict()}
-        )
+        self.namespace_vasp.parameters = orm.Dict(dict={"incar": inset.get_input_dict()})
         self.namespace_vasp.potential_family = orm.Str("PBE.54")
         self.namespace_vasp.potential_mapping = orm.Dict(dict=inset.get_pp_mapping())
         self.namespace_vasp.kpoints_spacing = orm.Float(0.05)
@@ -149,23 +147,17 @@ class VaspBuilderUpdater(BuilderUpdater):
     def _initialise_parameters_wrapper(self, force=False):
         """Initialise DictWrapper for tracking INCAR tags"""
         if self.parameters_wrapped is None or force:
-            self.parameters_wrapped = DictWrapper(
-                self.namespace_vasp.parameters, self.namespace_vasp, "parameters"
-            )
+            self.parameters_wrapped = DictWrapper(self.namespace_vasp.parameters, self.namespace_vasp, "parameters")
 
     def _initialise_options_wrapper(self, force=False):
         """Initialise DictWrapper for tracking INCAR tags"""
         if self.options_wrapped is None or force:
-            self.options_wrapped = DictWrapper(
-                self.namespace_vasp.options, self.namespace_vasp, "options"
-            )
+            self.options_wrapped = DictWrapper(self.namespace_vasp.options, self.namespace_vasp, "options")
 
     def _initialise_settings_wrapper(self, force=False):
         """Initialise DictWrapper for tracking INCAR tags"""
         if self.settings_wrapped is None or force:
-            self.settings_wrapped = DictWrapper(
-                self.namespace_vasp.settings, self.namespace_vasp, "settings"
-            )
+            self.settings_wrapped = DictWrapper(self.namespace_vasp.settings, self.namespace_vasp, "settings")
 
     def set_kspacing(self, kspacing: float):
         self.namespace_vasp.kpoints_spacing = orm.Float(kspacing)
@@ -264,9 +256,7 @@ class VaspBuilderUpdater(BuilderUpdater):
 
         # Use the very default settings
         if options is None:
-            warn(
-                "Using default options template - adjustment needed for the target computer"
-            )
+            warn("Using default options template - adjustment needed for the target computer")
             options = orm.Dict(
                 dict={
                     "resources": {
@@ -409,9 +399,7 @@ class VaspNEBUpdater(VaspBuilderUpdater):
     def use_inputset(self, initial_structure, set_name="UCLRelaxSet", overrides=None):
 
         inset = VASPInputSet(set_name, initial_structure, overrides=overrides)
-        self.namespace_vasp.parameters = orm.Dict(
-            dict={"incar": inset.get_input_dict()}
-        )
+        self.namespace_vasp.parameters = orm.Dict(dict={"incar": inset.get_input_dict()})
         self.namespace_vasp.potential_family = orm.Str("PBE.54")
         self.namespace_vasp.potential_mapping = orm.Dict(dict=inset.get_pp_mapping())
         self.namespace_vasp.kpoints_spacing = orm.Float(0.05)
@@ -447,11 +435,7 @@ class VaspNEBUpdater(VaspBuilderUpdater):
         assert final
         # Generate interpolated images and fix PBC issues if applicable
         interpolated = neb_interpolate(initial, final, orm.Int(nimages))
-        images = {
-            key: value
-            for key, value in interpolated.items()
-            if not ("init" in key or "final" in key)
-        }
+        images = {key: value for key, value in interpolated.items() if not ("init" in key or "final" in key)}
         self.namespace_vasp.neb_images = images
         # Update the final image
         self.set_final_structure = interpolated["image_final"]
@@ -482,9 +466,7 @@ class VaspRelaxUpdater(VaspBuilderUpdater):
         if self.namespace_relax.relax_settings is None:
             current_options = RelaxOptions()
         else:
-            current_options = RelaxOptions(
-                **self.namespace_relax.relax_settings.get_dict()
-            )
+            current_options = RelaxOptions(**self.namespace_relax.relax_settings.get_dict())
         for key, value in kwargs.items():
             setattr(current_options, key, value)
         self.namespace_relax.relax_settings = current_options.to_aiida_dict()
@@ -646,9 +628,7 @@ class VaspAutoPhononUpdater(VaspBuilderUpdater):
             relax_upd.update_from_config(structure, config["relax"])
 
         if "nac" in config:
-            nac_upd = VaspBuilderUpdater(
-                self.root_namespace.nac, root_namespace=self.root_namespace
-            )
+            nac_upd = VaspBuilderUpdater(self.root_namespace.nac, root_namespace=self.root_namespace)
             nac_upd.update_from_config(structure, config["nac"])
 
         # Update the phonon settings
