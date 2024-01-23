@@ -26,6 +26,6 @@ def surfaxes_generate_slabs(structure, hkl, thicknesses, vacuums, **other_kwargs
         struct = slab.pop("slab")
         struct.remove_oxidation_states()
         struct = StructureData(ase=AseAtomsAdaptor.get_atoms(struct))
-        struct.set_attribute("slab_metadata", slab)
+        struct.base.attributes.set("slab_metadata", slab)
         outdict[f"slab_{i:02d}"] = struct
     return outdict

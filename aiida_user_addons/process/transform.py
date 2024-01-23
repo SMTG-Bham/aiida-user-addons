@@ -35,18 +35,14 @@ def magnetic_structure_decorate(structure, magmom):
     assert len(magmom) == len(
         structure.sites
     ), f"Mismatch between the magmom ({len(magmom)}) and the nubmer of sites ({len(structure.sites)})."
-    old_species = [
-        structure.get_kind(site.kind_name).symbol for site in structure.sites
-    ]
+    old_species = [structure.get_kind(site.kind_name).symbol for site in structure.sites]
     new_species, magmom_mapping = create_additional_species(old_species, magmom)
     new_structure = StructureData()
     new_structure.set_cell(structure.cell)
     new_structure.set_pbc(structure.pbc)
     for site, name in zip(structure.sites, new_species):
         this_symbol = structure.get_kind(site.kind_name).symbol
-        new_structure.append_atom(
-            position=site.position, symbols=this_symbol, name=name
-        )
+        new_structure.append_atom(position=site.position, symbols=this_symbol, name=name)
 
     # Keep the label
     new_structure.label = structure.label
@@ -75,9 +71,7 @@ def magnetic_structure_dedecorate(structure, mapping):
 
     for site, name in zip(structure.sites, new_species):
         this_symbol = structure.get_kind(site.kind_name).symbol
-        new_structure.append_atom(
-            position=site.position, symbols=this_symbol, name=name
-        )
+        new_structure.append_atom(position=site.position, symbols=this_symbol, name=name)
     new_structure.label = structure.label
     return {"structure": new_structure, "magmom": orm.List(list=magmom)}
 
@@ -98,9 +92,7 @@ def make_vac(cell, indices, supercell, **kwargs):
         supercell_atoms = make_supercell(atoms, np.array(supercell.get_list()))
 
     mask = np.in1d(np.arange(len(supercell_atoms)), indices.get_list())
-    supercell_atoms = supercell_atoms[
-        ~mask
-    ]  ## Remove any atoms in the original indices
+    supercell_atoms = supercell_atoms[~mask]  ## Remove any atoms in the original indices
     supercell_atoms.set_tags(None)
     supercell_atoms.set_masses(None)
     # Now I sort the supercell in the order of chemical symbols
@@ -136,17 +128,11 @@ def make_vac_at_o(cell, excluded_sites, nsub, supercell):
     # Expand the supercell with S subsituted strucutre
     struc = struc * supercell.get_list()
     noxygen = int(struc.composition["O"])
-    unique_structure = unique_structure_substitutions(
-        struc, "O", {"Og": nsub, "O": noxygen - nsub}
-    )
+    unique_structure = unique_structure_substitutions(struc, "O", {"Og": nsub, "O": noxygen - nsub})
     # Convert back to normal structure
     # Remove P as they are vacancies, Convert S back to O
     for ustruc in unique_structure:
-        p_indices = [
-            n
-            for n, site in enumerate(ustruc.sites)
-            if site.species == Composition("Og")
-        ]
+        p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition("Og")]
         ustruc.remove_sites(p_indices)
         # Convert S sites back to O
         ustruc["Ts"] = "O"
@@ -154,8 +140,8 @@ def make_vac_at_o(cell, excluded_sites, nsub, supercell):
     output_structs = {}
     for n, s in enumerate(unique_structure):
         stmp = StructureData(pymatgen=s)
-        stmp.set_attribute("vac_id", n)
-        stmp.set_attribute("supercell", " ".join(map(str, supercell.get_list())))
+        stmp.base.attributes.set("vac_id", n)
+        stmp.base.attributes.set("supercell", " ".join(map(str, supercell.get_list())))
         stmp.label = cell.label + f" VAC {n}"
         output_structs[f"structure_{n:04d}"] = stmp
 
@@ -193,17 +179,11 @@ def make_vac_at_o_and_shake(cell, excluded_sites, nsub, supercell, shake_amp):
     # Expand the supercell with S subsituted strucutre
     struc = struc * supercell.get_list()
     noxygen = int(struc.composition["O"])
-    unique_structure = unique_structure_substitutions(
-        struc, "O", {"Og": nsub, "O": noxygen - nsub}
-    )
+    unique_structure = unique_structure_substitutions(struc, "O", {"Og": nsub, "O": noxygen - nsub})
     # Convert back to normal structure
     # Remove P as they are vacancies, Convert S back to O
     for ustruc in unique_structure:
-        p_indices = [
-            n
-            for n, site in enumerate(ustruc.sites)
-            if site.species == Composition("Og")
-        ]
+        p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition("Og")]
 
         ustruc.remove_sites(p_indices)
         # Convert S sites back to O
@@ -211,15 +191,13 @@ def make_vac_at_o_and_shake(cell, excluded_sites, nsub, supercell, shake_amp):
 
     # Perturb structures
     trans = PerturbStructureTransformation(distance=float(shake_amp))
-    unique_structure = [
-        trans.apply_transformation(ustruc) for ustruc in unique_structure
-    ]
+    unique_structure = [trans.apply_transformation(ustruc) for ustruc in unique_structure]
 
     output_structs = {}
     for n, s in enumerate(unique_structure):
         stmp = StructureData(pymatgen=s)
-        stmp.set_attribute("vac_id", n)
-        stmp.set_attribute("supercell", " ".join(map(str, supercell.get_list())))
+        stmp.base.attributes.set("vac_id", n)
+        stmp.base.attributes.set("supercell", " ".join(map(str, supercell.get_list())))
         stmp.label = cell.label + f" VAC {n}"
         output_structs[f"structure_{n:04d}"] = stmp
 
@@ -233,11 +211,7 @@ def rattle(structure, amp):
     """
     native_keys = ["cell", "pbc1", "pbc2", "pbc3", "kinds", "sites", "mp_id"]
     # Keep the foreign keys as it is
-    foreign_attrs = {
-        key: value
-        for key, value in structure.attributes.items()
-        if key not in native_keys
-    }
+    foreign_attrs = {key: value for key, value in structure.attributes.items() if key not in native_keys}
     atoms = structure.get_ase()
     atoms.rattle(amp.value)
     # Clean any tags etc
@@ -245,7 +219,7 @@ def rattle(structure, amp):
     atoms.set_masses(None)
     # Convert it back
     out = StructureData(ase=atoms)
-    out.set_attribute_many(foreign_attrs)
+    out.base.attributes.set_many(foreign_attrs)
     out.label = structure.label + " RATTLED"
     return out
 
@@ -277,8 +251,8 @@ def res2structure(file):
     atoms.set_calculator(None)
     atoms.wrap()
     struct = StructureData(ase=atoms)
-    struct.set_attribute("H", titls.enthalpy)
-    struct.set_attribute("search_label", titls.label)
+    struct.base.attributes.set("H", titls.enthalpy)
+    struct.base.attributes.set("search_label", titls.label)
     struct.label = file.filename
     return struct
 
@@ -344,9 +318,7 @@ def get_refined_structure(structure, symprec, angle_tolerance):
     from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
     pstruct = structure.get_pymatgen()
-    ana = SpacegroupAnalyzer(
-        pstruct, symprec=symprec.value, angle_tolerance=angle_tolerance.value
-    )
+    ana = SpacegroupAnalyzer(pstruct, symprec=symprec.value, angle_tolerance=angle_tolerance.value)
     ps = ana.get_refined_structure()
     out = StructureData(pymatgen=ps)
     out.label = structure.label + " REFINED"
@@ -360,9 +332,7 @@ def get_conventional_standard_structure(structure, symprec, angle_tolerance):
     from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
     pstruct = structure.get_pymatgen()
-    ana = SpacegroupAnalyzer(
-        pstruct, symprec=symprec.value, angle_tolerance=angle_tolerance.value
-    )
+    ana = SpacegroupAnalyzer(pstruct, symprec=symprec.value, angle_tolerance=angle_tolerance.value)
     ps = ana.get_conventional_standard_structure()
     out = StructureData(pymatgen=ps)
     out.label = structure.label + " CONVENTIONAL STANDARD"
@@ -404,7 +374,7 @@ def make_supercell(structure, supercell, **kwargs):
 
 
 @calcfunction
-def delithiate_by_wyckoff(structure, wyckoff, element):
+def delithiate_by_wyckoff(structure, wyckoff, **kwargs):
     """Remove ALL lithium in a certain wyckoff sites for a given structure"""
     remove_symbol = kwargs.get("element", orm.Str("Li"))
     remove_wyckoff = wyckoff.value
@@ -414,9 +384,7 @@ def delithiate_by_wyckoff(structure, wyckoff, element):
     natoms = len(psymm.sites)
 
     rm_indices = []
-    for lsite, lidx, symbol in zip(
-        psymm.equivalent_sites, psymm.equivalent_indices, psymm.wyckoff_symbols
-    ):
+    for lsite, lidx, symbol in zip(psymm.equivalent_sites, psymm.equivalent_indices, psymm.wyckoff_symbols):
         site = lsite[0]
         if site.species_string != remove_symbol:
             continue
@@ -427,13 +395,11 @@ def delithiate_by_wyckoff(structure, wyckoff, element):
     psymm.remove_sites(rm_indices)
     out = StructureData(pymatgen=Structure.from_sites(psymm.sites))
     for kind in out.kinds:
-        assert not re.search(
-            r"\d", kind.name
-        ), f"Kind name: {kind.name} contains indices"
+        assert not re.search(r"\d", kind.name), f"Kind name: {kind.name} contains indices"
 
     # Set some special attribute
-    out.set_attribute("removed_specie", remove_symbol)
-    out.set_attribute("removed_wyckoff", remove_wyckoff)
+    out.base.attributes.set("removed_specie", remove_symbol)
+    out.base.attributes.set("removed_wyckoff", remove_wyckoff)
     out.label += f" delithiated {remove_wyckoff}"
 
     # Prepare a mask for the removed structures
@@ -459,15 +425,11 @@ def delithiate_full(structure, **kwargs):
     """
     remove_symbol = kwargs.get("element", orm.Str("Li"))
     pstruct = structure.get_pymatgen()
-    to_remove = [
-        idx
-        for idx, site in enumerate(pstruct.sites)
-        if site.species_string == remove_symbol
-    ]
+    to_remove = [idx for idx, site in enumerate(pstruct.sites) if site.species_string == remove_symbol]
     pstruct.remove_sites(to_remove)
 
     out = StructureData(pymatgen=pstruct)
-    out.set_attribute("removed_specie", remove_symbol)
+    out.base.attributes.set("removed_specie", remove_symbol)
     out.label = structure.label + f" fully delithiated"
     out.description = f"A fully delithiated structure, crated from {structure.uuid}"
 
@@ -498,23 +460,17 @@ def delithiate_one(structure, **kwargs):
 
     remove_symbol = kwargs.get("element", orm.Str("Li"))
     pstruct = structure.get_pymatgen()
-    to_remove = [
-        idx
-        for idx, site in enumerate(pstruct.sites)
-        if site.species_string == remove_symbol
-    ]
+    to_remove = [idx for idx, site in enumerate(pstruct.sites) if site.species_string == remove_symbol]
     outdict = {}
     for idx, site in enumerate(to_remove):
         tmp_struct = structure.get_pymatgen()
         tmp_struct.remove_sites([site])
 
         out = StructureData(pymatgen=tmp_struct)
-        out.set_attribute("removed_specie", remove_symbol)
-        out.set_attribute("removed_site", site)
+        out.base.attributes.set("removed_specie", remove_symbol)
+        out.base.attributes.set("removed_site", site)
         out.label = structure.label + f" delithiated 1 - {idx}"
-        out.description = (
-            f"A structure with one Li removed, crated from {structure.uuid}"
-        )
+        out.description = f"A structure with one Li removed, crated from {structure.uuid}"
 
         # Create the mask
         mask = []
@@ -554,9 +510,7 @@ def delithiate_unique_sites(cell, excluded_sites, nsub, atol, **kwargs):
     )
 
 
-def _delithiate_unique_sites(
-    cell, excluded_sites, nsub, atol, pmg_only=False, limit=None, element="Li"
-):
+def _delithiate_unique_sites(cell, excluded_sites, nsub, atol, pmg_only=False, limit=None, element="Li"):
     """
     Make lots of delithiated non-equivalent cells using BSYM
 
@@ -600,21 +554,13 @@ def _delithiate_unique_sites(
             atol=float(atol),
         )
     elif li_left == 0:
-        unique_structure = unique_structure_substitutions(
-            struc, element, {vacancy_dummy: nsub}, verbose=True, atol=float(atol)
-        )
+        unique_structure = unique_structure_substitutions(struc, element, {vacancy_dummy: nsub}, verbose=True, atol=float(atol))
     else:
-        raise ValueError(
-            f"There are {noli} {element} but requested to remove {nsub} of them!!"
-        )
+        raise ValueError(f"There are {noli} {element} but requested to remove {nsub} of them!!")
 
     # Convert back to normal structure
     for ustruc in unique_structure:
-        p_indices = [
-            n
-            for n, site in enumerate(ustruc.sites)
-            if site.species == Composition(vacancy_dummy)
-        ]
+        p_indices = [n for n, site in enumerate(ustruc.sites) if site.species == Composition(vacancy_dummy)]
         ustruc.remove_sites(p_indices)
         ustruc[exclude_dummy] = element
 
@@ -628,7 +574,7 @@ def _delithiate_unique_sites(
     output_dict = {}
     for n, s in enumerate(unique_structure):
         stmp = StructureData(pymatgen=s)
-        stmp.set_attribute("delithiate_id", n)
+        stmp.base.attributes.set("delithiate_id", n)
         stmp.label = cell.label + f" delithiate {n}"
         output_dict[f"structure_{n:04d}"] = stmp
 
@@ -746,9 +692,7 @@ def fix_atom_order(reference, to_fix):
         min_idx = np.argmin(dists)
         min_dist = min(dists)
         if min_dist > 0.5:
-            print(
-                f"Large displacement found - moving atom {j} to {i} - please check if this is correct!"
-            )
+            print(f"Large displacement found - moving atom {j} to {i} - please check if this is correct!")
         new_indices[i] = min_idx
 
     afixed = afix[new_indices]

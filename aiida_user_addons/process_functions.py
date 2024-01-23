@@ -41,7 +41,7 @@ def extend_magnetic_orderings(struct, moment_map):
             # This avoids AiiDA added addition Kind to reflect the spins
             site.species = site.species.elements[0].name
         astruc = StructureData(pymatgen=ptemp)
-        astruc.set_attribute("MAGMOM", magmom)
+        astruc.base.attributes.set("MAGMOM", magmom)
         structs[f"out_structure_{idx:03d}"] = astruc
     return structs
 

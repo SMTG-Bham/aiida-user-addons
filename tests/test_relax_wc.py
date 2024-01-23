@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from aiida.common.extendeddicts import AttributeDict
-from aiida.orm import StructureData
+from aiida.orm import load_code
 from aiida_vasp.utils.aiida_utils import create_authinfo, get_data_node
 from aiida_vasp.utils.fixtures import *
 from aiida_vasp.utils.fixtures.data import (
@@ -73,7 +73,7 @@ def setup_relax_workchain(structure, incar, opts, nkpts):
     )
     vasp.settings = get_data_node("dict", dict={"parser_settings": {"add_structure": True}})
 
-    mock = Code.get_from_string("mock-vasp-strict@localhost")
+    mock = load_code("mock-vasp-strict@localhost")
     vasp.code = mock
     relax_options = RelaxOptions(**opts).to_aiida_dict()
     inputs.relax_settings = relax_options

@@ -67,9 +67,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             ),
             cls.run_force_and_nac_calcs,
             cls.create_force_set_and_constants,
-            if_(cls.remote_phonopy)(
-                cls.run_phonopy_remote, cls.collect_remote_run_data
-            ).else_(
+            if_(cls.remote_phonopy)(cls.run_phonopy_remote, cls.collect_remote_run_data).else_(
                 cls.create_force_constants,
                 cls.run_phonopy_local,
             ),
@@ -180,9 +178,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             help="The output structure of the high precision relaxation, used for phonon calculations.",
         )
 
-        spec.exit_code(
-            501, "ERROR_RELAX_FAILURE", message="Initial relaxation has failed!"
-        )
+        spec.exit_code(501, "ERROR_RELAX_FAILURE", message="Initial relaxation has failed!")
 
     def setup(self):
         """Setup the workspace"""
@@ -193,9 +189,7 @@ class VaspAutoPhononWorkChain(WorkChain):
     def should_run_relax(self):
         if "relax" in self.inputs:
             return True
-        self.report(
-            "Not performing relaxation - assuming the input structure is fully relaxed."
-        )
+        self.report("Not performing relaxation - assuming the input structure is fully relaxed.")
         return False
 
     def should_run_supercell_chgcar(self):
@@ -228,9 +222,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             return self.exit_codes.ERROR_RELAX_FAILURE  # pylint: disable=no-member
 
         # All OK
-        self.ctx.current_structure = (
-            workchain.outputs.relax__structure
-        )  # NOTE: this is workchain specific
+        self.ctx.current_structure = workchain.outputs.relax__structure  # NOTE: this is workchain specific
         self.report("Relaxation finished OK, recorded the relaxed structure")
         self.out("relaxed_structure", self.ctx.current_structure)
 
@@ -247,9 +239,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             relax_calc_inputs = self.exposed_inputs(self._relax_chain, "relax")
             # Fetch the magmom from the relaxation calculation (eg. for the starting structure)
             try:
-                magmom = relax_calc_inputs.vasp.parameters[OVERRIDE_NAMESPACE].get(
-                    "magmom"
-                )
+                magmom = relax_calc_inputs.vasp.parameters[OVERRIDE_NAMESPACE].get("magmom")
             except AttributeError:
                 magmom = None
         else:
@@ -264,9 +254,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             phonon_settings_dict = self.inputs.phonon_settings
 
         if "supercell_matrix" not in phonon_settings:
-            raise RuntimeError(
-                "Must supply 'supercell_matrix' in the phonon_settings input."
-            )
+            raise RuntimeError("Must supply 'supercell_matrix' in the phonon_settings input.")
 
         kwargs = {}
         return_vals = generate_phonopy_cells(
@@ -337,9 +325,7 @@ class VaspAutoPhononWorkChain(WorkChain):
 
         workchain = self.ctx.supercell_calc
         if not workchain.is_finished_ok:
-            self.report(
-                "Supercell calculation finished with error, abort further actions"
-            )
+            self.report("Supercell calculation finished with error, abort further actions")
             return self.exit_codes.ERROR_RELAX_FAILURE  # pylint: disable=no-member
 
         if "chgcar" in workchain.outputs:
@@ -349,9 +335,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         else:
             self.ctx.supercell_chgcar = None
             self.ctx.supercell_remote_folder = workchain.outputs.remote_folder
-            self.report(
-                "Supercell calculation finished OK, will reuse the restart folder"
-            )
+            self.report("Supercell calculation finished OK, will reuse the restart folder")
         return None
 
     def run_force_and_nac_calcs(self):
@@ -362,9 +346,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         # Set the CHGCAR or restart folder
         if self.should_run_supercell_chgcar():
             # Set start from constant charge
-            force_calc_inputs.parameters = nested_update_dict_node(
-                force_calc_inputs.parameters, {"charge": {"from_charge": True}}
-            )
+            force_calc_inputs.parameters = nested_update_dict_node(force_calc_inputs.parameters, {"charge": {"from_charge": True}})
             # Supply the inputs if needed
             if self.ctx.supercell_chgcar:
                 force_calc_inputs.chgcar = self.ctx.chgcar
@@ -386,9 +368,7 @@ class VaspAutoPhononWorkChain(WorkChain):
             force_calc_inputs.structure = node
             force_calc_inputs.metadata.call_link_label = label
             # Set the label of the force calculation
-            force_calc_inputs.metadata.label = (
-                self.ctx.label + " FC_" + key.split("_")[-1]
-            )
+            force_calc_inputs.metadata.label = self.ctx.label + " FC_" + key.split("_")[-1]
 
             running = self.submit(self._singlepoint_chain, **force_calc_inputs)
 
@@ -428,9 +408,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         """Create the force set and constants from the finished calculations"""
 
         self.report("Creating force set and nac (if applicable)")
-        forces_dict = collect_vasp_forces_and_energies(
-            self.ctx, self.ctx.supercell_structures, "force_calc"
-        )
+        forces_dict = collect_vasp_forces_and_energies(self.ctx, self.ctx.supercell_structures, "force_calc")
 
         # Will set force_sets, supercell_forces, supercell_energy - the latter two are optional
         for key, value in get_vasp_force_sets_dict(**forces_dict).items():
@@ -450,15 +428,9 @@ class VaspAutoPhononWorkChain(WorkChain):
                 structure = calc.inputs.structure
 
             if "born_charges" not in calc_dict:
-                raise RuntimeError(
-                    "Born effective charges could not be found "
-                    "in the calculation. Please check the calculation setting."
-                )
+                raise RuntimeError("Born effective charges could not be found " "in the calculation. Please check the calculation setting.")
             if "dielectrics" not in calc_dict:
-                raise RuntimeError(
-                    "Dielectric constant could not be found "
-                    "in the calculation. Please check the calculation setting."
-                )
+                raise RuntimeError("Dielectric constant could not be found " "in the calculation. Please check the calculation setting.")
 
             self.ctx.nac_params = get_nac_params(
                 calc_dict["born_charges"],
@@ -473,11 +445,9 @@ class VaspAutoPhononWorkChain(WorkChain):
         self.report("run remote phonopy calculation")
 
         code_string = self.inputs.code_string.value
-        builder = orm.Code.get_from_string(code_string).get_builder()
+        builder = orm.load_code(code_string).get_builder()
         builder.structure = self.ctx.current_structure
-        builder.settings = (
-            self.ctx.phonon_setting_info
-        )  # This was generated by the earlier call
+        builder.settings = self.ctx.phonon_setting_info  # This was generated by the earlier call
         builder.metadata.options.update(self.inputs.options)
         builder.metadata.label = self.ctx.label
         builder.force_sets = self.ctx.force_sets  # Generated earlier
@@ -554,9 +524,7 @@ class VaspAutoPhononWorkChain(WorkChain):
         return bool(node)
 
 
-def collect_vasp_forces_and_energies(
-    ctx, ctx_supercells, prefix="force_calc", obj=None
-):
+def collect_vasp_forces_and_energies(ctx, ctx_supercells, prefix="force_calc", obj=None):
     """
     Collect forces and energies from VASP calculations.
     This is essentially for pre-process before dispatching to the calcfunction for creating
@@ -591,9 +559,7 @@ def collect_vasp_forces_and_energies(
         else:
             raise RuntimeError(f"Forces could not be found in calculation {num}.")
 
-        if (
-            "misc" in calc_dict and "total_energies" in calc_dict["misc"].keys()
-        ):  # needs .keys() - calc_dict can be a dict or a LinkManager
+        if "misc" in calc_dict and "total_energies" in calc_dict["misc"].keys():  # needs .keys() - calc_dict can be a dict or a LinkManager
             forces_dict[f"misc_{num}"] = calc_dict["misc"]
 
     return forces_dict
@@ -662,6 +628,4 @@ def validate_reuse_supercell_calc(node, port=None):
     if not node:
         return
     if not node.value in ["restart", "retrieve"]:
-        raise InputValidationError(
-            "Valid options for <reuse_supercell_calc> are: 'retrieve' and 'restart'"
-        )
+        raise InputValidationError("Valid options for <reuse_supercell_calc> are: 'retrieve' and 'restart'")

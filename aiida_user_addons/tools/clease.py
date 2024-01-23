@@ -47,13 +47,9 @@ def dbtoaiida(
         row_filters["gen"] = gen
 
     if group_reduced_structure is None:
-        group_reduced_structure = orm.Group.objects.get_or_create(
-            label=group_structure.label + "-reduced"
-        )[0]
+        group_reduced_structure = orm.Group.objects.get_or_create(label=group_structure.label + "-reduced")[0]
     with connect(db_path) as conn:
-        for i, row in enumerate(
-            conn.select(converged=False, struct_type="initial", **row_filters)
-        ):
+        for i, row in enumerate(conn.select(converged=False, struct_type="initial", **row_filters)):
             q = orm.QueryBuilder()
             q.append(
                 orm.StructureData,
@@ -69,19 +65,15 @@ def dbtoaiida(
                     with_node=orm.StructureData,
                 )
             if q.count() > 0:
-                print(
-                    f"Structure {row.unique_id} {row.name} has been deposited into the database already: {q.first()[0]}"
-                )
+                print(f"Structure {row.unique_id} {row.name} has been deposited into the database already: {q.first()[0]}")
                 continue
 
-            atoms = sort(
-                row.toatoms()
-            )  # We have to sort the atoms so it is easier for the subsequent calculations
+            atoms = sort(row.toatoms())  # We have to sort the atoms so it is easier for the subsequent calculations
             atoms.set_tags(None)
             struct = orm.StructureData(ase=atoms)
-            struct.set_attribute("ce_uuid", row.unique_id)
-            struct.set_attribute("ce_uid", row.id)
-            struct.set_attribute("gen", row.gen)
+            struct.base.attributes.set("ce_uuid", row.unique_id)
+            struct.base.attributes.set("ce_uid", row.id)
+            struct.base.attributes.set("gen", row.gen)
             struct.label = row.name
             struct.description = f"Initial structure generated in {db_path}.db."
             if not dryrun:
@@ -172,9 +164,7 @@ def aiidatodb(
 
         # Inserting the input structure for the geometry optimisation
         final_atoms_origin = ra.input_structure.get_ase()
-        final_origin_id = conn.write(
-            final_atoms_origin, key_value_pairs=custom_kvp_final_origin
-        )
+        final_origin_id = conn.write(final_atoms_origin, key_value_pairs=custom_kvp_final_origin)
         custom_kvp_init["final_origin_struct_id"] = final_origin_id
 
         update_db(

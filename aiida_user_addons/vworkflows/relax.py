@@ -550,7 +550,7 @@ class VaspRelaxWorkChain(WorkChain, WithVaspInputSet):
             # BONAN: Check force - this is because the underlying VASP calculation may not have finished with
             # fully converge geometry, and the vasp plugin does not check it.
             force_cut_off = relax_settings.get("force_cutoff")
-            max_force = workchain.outputs.misc.get_attribute("maximum_force")
+            max_force = workchain.outputs.misc.base.attributes.get("maximum_force")
             if force_cut_off is not None and max_force > force_cut_off:
                 self.report(f"Maximum force in the structure {max_force:.4g} excess the cut-off limit {force_cut_off:.4g} - NOT OK")
                 converged = False

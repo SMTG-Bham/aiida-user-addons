@@ -86,9 +86,7 @@ class SpinEnumerateWorkChain(WorkChain, WithVaspInputSet):
 
     def generate_magnetic_configurations(self):
         """Generate frames of magnetic configurations"""
-        structures = extend_magnetic_orderings(
-            self.inputs.structure, self.inputs.moment_map, self.inputs.enum_options
-        )
+        structures = extend_magnetic_orderings(self.inputs.structure, self.inputs.moment_map, self.inputs.enum_options)
         self.ctx.decorated_structures = structures
 
     def run_relaxation(self):
@@ -96,29 +94,21 @@ class SpinEnumerateWorkChain(WorkChain, WithVaspInputSet):
         nst = len(self.ctx.decorated_structures)
         for link_name, mag_struct in self.ctx.decorated_structures.items():
 
-            magmom = mag_struct.get_attribute("MAGMOM")
-            orig = mag_struct.get_attribute("magnetic_origin")
-            inputs = self.exposed_inputs(
-                WorkflowFactory(self._relax_workchain), "relax"
-            )
+            magmom = mag_struct.base.attributes.get("MAGMOM")
+            orig = mag_struct.base.attributes.get("magnetic_origin")
+            inputs = self.exposed_inputs(WorkflowFactory(self._relax_workchain), "relax")
             inputs.structure = mag_struct
             # Apply the MAGMOM to the input parameters
-            inputs.vasp.parameters = nested_update_dict_node(
-                inputs.vasp.parameters, {OVERRIDE_NAMESPACE: {"magmom": magmom}}
-            )
+            inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {OVERRIDE_NAMESPACE: {"magmom": magmom}})
             incar_dict = inputs.vasp.parameters.get_dict()[OVERRIDE_NAMESPACE]
 
             # Setup LDA+U - we cannot use the original since atoms can be reordered!!
             if "ldau_mapping" in self.inputs:
                 ldau_settings = self.inputs.ldau_mapping.get_dict()
                 ldau_keys = get_ldau_keys(mag_struct, **ldau_settings)
-                inputs.vasp.parameters = nested_update_dict_node(
-                    inputs.vasp.parameters, {OVERRIDE_NAMESPACE: ldau_keys}
-                )
+                inputs.vasp.parameters = nested_update_dict_node(inputs.vasp.parameters, {OVERRIDE_NAMESPACE: ldau_keys})
             elif "laduu" in incar_dict:
-                raise RuntimeError(
-                    "Using LDA+U but not explicity mapping given. Please set ldu_mapping input."
-                )
+                raise RuntimeError("Using LDA+U but not explicity mapping given. Please set ldu_mapping input.")
 
             # Index of the structure
             ist = int(link_name.split("_")[-1])
@@ -137,20 +127,14 @@ class SpinEnumerateWorkChain(WorkChain, WithVaspInputSet):
 
         miscs = {}
         for workchain in self.ctx.workchains:
-            link_name = (
-                workchain.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
-            )
+            link_name = workchain.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
             if not workchain.is_finished_ok:
-                self.report(
-                    f"Relaxation {workchain} ({link_name}) did not finished ok - not attaching the results"
-                )
+                self.report(f"Relaxation {workchain} ({link_name}) did not finished ok - not attaching the results")
             else:
                 miscs[link_name] = workchain.outputs.misc
 
         if not miscs:
-            self.report(
-                "None of the work has finished ok - serious problem must occurred"
-            )
+            self.report("None of the work has finished ok - serious problem must occurred")
             return self.exit_codes.ERROR_ALL_SUB_WORK_FAILED
         record_node = compose_magnetic_data(**miscs)
         self.out("output_parameters", record_node)
@@ -169,15 +153,13 @@ def compose_magnetic_data(**miscs):
         q.append(orm.Node, filters={"id": misc.pk})
         workchain = q.one()[0]
 
-        link_name = (
-            workchain.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
-        )
+        link_name = workchain.get_incoming(link_type=LinkType.CALL_WORK).one().link_label
         ist = int(link_name.split("_")[-1])
 
         mag_struct = workchain.inputs.structure
         mag_pstruct = mag_struct.get_pymatgen()
         num_fu = mag_pstruct.composition.get_reduced_composition_and_factor()[1]
-        orig = mag_struct.get_attribute("magnetic_origin")
+        orig = mag_struct.base.attributes.get("magnetic_origin")
 
         misc = workchain.outputs.misc.get_dict()
         miscs[link_name] = misc  # Record the misc nodes for linking
@@ -237,19 +219,15 @@ def extend_magnetic_orderings(struct, moment_map, enum_options):
 
     enum = MagneticStructureEnumerator(pstruc, moment_map, **kwargs)
     structs = {}
-    for idx, (ptemp, orig) in enumerate(
-        zip(enum.ordered_structures, enum.ordered_structure_origins)
-    ):
+    for idx, (ptemp, orig) in enumerate(zip(enum.ordered_structures, enum.ordered_structure_origins)):
         magmom = _get_all_spins(ptemp)
         for site in ptemp.sites:
             # This is a bit of hack - I set the specie to be the element
             # This avoids AiiDA added addition Kind to reflect the spins
             site.species = site.species.elements[0].name
         astruc = orm.StructureData(pymatgen=ptemp)
-        astruc.set_attribute("MAGMOM", magmom)  # Stores the magnetic moments
-        astruc.set_attribute(
-            "magnetic_origin", orig
-        )  # Stores the type of transforms - AFM/FM etc
+        astruc.base.attributes.set("MAGMOM", magmom)  # Stores the magnetic moments
+        astruc.base.attributes.set("magnetic_origin", orig)  # Stores the type of transforms - AFM/FM etc
         structs[f"out_structure_{idx:03d}"] = astruc
     return structs
 

@@ -50,9 +50,9 @@ def load_mp_struct(mp_id):
     strucd = StructureData(pymatgen=struc)
     strucd.label = strucd.get_formula()
     strucd.description = f"Imported from Materials Project ID={mp_id}"
-    strucd.set_attribute("mp_id", mp_id)
+    strucd.base.attributes.set("mp_id", mp_id)
     if magmom:
-        strucd.set_attribute("mp_magmom", magmom)
+        strucd.base.attributes.set("mp_magmom", magmom)
     strucd.store()
     strucd.set_extra("mp_id", mp_id)
     if magmom:

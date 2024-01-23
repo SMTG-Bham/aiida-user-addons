@@ -74,7 +74,7 @@ class DictWrapper(UserDict):
             if self._unstored_node is None:
                 self._unstored_node = Dict(dict=self.data)
             else:
-                self._unstored_node.set_attribute(key, value)
+                self._unstored_node.base.attributes.set(key, value)
 
         if self.namespace is not None:
             self.namespace[self.port] = self.node

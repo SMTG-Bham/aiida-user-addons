@@ -87,9 +87,7 @@ class RelaxationAnalyser:
             for calc in sorted(work.called, key=lambda x: x.mtime):
                 if not calc.is_finished:
                     break
-                with open_compressed(
-                    calc.outputs.retrieved, "vasprun.xml", mode="rb"
-                ) as handle_source:
+                with open_compressed(calc.outputs.retrieved, "vasprun.xml", mode="rb") as handle_source:
                     with open(tempdir / "vasprun.xml", "wb") as handle_destination:
                         shutil.copyfileobj(handle_source, handle_destination)
                 all_atoms = read(str(tempdir / "vasprun.xml"), index=":")
@@ -150,10 +148,8 @@ def traj_node_to_atoms(traj: orm.TrajectoryData, energies=None) -> List[Atoms]:
     traj (TrajectoryData): The TrajectoryData node to be converged
     energies (np.ndarray): Energies of each frame. This needs to be supplied separately.
     """
-    symbols = traj.get_attribute("symbols")
-    cells, positions, forces = (
-        traj.get_array(n) for n in ["cells", "positions", "forces"]
-    )
+    symbols = traj.base.attributes.get("symbols")
+    cells, positions, forces = (traj.get_array(n) for n in ["cells", "positions", "forces"])
     atoms_list = []
 
     if energies is None:

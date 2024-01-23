@@ -147,7 +147,7 @@ def structure_from_res(resfile: SinglefileData) -> StructureData:
     title, atoms = read_res(lines)
     atoms.wrap()
     out = StructureData(ase=atoms)
-    out.set_attribute_many(title._asdict())
+    out.base.attributes.set_many(title._asdict())
     out.label = title.label
     return out
 

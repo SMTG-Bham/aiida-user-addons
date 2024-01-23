@@ -48,22 +48,16 @@ def export_phonon_work(work, dst, include_potcar=False):
     dst.mkdir(exist_ok=True)
 
     info_file = dst / "aiida_info"
-    info_content = (
-        f"Label: {work.label}\nDescription: {work.description}\nUUID: {work.uuid}\n"
-    )
+    info_content = f"Label: {work.label}\nDescription: {work.description}\nUUID: {work.uuid}\n"
     info_file.write_text(info_content)
 
     for triple in work.get_outgoing(link_label_filter="force_calc%").all():
         fc_calc = triple.node
         fc_folder = dst / triple.link_label
         try:
-            export_vasp_calc(
-                fc_calc, fc_folder, decompress=True, include_potcar=include_potcar
-            )
+            export_vasp_calc(fc_calc, fc_folder, decompress=True, include_potcar=include_potcar)
         except Exception as error:
-            print(
-                f"Cannot export the {fc_calc} - exporting its last calculation instead. The error was {error.args}"
-            )
+            print(f"Cannot export the {fc_calc} - exporting its last calculation instead. The error was {error.args}")
             export_vasp_calc(
                 fc_calc.called[0],
                 fc_folder,
@@ -85,9 +79,7 @@ def export_phonon_work(work, dst, include_potcar=False):
     q.append(Node, filters={"id": fc_calc.pk}, tag="fc_calc")
     q.append(StructureData, with_outgoing="fc_calc", tag="fc_inp_structure")
     q.append(CalcFunctionNode, with_outgoing="fc_inp_structure", tag="displacement")
-    q.append(
-        StructureData, with_outgoing="displacement", edge_filters={"label": "structure"}
-    )
+    q.append(StructureData, with_outgoing="displacement", edge_filters={"label": "structure"})
     disp_structure = q.one()[0]  # Structure used to create the displacements
 
     # Write the poscars
@@ -98,9 +90,7 @@ def export_phonon_work(work, dst, include_potcar=False):
     try:
         pobj = get_phonon_obj(work, nac="auto")
     except Exception as error:
-        print(
-            f"Cannot obtained the computed phonon data - manual re-computation will be needed. The error was {error.args}"
-        )
+        print(f"Cannot obtained the computed phonon data - manual re-computation will be needed. The error was {error.args}")
     else:
         # phonopy_disp.yaml
         pobj.save(dst / "phonopy_disp.yaml")
@@ -136,20 +126,14 @@ def get_phonon_obj(work, nac="auto"):
         params = {}
 
     if "relaxed_structure" in work.outputs:
-        phonon = get_phonopy_instance(
-            work.outputs.relaxed_structure, work.outputs.phonon_setting_info, params
-        )
+        phonon = get_phonopy_instance(work.outputs.relaxed_structure, work.outputs.phonon_setting_info, params)
     else:
         # No relaxation - use the input structure directly
-        phonon = get_phonopy_instance(
-            work.inputs.structure, work.outputs.phonon_setting_info, params
-        )
+        phonon = get_phonopy_instance(work.inputs.structure, work.outputs.phonon_setting_info, params)
 
     # Treat the magmom
     try:
-        phonon.unitcell.set_magnetic_moments(
-            work.inputs.structure.get_attribute("MAGMOM")
-        )
+        phonon.unitcell.set_magnetic_moments(work.inputs.structure.base.attributes.get("MAGMOM"))
     except (KeyError, AttributeError):
         pass
 
@@ -157,20 +141,14 @@ def get_phonon_obj(work, nac="auto"):
     phonon.dataset = displacements
     phonon.set_forces(force_set.get_array("force_sets"))
     try:
-        phonon.set_force_constants(
-            work.outputs.force_constants.get_array("force_constants")
-        )
+        phonon.set_force_constants(work.outputs.force_constants.get_array("force_constants"))
     except (AttributeError, KeyError, NotExistent):
         phonon.produce_force_constants()
-        warn(
-            "Cannot locate force constants - producing force constants from force_sets."
-        )
+        warn("Cannot locate force constants - producing force constants from force_sets.")
     return phonon
 
 
-def mode_mapping_gamma_from_work_node(
-    work, qstart, qfinish, qsample, band, dryrun=True
-):
+def mode_mapping_gamma_from_work_node(work, qstart, qfinish, qsample, band, dryrun=True):
     """
     Generate mode mapping using a work node
     """
@@ -218,9 +196,7 @@ def mode_mapping_gamma_from_work_node(
 
 
 @calcfunction
-def mode_mapping_gamma(
-    structure, phonon_settings, force_set, nac_param, qstart, qfinish, qsamples, band
-):
+def mode_mapping_gamma(structure, phonon_settings, force_set, nac_param, qstart, qfinish, qsamples, band):
     """Generate pushed structures at gamma point"""
     phonon = get_phonopy_instance(
         structure,
@@ -238,16 +214,12 @@ def mode_mapping_gamma(
     for i, q in enumerate(np.linspace(qstart.value, qfinish.value, qsamples.value)):
         phonon.set_modulations((1, 1, 1), [[[0, 0, 0], band.value, q * qscale, 0.0]])
         cell = phonon.get_modulated_supercells()[0]
-        atoms = Atoms(
-            positions=cell.positions, cell=cell.cell, numbers=cell.numbers, pbc=True
-        )
+        atoms = Atoms(positions=cell.positions, cell=cell.cell, numbers=cell.numbers, pbc=True)
         struct = StructureData(ase=atoms)
         struct.label = structure.label + f" q_{i:03d}"
         frames[f"q_{i:03d}"] = struct
         qpoints.append(q)
-    frames["info"] = Dict(
-        dict={"Q_list": qpoints, "band": band.value, "qscale": qscale}
-    )
+    frames["info"] = Dict(dict={"Q_list": qpoints, "band": band.value, "qscale": qscale})
     return frames
 
 
@@ -297,20 +269,14 @@ def mode_mapping_1d(
     qscale = math.sqrt(len(phonon.unitcell.get_scaled_positions()))
     qpoints = []
     for i, q in enumerate(np.linspace(qstart.value, qfinish.value, qsamples.value)):
-        phonon.set_modulations(
-            supercell.get_list(), [[q_point.get_list(), band.value, q * qscale, 0.0]]
-        )
+        phonon.set_modulations(supercell.get_list(), [[q_point.get_list(), band.value, q * qscale, 0.0]])
         cell = phonon.get_modulated_supercells()[0]
-        atoms = Atoms(
-            positions=cell.positions, cell=cell.cell, numbers=cell.numbers, pbc=True
-        )
+        atoms = Atoms(positions=cell.positions, cell=cell.cell, numbers=cell.numbers, pbc=True)
         struct = StructureData(ase=atoms)
         struct.label = structure.label + f" q_{i:03d}"
         frames[f"q_{i:03d}"] = struct
         qpoints.append(q)
-    frames["info"] = Dict(
-        dict={"Q_list": qpoints, "band": band.value, "qscale": qscale}
-    )
+    frames["info"] = Dict(dict={"Q_list": qpoints, "band": band.value, "qscale": qscale})
     return frames
 
 
@@ -350,7 +316,5 @@ def mode_mapping_gamma_2d(structure, phonon_settings, force_set, nac_param, sett
         struct.label = structure.label + f" disp_{i:03d}"
         frames[f"disp_{i:03d}"] = struct
         qpoints.append([q1, q2])
-    frames["info"] = Dict(
-        dict={"Q_list": qpoints, "band1": band1, "band2": band2, "qscale": qscale}
-    )
+    frames["info"] = Dict(dict={"Q_list": qpoints, "band1": band1, "band2": band2, "qscale": qscale})
     return frames

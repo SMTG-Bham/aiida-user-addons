@@ -330,7 +330,7 @@ def compare_incars(nodes):
 
 def _traj_node_to_atoms(traj, energies=None):
     """Convert TrajectorData from aiida-vasp to ase.Atoms"""
-    symbols = traj.get_attribute("symbols")
+    symbols = traj.base.attributes.get("symbols")
     cells, positions, forces = (traj.get_array(n) for n in ["cells", "positions", "forces"])
     atoms_list = []
     if energies is not None:
@@ -369,7 +369,7 @@ def combine_trajectories(**traj_nodes):
     new_traj = TrajectoryData()
     for name, value in collect_dict.items():
         new_traj.set_array(name, np.concatenate(value, axis=0))
-    new_traj.set_attribute("symbols", symbols)
+    new_traj.base.attributes.set("symbols", symbols)
 
     nframes = new_traj.get_array("positions").shape[0]
     new_traj.set_array("steps", np.arange(nframes))

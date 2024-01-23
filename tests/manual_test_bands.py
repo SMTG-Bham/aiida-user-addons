@@ -25,7 +25,7 @@ builder.scf.options = Dict(
     }
 )
 
-builder.scf.code = Code.get_from_string("vasp@localhost")
+builder.scf.code = orm.load_code("vasp@localhost")
 
 builder.dos_kpoints = KpointsData()
 builder.dos_kpoints.set_kpoints_mesh((8, 8, 8))
